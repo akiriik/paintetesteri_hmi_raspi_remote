@@ -1,0 +1,40 @@
+#muut
+v2/
+v1/
+v2vanhin/
+mpx5700/
+
+# Virtuaaliympäristöt
+venv/
+.env/
+.venv/
+
+# VSCode-konfiguraatio
+.vscode/
+
+# __pycache__ ja käännöstiedostot
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Isot tiedostot
+*.log
+*.tar
+*.zip
+*.gz
+*.img
+*.bin
+
+# Testitulokset ja datatiedostot
+results/
+data/
+*.csv
+
+# Paikalliset asetukset
+*.local
+.settings/
+
+# LVGL-fonttien .c/.h -generoinnit (jos väliaikaisia)
+*.lv_font_*.h
+*.lv_font_*.c
