@@ -271,68 +271,68 @@ class TestingScreen(BaseScreen):
             print(f"Status error: {e}")
             self.test_status_label.setText("Yhteysvirhe")
     
-        def read_test_results(self):
-            """Lue testitulokset"""
-            try:
-                # Lue tulokset (0x40)
-                result_regs = self.fortest_modbus.read_holding_registers(0x40, 40)
-                
-                if result_regs and hasattr(result_regs, 'registers') and len(result_regs.registers) >= 40:
-                    # Check if registers have data
-                    if any(result_regs.registers):
-                        # Result value is at position 19 (index 18)
-                        result_value = result_regs.registers[18]
-                        
-                        # Table - Result of Test
-                        if result_value == 1:
-                            self.result_label.setText("HYVÄ")
-                            self.result_label.setStyleSheet("color: #4CAF50; font-size: 30px; font-weight: bold;")
-                        elif result_value == 2:
-                            self.result_label.setText("HYLÄTTY")
-                            self.result_label.setStyleSheet("color: #F44336; font-size: 30px; font-weight: bold;")
-                        elif result_value == 13:
-                            self.result_label.setText("KESKEYTETTY")
-                            self.result_label.setStyleSheet("color: #FF9800; font-size: 30px; font-weight: bold;")
-                        else:
-                            self.result_label.setText(f"Tulos: {result_value}")
-                        
-                        # Pressure at end of test (Position 33, 35)
-                        pressure_high = result_regs.registers[32]  # Position 33
-                        pressure_low = result_regs.registers[34]   # Position 35
-                        
-                        # Combine high and low bytes
-                        pressure_value = (pressure_high << 16) | pressure_low
-                        
-                        # From Table - Unit measures, position 37:
-                        unit_measure = result_regs.registers[36]   # Position 37
-                        decimal_points = result_regs.registers[38] # Position 39
-                        
-                        # Convert pressure value using decimal points
-                        actual_pressure = pressure_value / (10 ** decimal_points)
-                        
-                        # Show pressure value in test_pressure_label
-                        self.test_pressure_label.setText(f"{actual_pressure:.3f}")
-                        
-                        # Show unit
-                        if unit_measure == 0:
-                            unit_text = "mbar"
-                        elif unit_measure == 1:
-                            unit_text = "bar"
-                        elif unit_measure == 4:
-                            unit_text = "psi"
-                        else:
-                            unit_text = "mbar"  # default
-                            
-                        self.test_unit_label.setText(unit_text)
-                        self.test_status_label.setText("Testi valmis")
+    def read_test_results(self):
+        """Lue testitulokset"""
+        try:
+            # Lue tulokset (0x40)
+            result_regs = self.fortest_modbus.read_holding_registers(0x40, 40)
+            
+            if result_regs and hasattr(result_regs, 'registers') and len(result_regs.registers) >= 40:
+                # Check if registers have data
+                if any(result_regs.registers):
+                    # Result value is at position 19 (index 18)
+                    result_value = result_regs.registers[18]
+                    
+                    # Table - Result of Test
+                    if result_value == 1:
+                        self.result_label.setText("HYVÄ")
+                        self.result_label.setStyleSheet("color: #4CAF50; font-size: 30px; font-weight: bold;")
+                    elif result_value == 2:
+                        self.result_label.setText("HYLÄTTY")
+                        self.result_label.setStyleSheet("color: #F44336; font-size: 30px; font-weight: bold;")
+                    elif result_value == 13:
+                        self.result_label.setText("KESKEYTETTY")
+                        self.result_label.setStyleSheet("color: #FF9800; font-size: 30px; font-weight: bold;")
                     else:
-                        # No results yet
-                        self.test_status_label.setText("Odotetaan tuloksia...")
-                        self.test_pressure_label.setText("")
-            except Exception as e:
-                print(f"Result reading error: {e}")
-                self.test_status_label.setText("Tuloslukuvirhe")
-                self.test_pressure_label.setText("")
+                        self.result_label.setText(f"Tulos: {result_value}")
+                    
+                    # Pressure at end of test (Position 33, 35)
+                    pressure_high = result_regs.registers[32]  # Position 33
+                    pressure_low = result_regs.registers[34]   # Position 35
+                    
+                    # Combine high and low bytes
+                    pressure_value = (pressure_high << 16) | pressure_low
+                    
+                    # From Table - Unit measures, position 37:
+                    unit_measure = result_regs.registers[36]   # Position 37
+                    decimal_points = result_regs.registers[38] # Position 39
+                    
+                    # Convert pressure value using decimal points
+                    actual_pressure = pressure_value / (10 ** decimal_points)
+                    
+                    # Show pressure value in test_pressure_label
+                    self.test_pressure_label.setText(f"{actual_pressure:.3f}")
+                    
+                    # Show unit
+                    if unit_measure == 0:
+                        unit_text = "mbar"
+                    elif unit_measure == 1:
+                        unit_text = "bar"
+                    elif unit_measure == 4:
+                        unit_text = "psi"
+                    else:
+                        unit_text = "mbar"  # default
+                        
+                    self.test_unit_label.setText(unit_text)
+                    self.test_status_label.setText("Testi valmis")
+                else:
+                    # No results yet
+                    self.test_status_label.setText("Odotetaan tuloksia...")
+                    self.test_pressure_label.setText("")
+        except Exception as e:
+            print(f"Result reading error: {e}")
+            self.test_status_label.setText("Tuloslukuvirhe")
+            self.test_pressure_label.setText("")
     
     def cleanup(self):
         # Pysäytä säie jos se on käynnissä
