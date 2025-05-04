@@ -275,10 +275,10 @@ class TestingScreen(BaseScreen):
         """Lue testitulokset"""
         try:
             # Lue tulokset (0x40)
-            result_regs = self.fortest_modbus.read_holding_registers(0x40, 40)
+            result_regs = self.fortest_modbus.read_holding_registers(0x40, 70)
             
-            if result_regs and hasattr(result_regs, 'registers') and len(result_regs.registers) >= 40:
-                # Check if registers have data
+            if result_regs and hasattr(result_regs, 'registers') and len(result_regs.registers) >= 60:
+                # Check if registers have data  
                 if any(result_regs.registers):
                     # Result value is at position 19 (index 18)
                     result_value = result_regs.registers[18]
@@ -296,22 +296,24 @@ class TestingScreen(BaseScreen):
                     else:
                         self.result_label.setText(f"Tulos: {result_value}")
                     
-                    # Pressure at end of test (Position 33, 35)
+                    # Pressure at end of test - from register 51 (position 33)
                     pressure_high = result_regs.registers[32]  # Position 33
                     pressure_low = result_regs.registers[34]   # Position 35
                     
                     # Combine high and low bytes
                     pressure_value = (pressure_high << 16) | pressure_low
                     
-                    # From Table - Unit measures, position 37:
-                    unit_measure = result_regs.registers[36]   # Position 37
-                    decimal_points = result_regs.registers[38] # Position 39
+                    # Decimal points from register 39 (position 39)
+                    decimal_points = result_regs.registers[38]  # Position 39
                     
                     # Convert pressure value using decimal points
                     actual_pressure = pressure_value / (10 ** decimal_points)
                     
-                    # Show pressure value in test_pressure_label
+                    # Show pressure value
                     self.test_pressure_label.setText(f"{actual_pressure:.3f}")
+                    
+                    # Unit from register 37 (position 37)
+                    unit_measure = result_regs.registers[36]  # Position 37
                     
                     # Show unit
                     if unit_measure == 0:
@@ -329,6 +331,8 @@ class TestingScreen(BaseScreen):
                     # No results yet
                     self.test_status_label.setText("Odotetaan tuloksia...")
                     self.test_pressure_label.setText("")
+            else:
+                self.test_status_label.setText("Ei tuloksia saatavissa")
         except Exception as e:
             print(f"Result reading error: {e}")
             self.test_status_label.setText("Tuloslukuvirhe")
