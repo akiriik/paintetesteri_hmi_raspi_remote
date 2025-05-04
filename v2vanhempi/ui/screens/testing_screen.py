@@ -180,7 +180,7 @@ class TestingScreen(BaseScreen):
             
         # Tyhjennä edelliset tulokset
         self.result_label.setText("")
-        self.test_value_label.setText("")
+        self.test_pressure_label.setText("")
         self.test_status_label.setText("Käynnistetään...")
         
         try:
