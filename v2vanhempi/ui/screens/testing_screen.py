@@ -228,9 +228,30 @@ class TestingScreen(BaseScreen):
                 
                 print(f"DEBUG: Status={last_status}, SubStatus={last_substatus}, Phase={last_result_phase}")
                 
-                # Table - Status (value 4 = calibration)
-                if last_status == 0:  # Waiting
-                    if self.test_running and last_substatus == 0:
+                # Tarkista onko testi käynnissä (status 1-26)
+                if last_status in [1, 3, 11, 12, 14, 15, 22, 26]:  # Test phases from Table - Phase of test
+                    self.test_running = True
+                    self.result_label.setText("TESTAUS KÄYNNISSÄ")
+                    self.result_label.setStyleSheet("color: #2196F3; font-size: 30px; font-weight: bold;")
+                    
+                    # Näytä testitilanne last_status mukaan  
+                    if last_status == 1:
+                        self.test_status_label.setText("Aloitus")
+                    elif last_status == 3:
+                        self.test_status_label.setText("Esi-täyttö")
+                    elif last_status == 11:
+                        self.test_status_label.setText("Täyttö")
+                    elif last_status == 14:
+                        self.test_status_label.setText("Asettuminen")
+                    elif last_status == 26:
+                        self.test_status_label.setText("Testausvaihe")
+                    else:
+                        self.test_status_label.setText(f"Vaihe {last_status}")
+                        
+                    self.test_pressure_label.setText("")
+                    
+                elif last_status == 0:  # Waiting
+                    if self.test_running:
                         # Test ended, check results
                         self.test_running = False
                         self.test_status_label.setText("Testi valmis")
@@ -238,30 +259,9 @@ class TestingScreen(BaseScreen):
                     else:
                         self.test_status_label.setText("Valmiustila")
                         
-                elif last_status == 1:  # Test in progress
-                    self.test_running = True
-                    self.result_label.setText("TESTAUS KÄYNNISSÄ")
-                    self.result_label.setStyleSheet("color: #2196F3; font-size: 30px; font-weight: bold;")
-                    
-                    # Table - Phase of test
-                    if last_substatus == 1:
-                        self.test_status_label.setText("Aloitus")
-                    elif last_substatus == 3:
-                        self.test_status_label.setText("Täyttö")
-                    elif last_substatus == 14:
-                        self.test_status_label.setText("Asettuminen")
-                    elif last_substatus == 26:
-                        self.test_status_label.setText("Testausvaihe")
-                    elif last_substatus == 50:
-                        self.test_status_label.setText("Päättyminen")
-                    else:
-                        self.test_status_label.setText(f"Vaihe {last_substatus}")
-                        
-                    self.test_pressure_label.setText("")
-                    
                 elif last_status == 2:  # Autozero
                     self.test_status_label.setText("Kalibrointi")
-                elif last_status == 3:  # Discharge
+                elif last_status == 30:  # Discharge
                     self.test_status_label.setText("Purku")
                     
             else:
