@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Testaussivun sisältö painetestausjärjestelmälle
+Käyttää suoraa USB-yhteyttä ForTest-testilaitteeseen
 """
 import sys
 import os
@@ -23,7 +24,7 @@ class TestingScreen(BaseScreen):
     def __init__(self, parent=None, modbus=None):
         self.sensor = None
         self.pressure_thread = None
-        self.modbus = modbus or ModbusHandler(port='/dev/ttyUSB0', baudrate=19200)
+        self.fortest_modbus = ModbusHandler(port='/dev/ttyUSB1', baudrate=19200)
         self.test_result = ""
         self.test_running = False
         super().__init__(parent)
@@ -34,7 +35,7 @@ class TestingScreen(BaseScreen):
         # Ajastin testauksen tilan tarkistamiseksi
         self.status_timer = QTimer(self)
         self.status_timer.timeout.connect(self.check_test_status)
-        self.status_timer.start(500)  # Tarkista 500ms välein
+        self.status_timer.start(1000)  # Tarkista 1s välein
     
     def init_ui(self):
         # Sivun otsikko
@@ -75,9 +76,30 @@ class TestingScreen(BaseScreen):
         self.result_label.setAlignment(Qt.AlignCenter)
         self.result_label.setGeometry(300, 150, 680, 50)
         
-        # Käynnistys-nappi (keskellä)
+        # Numeraalinen testitulos
+        self.test_value_label = QLabel("", self)
+        self.test_value_label.setStyleSheet("""
+            color: #333333;
+            font-family: 'Consolas', monospace;
+            font-size: 24px;
+            font-weight: bold;
+        """)
+        self.test_value_label.setAlignment(Qt.AlignCenter)
+        self.test_value_label.setGeometry(300, 200, 680, 40)
+        
+        # Testerin tilatieto  
+        self.test_status_label = QLabel("", self)
+        self.test_status_label.setStyleSheet("""
+            color: #666666;
+            font-family: 'Arial', sans-serif;
+            font-size: 18px;
+        """)
+        self.test_status_label.setAlignment(Qt.AlignCenter)
+        self.test_status_label.setGeometry(300, 240, 680, 30)
+        
+        # Käynnistys-nappi
         self.start_button = QPushButton("KÄYNNISTÄ", self)
-        self.start_button.setGeometry(440, 250, 180, 80)
+        self.start_button.setGeometry(440, 300, 180, 80)
         self.start_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
@@ -86,18 +108,12 @@ class TestingScreen(BaseScreen):
                 font-size: 22px;
                 font-weight: bold;
             }
-            QPushButton:hover {
-                background-color: #388E3C;
-            }
-            QPushButton:pressed {
-                background-color: #1B5E20;
-            }
         """)
         self.start_button.clicked.connect(self.start_test)
         
-        # Pysäytys-nappi (käynnistys-napin vieressä)
+        # Pysäytys-nappi
         self.stop_button = QPushButton("PYSÄYTÄ", self)
-        self.stop_button.setGeometry(640, 250, 180, 80)
+        self.stop_button.setGeometry(640, 300, 180, 80)
         self.stop_button.setStyleSheet("""
             QPushButton {
                 background-color: #F44336;
@@ -106,12 +122,6 @@ class TestingScreen(BaseScreen):
                 font-size: 22px;
                 font-weight: bold;
             }
-            QPushButton:hover {
-                background-color: #D32F2F;
-            }
-            QPushButton:pressed {
-                background-color: #B71C1C;
-            }
         """)
         self.stop_button.clicked.connect(self.stop_test)
 
@@ -119,15 +129,13 @@ class TestingScreen(BaseScreen):
         if DFRobot_MPX5700_I2C is not None:
             try:
                 self.sensor = DFRobot_MPX5700_I2C(1, 0x16)
-                self.sensor.set_mean_sample_size(5)  # Kasvatettu tasaisuuden parantamiseksi
-                print("Paineanturi alustettu onnistuneesti")
+                self.sensor.set_mean_sample_size(5)
                 
                 # Aloita paineen lukeminen erillisessä säikeessä
                 self.pressure_thread = PressureReaderThread(self.sensor)
                 self.pressure_thread.pressureUpdated.connect(self.update_pressure)
                 self.pressure_thread.start()
             except Exception as e:
-                print(f"Paineanturin alustusvirhe: {e}")
                 self.sensor = None
                 if hasattr(self, 'status_indicator'):
                     self.status_indicator.setStyleSheet("""
@@ -138,10 +146,9 @@ class TestingScreen(BaseScreen):
     
     def update_pressure(self, value):
         """Päivitä painelukema näytölle"""
-        # Päivitä arvo digitaalinäyttöön
         self.pressure_label.setText(f"{value:.2f}")
         
-        # Muuta väri paineen mukaan (vihreä=normaali, keltainen=korkea, punainen=kriittinen)
+        # Muuta väri paineen mukaan
         if value > 500:
             color = "#F44336"  # Punainen
         elif value > 300:
@@ -161,117 +168,145 @@ class TestingScreen(BaseScreen):
         """)
     
     def start_test(self):
-        """Käynnistä testi Modbus-komennolla"""
-        if not self.modbus.connected:
-            self.result_label.setText("Modbus-yhteyttä ei ole!")
+        """Käynnistä testi"""
+        if not self.fortest_modbus.connected:
+            self.result_label.setText("Testilaite ei yhteydessä!")
             return
             
+        # Tyhjennä edelliset tulokset
+        self.result_label.setText("")
+        self.test_value_label.setText("")
+        self.test_status_label.setText("Käynnistetään...")
+        
         try:
-            # Päivitetty pymodbus 3.9.2 -syntaksille: käytä handler-luokan metodia
-            result = self.modbus.write_coil(0x0A, True)
-            
+            result = self.fortest_modbus.write_coil(0x0A, True)
             if result:
-                self.result_label.setText("Testi käynnistetty")
                 self.test_running = True
+                self.test_status_label.setText("Testi käynnistetty")
             else:
                 self.result_label.setText("Virhe testin käynnistyksessä")
         except Exception as e:
             self.result_label.setText(f"Virhe: {str(e)}")
     
     def stop_test(self):
-        """Pysäytä testi Modbus-komennolla"""
-        if not self.modbus.connected:
-            self.result_label.setText("Modbus-yhteyttä ei ole!")
+        """Pysäytä testi"""
+        if not self.fortest_modbus.connected:
+            self.result_label.setText("Testilaite ei yhteydessä!")
             return
             
         try:
-            # Päivitetty pymodbus 3.9.2 -syntaksille: käytä handler-luokan metodia
-            result = self.modbus.write_coil(0x14, True)
-            
+            result = self.fortest_modbus.write_coil(0x14, True)
             if result:
-                self.result_label.setText("Testi pysäytetty")
                 self.test_running = False
+                self.test_status_label.setText("Testi keskeytetty")
             else:
                 self.result_label.setText("Virhe testin pysäytyksessä")
         except Exception as e:
             self.result_label.setText(f"Virhe: {str(e)}")
     
     def check_test_status(self):
-        """Tarkista testin tila ja tulos"""
-        if not self.modbus.connected:
+        """Tarkista testin tila"""
+        if not self.fortest_modbus.connected:
+            self.test_status_label.setText("Ei yhteyttä testilaitteeseen")
             return
             
         try:
-            # Päivitetty pymodbus 3.9.2 -syntaksille: käytä handler-luokan metodia
-            status_result = self.modbus.read_holding_registers(0x30, 10)
+            # Lue tila-rekisterit (50 ja 51)
+            status_result = self.fortest_modbus.read_holding_registers(0x30, 6)
             
-            if status_result and not hasattr(status_result, 'isError'):
-                status_value = status_result.registers[0]
+            if status_result and hasattr(status_result, 'registers') and len(status_result.registers) >= 6:
+                # Rekisteri 50 (indeksi 1): testin vaihe
+                test_phase = status_result.registers[1]
+                # Rekisteri 51 (indeksi 2): testi käynnissä/standby
+                test_active = status_result.registers[2]
                 
-                # Tilan tulkinta rekisteristä (0 = odottaa, 1 = testi käynnissä, jne.)
-                if status_value == 0:
-                    # Odotustila
-                    self.test_running = False
-                elif status_value == 1:
+                # Tilan tulkinta
+                if test_phase == 0 and test_active == 1:
+                    # Standby-tila - tarkista onko tuloksia
+                    if self.test_running:
+                        # Testi on juuri päättynyt
+                        self.test_running = False
+                        self.test_status_label.setText("Testi valmis")
+                        self.read_test_results()
+                    else:
+                        # Normaalisti valmiustilassa
+                        self.test_status_label.setText("Valmiustila")
+                        
+                elif test_active == 99:
                     # Testi käynnissä
                     self.test_running = True
-                
-                # Jos testi on käynnissä, näytä "TESTAUS KÄYNNISSÄ"
-                if self.test_running:
                     self.result_label.setText("TESTAUS KÄYNNISSÄ")
                     self.result_label.setStyleSheet("color: #2196F3; font-size: 30px; font-weight: bold;")
-                
-                # Jos testi ei ole käynnissä, tarkista onko tulos saatavilla
-                if not self.test_running:
-                    # Lue tulos rekisteristä 0x40
-                    result_regs = self.modbus.read_holding_registers(0x40, 40)
                     
-                    if result_regs and result_regs.registers[0] != 0:
-                        # Tuloksen tulkinta (19 = tulos OK, muut arvot ovat eri virheitä)
-                        result_value = result_regs.registers[18]  # Rekisteri 0x40 + 18 = tuloksen tieto
-                        
-                        # Hae mitattu painearvo (rekisteri 0x40 + 32, 0x40 + 34)
-                        pressure_high = result_regs.registers[32]  # Paineen ylempi osa
-                        pressure_low = result_regs.registers[34]   # Paineen alempi osa
-                        
-                        # Paineen yksikkö ja desimaalipisteiden määrä
-                        pressure_unit = result_regs.registers[36]
-                        pressure_decimals = result_regs.registers[38]
-                        
-                        # Laske kokonaispainearvo
+                    # Näytä testin vaihe
+                    if test_phase == 1:
+                        self.test_status_label.setText("Täyttö")
+                    elif test_phase == 12:
+                        self.test_status_label.setText("Täytön aloitus")
+                    elif test_phase == 15:
+                        self.test_status_label.setText("Asettuminen")
+                    elif test_phase == 26:
+                        self.test_status_label.setText("Testausvaihe")
+                    elif test_phase == 99:
+                        self.test_status_label.setText("Testaus käynnissä")
+                    else:
+                        self.test_status_label.setText(f"Vaihe {test_phase}")
+                    
+                    # Tyhjennä edelliset tulokset
+                    self.test_value_label.setText("")
+                else:
+                    # Epäselvä tila
+                    self.test_status_label.setText(f"Tila {test_phase}/{test_active}")
+            else:
+                self.test_status_label.setText("Ei vastausta testilaitteelta")
+                
+        except Exception as e:
+            self.test_status_label.setText("Yhteysvirhe")
+    
+    def read_test_results(self):
+        """Lue testitulokset"""
+        try:
+            # Lue tulokset (0x40 = 64 desimaalista)
+            result_regs = self.fortest_modbus.read_holding_registers(0x40, 20)
+            
+            if result_regs and hasattr(result_regs, 'registers') and len(result_regs.registers) >= 19:
+                # Tarkista että tulokset eivät ole tyhjiä
+                if any(result_regs.registers):
+                    # Lue tuloksen arvo (indeksi 18)
+                    result_value = result_regs.registers[18]
+                    
+                    # Näytä tulos
+                    if result_value == 1:
+                        self.result_label.setText("HYVÄ TULOS")
+                        self.result_label.setStyleSheet("color: #4CAF50; font-size: 30px; font-weight: bold;")
+                    elif result_value == 2:
+                        self.result_label.setText("HYLÄTTY")
+                        self.result_label.setStyleSheet("color: #F44336; font-size: 30px; font-weight: bold;")
+                    elif result_value == 13:
+                        self.result_label.setText("KESKEYTETTY")
+                        self.result_label.setStyleSheet("color: #FF9800; font-size: 30px; font-weight: bold;")
+                    else:
+                        self.result_label.setText(f"Tulos: {result_value}")
+                    
+                    # Lue testerin painearvo ja näytä testerin tilakentässä
+                    if len(result_regs.registers) >= 35:
+                        pressure_high = result_regs.registers[32]
+                        pressure_low = result_regs.registers[34]
                         pressure_value = (pressure_high << 16) | pressure_low
                         
-                        # Skaalaa desimaalipisteiden mukaan
-                        if pressure_decimals > 0:
-                            pressure_value = pressure_value / (10 ** pressure_decimals)
+                        # Muunna paine oikeaksi (oletetaan 2 desimaalia)
+                        pressure_value = pressure_value / 100
                         
-                        # Määritä yksikkö
-                        unit_text = "mbar"  # Oletus
-                        if pressure_unit == 1:
-                            unit_text = "bar"
-                        elif pressure_unit == 2:
-                            unit_text = "hPa"
-                        elif pressure_unit == 3:
-                            unit_text = "Pa"
-                        elif pressure_unit == 4:
-                            unit_text = "psi"
-                        
-                        # Näytä tulos ja painearvo
-                        result_text = ""
-                        if result_value == 1:  # Good
-                            result_text = f"HYVÄ TULOS - {pressure_value:.2f} {unit_text}"
-                            self.result_label.setStyleSheet("color: #4CAF50; font-size: 30px; font-weight: bold;")
-                        elif result_value == 2:  # Bad
-                            result_text = f"HYLÄTTY - {pressure_value:.2f} {unit_text}"
-                            self.result_label.setStyleSheet("color: #F44336; font-size: 30px; font-weight: bold;")
-                        elif result_value == 13:  # Abort
-                            result_text = f"KESKEYTETTY - {pressure_value:.2f} {unit_text}"
-                            self.result_label.setStyleSheet("color: #FF9800; font-size: 30px; font-weight: bold;")
-                        
-                        self.result_label.setText(result_text)
-                        
+                        # Näytä testerin paine tilarivissä
+                        self.test_status_label.setText(f"Testiarvo: {pressure_value:.2f} mbar")
+                    
+                    # Tyhjennä numeroarvo-kenttä
+                    self.test_value_label.setText("")
+                else:
+                    # Ei tuloksia vielä
+                    self.test_status_label.setText("Odotetaan tuloksia...")
         except Exception as e:
-            print(f"Virhe tilan tarkistuksessa: {e}")
+            self.test_status_label.setText("Tuloslukuvirhe")
     
     def cleanup(self):
         # Pysäytä säie jos se on käynnissä
@@ -283,3 +318,7 @@ class TestingScreen(BaseScreen):
         # Pysäytä ajastin
         if hasattr(self, 'status_timer'):
             self.status_timer.stop()
+        
+        # Sulje ForTest-yhteys
+        if hasattr(self, 'fortest_modbus'):
+            self.fortest_modbus.close()
