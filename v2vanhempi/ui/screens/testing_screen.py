@@ -56,50 +56,34 @@ class TestingScreen(BaseScreen):
         self.pressure_label.setAlignment(Qt.AlignCenter)
         self.pressure_label.setGeometry(20, 80, 200, 80)
         
-        # Tilan indikaattori
-        self.status_indicator = QFrame(self)
-        self.status_indicator.setGeometry(230, 105, 20, 20)
-        self.status_indicator.setStyleSheet("""
-            background-color: #4CAF50; 
+        # Testin tulospaine-näyttö (kuten MPX-näyttö)
+        self.test_pressure_label = QLabel("", self)
+        self.test_pressure_label.setStyleSheet("""
+            background-color: black;
+            color: #33FF33;
+            font-family: 'Consolas', 'Courier', monospace;
+            font-size: 60px;
+            font-weight: bold;
+            border: 2px solid #444444;
             border-radius: 10px;
-            border: 2px solid #388E3C;
+            padding: 10px;
         """)
+        self.test_pressure_label.setAlignment(Qt.AlignCenter)
+        self.test_pressure_label.setGeometry(400, 300, 480, 100)
         
-        # Tulos-label keskelle ylös
-        self.result_label = QLabel("", self)
-        self.result_label.setStyleSheet("""
-            color: #333333;
-            font-family: 'Arial', sans-serif;
-            font-size: 30px;
-            font-weight: bold;
-        """)
-        self.result_label.setAlignment(Qt.AlignCenter)
-        self.result_label.setGeometry(300, 150, 680, 50)
-        
-        # Numeraalinen testitulos
-        self.test_value_label = QLabel("", self)
-        self.test_value_label.setStyleSheet("""
-            color: #333333;
-            font-family: 'Consolas', monospace;
-            font-size: 24px;
-            font-weight: bold;
-        """)
-        self.test_value_label.setAlignment(Qt.AlignCenter)
-        self.test_value_label.setGeometry(300, 200, 680, 40)
-        
-        # Testerin tilatieto  
-        self.test_status_label = QLabel("", self)
-        self.test_status_label.setStyleSheet("""
+        # Testiyksikkö-label tulospaineen alle
+        self.test_unit_label = QLabel("mbar", self)
+        self.test_unit_label.setStyleSheet("""
             color: #666666;
             font-family: 'Arial', sans-serif;
             font-size: 18px;
         """)
-        self.test_status_label.setAlignment(Qt.AlignCenter)
-        self.test_status_label.setGeometry(300, 240, 680, 30)
+        self.test_unit_label.setAlignment(Qt.AlignCenter)
+        self.test_unit_label.setGeometry(400, 410, 480, 30)
         
         # Käynnistys-nappi
         self.start_button = QPushButton("KÄYNNISTÄ", self)
-        self.start_button.setGeometry(440, 300, 180, 80)
+        self.start_button.setGeometry(440, 450, 180, 80)
         self.start_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
@@ -113,7 +97,7 @@ class TestingScreen(BaseScreen):
         
         # Pysäytys-nappi
         self.stop_button = QPushButton("PYSÄYTÄ", self)
-        self.stop_button.setGeometry(640, 300, 180, 80)
+        self.stop_button.setGeometry(640, 450, 180, 80)
         self.stop_button.setStyleSheet("""
             QPushButton {
                 background-color: #F44336;
@@ -124,6 +108,27 @@ class TestingScreen(BaseScreen):
             }
         """)
         self.stop_button.clicked.connect(self.stop_test)
+        
+        # Tulos-label
+        self.result_label = QLabel("", self)
+        self.result_label.setStyleSheet("""
+            color: #333333;
+            font-family: 'Arial', sans-serif;
+            font-size: 30px;
+            font-weight: bold;
+        """)
+        self.result_label.setAlignment(Qt.AlignCenter)
+        self.result_label.setGeometry(300, 150, 680, 50)
+        
+        # Testerin tilatieto  
+        self.test_status_label = QLabel("", self)
+        self.test_status_label.setStyleSheet("""
+            color: #666666;
+            font-family: 'Arial', sans-serif;
+            font-size: 18px;
+        """)
+        self.test_status_label.setAlignment(Qt.AlignCenter)
+        self.test_status_label.setGeometry(300, 200, 680, 30)
 
     def init_pressure_sensor(self):
         if DFRobot_MPX5700_I2C is not None:
@@ -211,102 +216,123 @@ class TestingScreen(BaseScreen):
             return
             
         try:
-            # Lue tila-rekisterit (50 ja 51)
-            status_result = self.fortest_modbus.read_holding_registers(0x30, 6)
+            # Lue tila-rekisterit (0x30)
+            status_result = self.fortest_modbus.read_holding_registers(0x30, 32)
             
-            if status_result and hasattr(status_result, 'registers') and len(status_result.registers) >= 6:
-                # Rekisteri 50 (indeksi 1): testin vaihe
-                test_phase = status_result.registers[1]
-                # Rekisteri 51 (indeksi 2): testi käynnissä/standby
-                test_active = status_result.registers[2]
+            if status_result and hasattr(status_result, 'registers') and len(status_result.registers) >= 32:
+                # Register mappings (from PDF Table - Status Value Mapping):
+                errors_mask = status_result.registers[0]  # Position 1
+                last_status = status_result.registers[2]  # Position 3
+                last_substatus = status_result.registers[4]  # Position 5
+                last_result_phase = status_result.registers[6]  # Position 7
                 
-                # Tilan tulkinta
-                if test_phase == 0 and test_active == 1:
-                    # Standby-tila - tarkista onko tuloksia
-                    if self.test_running:
-                        # Testi on juuri päättynyt
+                print(f"DEBUG: Status={last_status}, SubStatus={last_substatus}, Phase={last_result_phase}")
+                
+                # Table - Status (value 4 = calibration)
+                if last_status == 0:  # Waiting
+                    if self.test_running and last_substatus == 0:
+                        # Test ended, check results
                         self.test_running = False
                         self.test_status_label.setText("Testi valmis")
                         self.read_test_results()
                     else:
-                        # Normaalisti valmiustilassa
                         self.test_status_label.setText("Valmiustila")
                         
-                elif test_active == 99:
-                    # Testi käynnissä
+                elif last_status == 1:  # Test in progress
                     self.test_running = True
                     self.result_label.setText("TESTAUS KÄYNNISSÄ")
                     self.result_label.setStyleSheet("color: #2196F3; font-size: 30px; font-weight: bold;")
                     
-                    # Näytä testin vaihe
-                    if test_phase == 1:
+                    # Table - Phase of test
+                    if last_substatus == 1:
+                        self.test_status_label.setText("Aloitus")
+                    elif last_substatus == 3:
                         self.test_status_label.setText("Täyttö")
-                    elif test_phase == 12:
-                        self.test_status_label.setText("Täytön aloitus")
-                    elif test_phase == 15:
+                    elif last_substatus == 14:
                         self.test_status_label.setText("Asettuminen")
-                    elif test_phase == 26:
+                    elif last_substatus == 26:
                         self.test_status_label.setText("Testausvaihe")
-                    elif test_phase == 99:
-                        self.test_status_label.setText("Testaus käynnissä")
+                    elif last_substatus == 50:
+                        self.test_status_label.setText("Päättyminen")
                     else:
-                        self.test_status_label.setText(f"Vaihe {test_phase}")
+                        self.test_status_label.setText(f"Vaihe {last_substatus}")
+                        
+                    self.test_pressure_label.setText("")
                     
-                    # Tyhjennä edelliset tulokset
-                    self.test_value_label.setText("")
-                else:
-                    # Epäselvä tila
-                    self.test_status_label.setText(f"Tila {test_phase}/{test_active}")
+                elif last_status == 2:  # Autozero
+                    self.test_status_label.setText("Kalibrointi")
+                elif last_status == 3:  # Discharge
+                    self.test_status_label.setText("Purku")
+                    
             else:
                 self.test_status_label.setText("Ei vastausta testilaitteelta")
                 
         except Exception as e:
+            print(f"Status error: {e}")
             self.test_status_label.setText("Yhteysvirhe")
     
-    def read_test_results(self):
-        """Lue testitulokset"""
-        try:
-            # Lue tulokset (0x40 = 64 desimaalista)
-            result_regs = self.fortest_modbus.read_holding_registers(0x40, 20)
-            
-            if result_regs and hasattr(result_regs, 'registers') and len(result_regs.registers) >= 19:
-                # Tarkista että tulokset eivät ole tyhjiä
-                if any(result_regs.registers):
-                    # Lue tuloksen arvo (indeksi 18)
-                    result_value = result_regs.registers[18]
-                    
-                    # Näytä tulos
-                    if result_value == 1:
-                        self.result_label.setText("HYVÄ TULOS")
-                        self.result_label.setStyleSheet("color: #4CAF50; font-size: 30px; font-weight: bold;")
-                    elif result_value == 2:
-                        self.result_label.setText("HYLÄTTY")
-                        self.result_label.setStyleSheet("color: #F44336; font-size: 30px; font-weight: bold;")
-                    elif result_value == 13:
-                        self.result_label.setText("KESKEYTETTY")
-                        self.result_label.setStyleSheet("color: #FF9800; font-size: 30px; font-weight: bold;")
-                    else:
-                        self.result_label.setText(f"Tulos: {result_value}")
-                    
-                    # Lue testerin painearvo ja näytä testerin tilakentässä
-                    if len(result_regs.registers) >= 35:
-                        pressure_high = result_regs.registers[32]
-                        pressure_low = result_regs.registers[34]
+        def read_test_results(self):
+            """Lue testitulokset"""
+            try:
+                # Lue tulokset (0x40)
+                result_regs = self.fortest_modbus.read_holding_registers(0x40, 40)
+                
+                if result_regs and hasattr(result_regs, 'registers') and len(result_regs.registers) >= 40:
+                    # Check if registers have data
+                    if any(result_regs.registers):
+                        # Result value is at position 19 (index 18)
+                        result_value = result_regs.registers[18]
+                        
+                        # Table - Result of Test
+                        if result_value == 1:
+                            self.result_label.setText("HYVÄ")
+                            self.result_label.setStyleSheet("color: #4CAF50; font-size: 30px; font-weight: bold;")
+                        elif result_value == 2:
+                            self.result_label.setText("HYLÄTTY")
+                            self.result_label.setStyleSheet("color: #F44336; font-size: 30px; font-weight: bold;")
+                        elif result_value == 13:
+                            self.result_label.setText("KESKEYTETTY")
+                            self.result_label.setStyleSheet("color: #FF9800; font-size: 30px; font-weight: bold;")
+                        else:
+                            self.result_label.setText(f"Tulos: {result_value}")
+                        
+                        # Pressure at end of test (Position 33, 35)
+                        pressure_high = result_regs.registers[32]  # Position 33
+                        pressure_low = result_regs.registers[34]   # Position 35
+                        
+                        # Combine high and low bytes
                         pressure_value = (pressure_high << 16) | pressure_low
                         
-                        # Muunna paine oikeaksi (oletetaan 2 desimaalia)
-                        pressure_value = pressure_value / 100
+                        # From Table - Unit measures, position 37:
+                        unit_measure = result_regs.registers[36]   # Position 37
+                        decimal_points = result_regs.registers[38] # Position 39
                         
-                        # Näytä testerin paine tilarivissä
-                        self.test_status_label.setText(f"Testiarvo: {pressure_value:.2f} mbar")
-                    
-                    # Tyhjennä numeroarvo-kenttä
-                    self.test_value_label.setText("")
-                else:
-                    # Ei tuloksia vielä
-                    self.test_status_label.setText("Odotetaan tuloksia...")
-        except Exception as e:
-            self.test_status_label.setText("Tuloslukuvirhe")
+                        # Convert pressure value using decimal points
+                        actual_pressure = pressure_value / (10 ** decimal_points)
+                        
+                        # Show pressure value in test_pressure_label
+                        self.test_pressure_label.setText(f"{actual_pressure:.3f}")
+                        
+                        # Show unit
+                        if unit_measure == 0:
+                            unit_text = "mbar"
+                        elif unit_measure == 1:
+                            unit_text = "bar"
+                        elif unit_measure == 4:
+                            unit_text = "psi"
+                        else:
+                            unit_text = "mbar"  # default
+                            
+                        self.test_unit_label.setText(unit_text)
+                        self.test_status_label.setText("Testi valmis")
+                    else:
+                        # No results yet
+                        self.test_status_label.setText("Odotetaan tuloksia...")
+                        self.test_pressure_label.setText("")
+            except Exception as e:
+                print(f"Result reading error: {e}")
+                self.test_status_label.setText("Tuloslukuvirhe")
+                self.test_pressure_label.setText("")
     
     def cleanup(self):
         # Pysäytä säie jos se on käynnissä
