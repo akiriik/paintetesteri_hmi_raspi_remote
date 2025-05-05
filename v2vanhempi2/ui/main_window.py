@@ -6,6 +6,9 @@ from PyQt5.QtGui import QKeyEvent
 
 # Omat komponentit
 from ui.screens.testing_screen import TestingScreen
+from ui.screens.manual_screen import ManualScreen
+from ui.screens.program_selection_screen import ProgramSelectionScreen
+from utils.modbus_handler import ModbusHandler
 
 class MainWindow(QWidget):
     def __init__(self, parent=None):
@@ -21,13 +24,58 @@ class MainWindow(QWidget):
             }
         """)
         
+        # Luo Modbus-käsittelijä
+        self.modbus = ModbusHandler(port='/dev/ttyUSB0', baudrate=19200)
+        
         # Luo testaussivu
         self.testing_screen = TestingScreen(self)
         self.testing_screen.setGeometry(0, 0, 1280, 720)
+        
+        # Luo käsikäyttösivu
+        self.manual_screen = ManualScreen(self, self.modbus)
+        self.manual_screen.setGeometry(0, 0, 1280, 720)
+        self.manual_screen.hide()
+        
+        # Luo ohjelman valintasivu
+        self.program_selection_screen = ProgramSelectionScreen(self)
+        self.program_selection_screen.setGeometry(0, 0, 1280, 720)
+        self.program_selection_screen.hide()
+        
+        # Yhdistä signaalit
+        self.program_selection_screen.program_selected.connect(self.on_program_selected)
+    
+    def on_program_selected(self, program_name):
+        """Käsittele valittu ohjelma"""
+        # Anna valittu ohjelma testaussivulle
+        self.testing_screen.set_program_for_test(program_name)
+        # Palaa testaussivulle
+        self.show_testing()
+    
+    def show_testing(self):
+        """Näytä testaussivu"""
+        self.manual_screen.hide()
+        self.program_selection_screen.hide()
+        self.testing_screen.show()
+    
+    def show_manual(self):
+        """Näytä käsikäyttösivu"""
+        self.testing_screen.hide()
+        self.program_selection_screen.hide()
+        self.manual_screen.show()
+    
+    def show_program_selection(self):
+        """Näytä ohjelman valintasivu"""
+        self.testing_screen.hide()
+        self.manual_screen.hide()
+        self.program_selection_screen.show()
     
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key_Escape:
-            self.close()  # Sulje sovellus ESC-näppäimellä
+            # ESC palauttaa testaussivulle
+            if self.manual_screen.isVisible() or self.program_selection_screen.isVisible():
+                self.show_testing()
+            else:
+                self.close()
         super().keyPressEvent(event)
     
     def show(self):
@@ -37,4 +85,5 @@ class MainWindow(QWidget):
     def closeEvent(self, event):
         # Siivoa resurssit
         self.testing_screen.cleanup()
+        self.manual_screen.cleanup()
         super().closeEvent(event)
