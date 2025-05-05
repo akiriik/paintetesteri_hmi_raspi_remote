@@ -23,7 +23,6 @@ class TestPanel(QWidget):
         self.selected_program = None
         self.is_active = False
         self.modbus_register = 17000 + self.test_number  # PAINE 1-3 AKTIIVINEN rekisterit: 17001-17003
-        
         self.setFixedSize(300, 600)
         self.setStyleSheet("""
             QWidget {
@@ -45,8 +44,8 @@ class TestPanel(QWidget):
         self.pressure_result.setStyleSheet("""
             background-color: black;
             color: #33FF33;
-            font-family: Consolas, Courier, monospace;
-            font-size: 40px;  # Kasvatettu fontti
+            font-family: 'Digital-7', 'Consolas', monospace;
+            font-size: 40px;
             font-weight: bold;
             border: 2px solid #444444;
             border-radius: 10px;
@@ -208,7 +207,8 @@ class RightControl(QWidget):
             border-radius: 10px;
         """)
         self.pressure_display.setAlignment(Qt.AlignCenter)
-        
+
+
         # Käynnistä nappi (saman levyinen kun painenäyttö)
         self.start_button = QPushButton("KÄYNNISTÄ", self)
         self.start_button.setFixedSize(250, 120)  # Sama leveys kun painenäyttö
