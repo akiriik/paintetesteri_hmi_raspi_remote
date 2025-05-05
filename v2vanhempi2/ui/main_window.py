@@ -26,18 +26,19 @@ class MainWindow(QWidget):
             }
         """)
         
-        # Fortest ohjaus
-        self.fortest = ForTestHandler(port='/dev/ttyUSB1', baudrate=19200)
+        try:
+            self.fortest = ForTestHandler(port='/dev/ttyUSB1', baudrate=19200)
+        except Exception as e:
+            print(f"Varoitus: ForTest-yhteys epäonnistui: {e}")
+            # Luo dummy-ForTestHandler joka ei tee mitään
+            self.fortest = DummyForTestHandler()
+
+        # Välitä fortest aina testaussivulle
+        self.testing_screen = TestingScreen(self, self.fortest)
+        self.testing_screen.setGeometry(0, 0, 1280, 720)
 
         # Luo Modbus-käsittelijä
         self.modbus = ModbusHandler(port='/dev/ttyUSB0', baudrate=19200)
-        
-        # Välitä testaussivulle
-        self.testing_screen = TestingScreen(self, self.fortest)
-
-        # Luo testaussivu
-        self.testing_screen = TestingScreen(self)
-        self.testing_screen.setGeometry(0, 0, 1280, 720)
         
         # Luo käsikäyttösivu
         self.manual_screen = ManualScreen(self, self.modbus)

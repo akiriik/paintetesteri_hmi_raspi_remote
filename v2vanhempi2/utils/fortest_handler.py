@@ -20,3 +20,18 @@ class ForTestHandler:
     def read_results(self):
         """Read test results (0x0040)"""
         return self.modbus.read_holding_registers(0x0040, 32)
+
+class DummyForTestHandler:
+    def start_test(self):
+        print("DummyForTest: Testi käynnistetty (ei oikeaa laitetta)")
+        return True
+    
+    def abort_test(self):
+        print("DummyForTest: Testi pysäytetty (ei oikeaa laitetta)")
+        return True
+    
+    def read_status(self):
+        return None
+    
+    def read_results(self):
+        return None

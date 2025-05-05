@@ -31,9 +31,6 @@ class TestPanel(QWidget):
                 border: 1px solid #dddddd;
             }
         """)
-        
-        #fortest
-        self.fortest = ForTestHandler(port='/dev/ttyUSB1')
 
         # Layout
         layout = QVBoxLayout(self)
@@ -94,6 +91,13 @@ class TestPanel(QWidget):
         self.active_btn.clicked.connect(self.toggle_active)
         layout.addWidget(self.active_btn)
     
+    # Lisää parent-metodin käyttö:
+    def get_fortest(self):
+        """Hae vanhemman ForTest-olio"""
+        if hasattr(self.parent(), 'fortest'):
+            return self.parent().fortest
+        return None
+
     def request_program_selection(self):
         """Pyydä ohjelman valintaa"""
         self.program_selection_requested.emit(self.test_number)
@@ -200,7 +204,7 @@ class MenuButton(QPushButton):
         """)
 
 class TestingScreen(BaseScreen):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, fortest=None):
         super().__init__(parent)
         self.fortest = fortest
         self.current_test_panel = None  # Muistaa minkä testin ohjelma valitaan
@@ -301,14 +305,22 @@ class TestingScreen(BaseScreen):
     
     def start_test(self):
         """Käynnistä testi"""
+        if self.fortest is None:
+            print("ForTest-yhteys ei ole käytettävissä")
+            return
+        
         success = self.fortest.start_test()
         if success:
             print("Testi käynnistetty")
         else:
             print("Testin käynnistys epäonnistui")
-    
+
     def stop_test(self):
         """Pysäytä testi"""
+        if self.fortest is None:
+            print("ForTest-yhteys ei ole käytettävissä")
+            return
+        
         success = self.fortest.abort_test()
         if success:
             print("Testi pysäytetty")
