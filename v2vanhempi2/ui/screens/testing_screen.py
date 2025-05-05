@@ -85,7 +85,7 @@ class TestPanel(QWidget):
         self.selected_program = None
         self.is_active = False
         
-        self.setFixedSize(300, 250)
+        self.setFixedSize(310, 350)
         self.setStyleSheet("""
             QWidget {
                 background-color: #f5f5f5;
@@ -97,28 +97,32 @@ class TestPanel(QWidget):
         # Layout
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignTop)
-        layout.setSpacing(10)
+        layout.setSpacing(40)
         
         # Testin otsikko
         title = QLabel(f"TESTI {test_number}", self)
         title.setAlignment(Qt.AlignCenter)
         title.setFont(QFont("Arial", 20, QFont.Bold))
+        title.setFixedSize(300, 50)
         layout.addWidget(title)
         
         # Ohjelmatiedot
-        self.program_label = QLabel("Ohjelma: -", self)
+        self.program_label = QLabel("Ohjelma: --", self)
+        self.program_label.setFixedSize(300, 50)
         self.program_label.setAlignment(Qt.AlignCenter)
-        self.program_label.setFont(QFont("Arial", 14))
+        self.program_label.setFont(QFont("Arial", 14, QFont.Bold))
         layout.addWidget(self.program_label)
         
         # Valitse ohjelma nappi
         self.select_program_btn = QPushButton("VALITSE OHJELMA", self)
+        self.select_program_btn.setFixedSize(300, 50)
         self.select_program_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
                 color: white;
                 border-radius: 5px;
-                font-size: 14px;
+                font-size: 24px;
+                font-weight: bold;
                 padding: 8px;
             }
         """)
@@ -127,6 +131,7 @@ class TestPanel(QWidget):
         
         # Aktiivinen nappi
         self.active_btn = QPushButton("AKTIIVINEN", self)
+        self.active_btn.setFixedSize(300, 60)
         self.active_btn.setStyleSheet("""
             QPushButton {
                 background-color: #888888;
@@ -146,7 +151,7 @@ class TestPanel(QWidget):
     def set_program(self, program_name):
         """Aseta valittu ohjelma"""
         self.selected_program = program_name
-        self.program_label.setText(f"Ohjelma: {program_name}")
+        self.program_label.setText(f" {program_name}")
     
     def toggle_active(self):
         """Vaihda aktiivisuustila"""

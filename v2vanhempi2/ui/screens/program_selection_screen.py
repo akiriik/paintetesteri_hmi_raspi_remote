@@ -29,13 +29,13 @@ class ProgramSelectionScreen(BaseScreen):
         
         # Otsikko
         title = QLabel("VALITSE OHJELMA", self)
-        title.setFont(QFont("Arial", 36, QFont.Bold))
+        title.setFont(QFont("Arial", 30, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
-        title.setGeometry(0, 100, 1280, 60)
+        title.setGeometry(390, 30, 500, 60)
         
         # Grid-layout ohjelmapainikkeille
         self.grid_container = QFrame(self)
-        self.grid_container.setGeometry(40, 200, 1200, 400)
+        self.grid_container.setGeometry(20, 150, 1220, 550)
         
         grid_layout = QGridLayout(self.grid_container)
         grid_layout.setSpacing(15)
