@@ -9,6 +9,8 @@ from ui.screens.testing_screen import TestingScreen
 from ui.screens.manual_screen import ManualScreen
 from ui.screens.program_selection_screen import ProgramSelectionScreen
 from utils.modbus_handler import ModbusHandler
+from utils.fortest_handler import ForTestHandler
+
 
 class MainWindow(QWidget):
     def __init__(self, parent=None):
@@ -24,9 +26,15 @@ class MainWindow(QWidget):
             }
         """)
         
+        # Fortest ohjaus
+        self.fortest = ForTestHandler(port='/dev/ttyUSB1', baudrate=19200)
+
         # Luo Modbus-käsittelijä
         self.modbus = ModbusHandler(port='/dev/ttyUSB0', baudrate=19200)
         
+        # Välitä testaussivulle
+        self.testing_screen = TestingScreen(self, self.fortest)
+
         # Luo testaussivu
         self.testing_screen = TestingScreen(self)
         self.testing_screen.setGeometry(0, 0, 1280, 720)

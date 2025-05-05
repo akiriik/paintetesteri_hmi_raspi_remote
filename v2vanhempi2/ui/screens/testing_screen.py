@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (QLabel, QPushButton, QFrame, QWidget,
 from PyQt5.QtCore import Qt, QTimer, QRect, pyqtSignal
 from PyQt5.QtGui import QFont
 from ui.screens.base_screen import BaseScreen
+from utils.fortest_handler import ForTestHandler
 
 class TestPanel(QWidget):
     """Yksittäisen testin paneeli"""
@@ -31,6 +32,9 @@ class TestPanel(QWidget):
             }
         """)
         
+        #fortest
+        self.fortest = ForTestHandler(port='/dev/ttyUSB1')
+
         # Layout
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignTop)
@@ -198,6 +202,7 @@ class MenuButton(QPushButton):
 class TestingScreen(BaseScreen):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.fortest = fortest
         self.current_test_panel = None  # Muistaa minkä testin ohjelma valitaan
         
     def init_ui(self):
@@ -296,13 +301,19 @@ class TestingScreen(BaseScreen):
     
     def start_test(self):
         """Käynnistä testi"""
-        # Testi-logiikka tulee tänne
-        pass
+        success = self.fortest.start_test()
+        if success:
+            print("Testi käynnistetty")
+        else:
+            print("Testin käynnistys epäonnistui")
     
     def stop_test(self):
         """Pysäytä testi"""
-        # Pysäytys-logiikka tulee tänne
-        pass
+        success = self.fortest.abort_test()
+        if success:
+            print("Testi pysäytetty")
+        else:
+            print("Testin pysäytys epäonnistui")
     
     def cleanup(self):
         """Siivoa resursit"""
