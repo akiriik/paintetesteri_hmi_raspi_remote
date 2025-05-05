@@ -22,6 +22,7 @@ class TestPanel(QWidget):
         self.test_number = test_number
         self.selected_program = None
         self.is_active = False
+        self.modbus_register = 17000 + self.test_number  # PAINE 1-3 AKTIIVINEN rekisterit: 17001-17003
         
         self.setFixedSize(300, 600)
         self.setStyleSheet("""
@@ -90,12 +91,23 @@ class TestPanel(QWidget):
         """)
         self.active_btn.clicked.connect(self.toggle_active)
         layout.addWidget(self.active_btn)
+        
+        # Ajastin rekisterien tilan tarkistukseen
+        self.modbus_timer = QTimer(self)
+        self.modbus_timer.timeout.connect(self.check_modbus_state)
+        self.modbus_timer.start(150)  # Tarkista kerran sekunnissa
     
     # Lisää parent-metodin käyttö:
     def get_fortest(self):
         """Hae vanhemman ForTest-olio"""
         if hasattr(self.parent(), 'fortest'):
             return self.parent().fortest
+        return None
+    
+    def get_modbus(self):
+        """Hae vanhemman Modbus-olio"""
+        if hasattr(self.parent(), 'parent') and hasattr(self.parent().parent(), 'modbus'):
+            return self.parent().parent().modbus
         return None
 
     def request_program_selection(self):
@@ -108,8 +120,23 @@ class TestPanel(QWidget):
         self.program_label.setText(f" {program_name}")
     
     def toggle_active(self):
-        """Vaihda aktiivisuustila"""
+        """Vaihda aktiivisuustila ja lähetä Modbus-käsky"""
         self.is_active = not self.is_active
+        self.update_button_style()
+        
+        # Lähetä tila modbus-rekisteriin
+        modbus = self.get_modbus()
+        if modbus and modbus.connected:
+            value = 1 if self.is_active else 0
+            result = modbus.write_register(self.modbus_register, value)
+            if not result:
+                print(f"Virhe rekisterin {self.modbus_register} kirjoituksessa")
+                # Vaihda tila takaisin jos epäonnistui
+                self.is_active = not self.is_active
+                self.update_button_style()
+    
+    def update_button_style(self):
+        """Päivitä napin tyyli tilan mukaan"""
         if self.is_active:
             self.active_btn.setStyleSheet("""
                 QPushButton {
@@ -132,17 +159,41 @@ class TestPanel(QWidget):
                     padding: 8px;
                 }
             """)
+    
+    def check_modbus_state(self):
+        """Tarkista aktiivisuustila modbus-rekisteristä"""
+        modbus = self.get_modbus()
+        if modbus and modbus.connected:
+            try:
+                result = modbus.read_holding_registers(self.modbus_register, 1)
+                if result and hasattr(result, 'registers') and len(result.registers) > 0:
+                    # Jos rekisterissä on 1, vaihdetaan tilaa (toggle)
+                    if result.registers[0] == 1:
+                        # Vaihda tila päinvastaiseksi vain kerran rekisteriarvon ollessa 1
+                        if not hasattr(self, '_last_register_value') or self._last_register_value != 1:
+                            self.is_active = not self.is_active
+                            self.update_button_style()
+                            print(f"Testin {self.test_number} aktiivisuustila vaihdettiin: {self.is_active}")
+                        
+                    # Tallenna tämä rekisteriarvo muistiin seuraavaa tarkistusta varten
+                    self._last_register_value = result.registers[0]
+            except Exception as e:
+                print(f"Virhe modbus-rekisterin {self.modbus_register} lukemisessa: {e}")
+
+
 
 class RightControl(QWidget):
     """Oikean reunan ohjauspaneeli"""
     def __init__(self, parent=None):
         super().__init__(parent)
         
+        # Modbus-rekisteri käynnistysohjaukselle
+        self.start_register = 17000
+        
         # Layout
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignCenter)
         layout.setSpacing(20)
-        
         
         # Painenäyttö
         self.pressure_display = QLabel("0.00", self)
@@ -187,6 +238,122 @@ class RightControl(QWidget):
         layout.addWidget(self.pressure_display)
         layout.addWidget(self.start_button)
         layout.addWidget(self.stop_button)
+        
+        # Ajastin rekisterien tilan tarkistukseen
+        self.modbus_timer = QTimer(self)
+        self.modbus_timer.timeout.connect(self.check_start_register)
+        self.modbus_timer.start(150)  # Tarkista kerran sekunnissa
+        
+        # Käynnissä tila
+        self.is_running = False
+        
+    def get_modbus(self):
+        """Hae modbus-yhteys pääikkunalta"""
+        if hasattr(self.parent(), 'parent') and hasattr(self.parent().parent(), 'modbus'):
+            return self.parent().parent().modbus
+        return None
+    
+    def check_start_register(self):
+        """Tarkista käynnistys/pysäytys rekisterin tila"""
+        modbus = self.get_modbus()
+        if modbus and modbus.connected:
+            try:
+                result = modbus.read_holding_registers(self.start_register, 1)
+                if result and hasattr(result, 'registers') and len(result.registers) > 0:
+                    # Kun rekisterissä on 1, käynnistä testi jos se ei ole jo käynnissä
+                    if result.registers[0] == 1:
+                        # Vain jos edellinen arvo ei ollut 1, vaihdetaan tilaa
+                        if not hasattr(self, '_last_start_value') or self._last_start_value != 1:
+                            if not self.is_running:
+                                self.is_running = True
+                                self.update_buttons()
+                                # Käynnistä testi ForTest-laitteella
+                                if hasattr(self.parent(), 'start_test'):
+                                    self.parent().start_test()
+                                print("Testi käynnistetty rekisterin arvon muutoksesta")
+                    
+                    # Tallenna tämä rekisteriarvo seuraavaa tarkistusta varten
+                    self._last_start_value = result.registers[0]
+            except Exception as e:
+                print(f"Virhe rekisterin {self.start_register} lukemisessa: {e}")
+    
+    def update_buttons(self):
+        """Päivitä nappien tyylit tilan mukaan"""
+        if self.is_running:
+            self.start_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #388E3C;  /* Tummempi vihreä */
+                    color: white;
+                    border-radius: 5px;
+                    font-size: 24px;
+                    font-weight: bold;
+                }
+            """)
+            self.stop_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #F44336;
+                    color: white;
+                    border-radius: 5px;
+                    font-size: 24px;
+                    font-weight: bold;
+                }
+            """)
+        else:
+            self.start_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    border-radius: 5px;
+                    font-size: 24px;
+                    font-weight: bold;
+                }
+            """)
+            self.stop_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #D32F2F;  /* Tummempi punainen */
+                    color: white;
+                    border-radius: 5px;
+                    font-size: 24px;
+                    font-weight: bold;
+                }
+            """)
+    
+    def reset_start_register(self):
+        """Nollaa käynnistysrekisteri takaisin nollatilaan"""
+        modbus = self.get_modbus()
+        if modbus and modbus.connected:
+            result = modbus.write_register(self.start_register, 0)
+            if not result:
+                print(f"Virhe rekisterin {self.start_register} nollauksessa")
+    
+    def set_start_state(self, state):
+        """Aseta käynnistystila ja päivitä modbus-rekisteri"""
+        modbus = self.get_modbus()
+        if modbus and modbus.connected:
+            # Käyttäjän painaessa nappia, lähetä hetkellinen 1-arvo rekisteriin,
+            # jotta ulkopuoliset laitteet tunnistavat painalluksen
+            value = 1 if state else 0
+            result = modbus.write_register(self.start_register, value)
+            
+            # Jos kyseessä on pysäytyskomento, pysäytä testi välittömästi
+            if not state and result:
+                self.is_running = False
+                self.update_buttons()
+                # Pysäytä testi ForTest-laitteella
+                if hasattr(self.parent(), 'stop_test'):
+                    self.parent().stop_test()
+                
+            # Jos kyseessä käynnistyskomento, päivitetään tila
+            if state and result:
+                self.is_running = True
+                self.update_buttons()
+            
+            if not result:
+                print(f"Virhe rekisterin {self.start_register} kirjoittamisessa")
+                
+            # Jos arvo on 1 (käynnistys), nollataan se lyhyen viiveen jälkeen
+            if value == 1:
+                QTimer.singleShot(100, lambda: self.reset_start_register())
 
 class MenuButton(QPushButton):
     """Valikko-nappi"""
@@ -304,7 +471,11 @@ class TestingScreen(BaseScreen):
             self.current_test_panel = None
     
     def start_test(self):
-        """Käynnistä testi"""
+        """Käynnistä testi ja päivitä modbus-rekisteri"""
+        # Päivitä modbus-rekisteri
+        self.right_control.set_start_state(True)
+        
+        # Käynnistä testi ForTest-laitteella jos saatavilla
         if self.fortest is None:
             print("ForTest-yhteys ei ole käytettävissä")
             return
@@ -316,7 +487,11 @@ class TestingScreen(BaseScreen):
             print("Testin käynnistys epäonnistui")
 
     def stop_test(self):
-        """Pysäytä testi"""
+        """Pysäytä testi ja päivitä modbus-rekisteri"""
+        # Päivitä modbus-rekisteri
+        self.right_control.set_start_state(False)
+        
+        # Pysäytä testi ForTest-laitteella jos saatavilla
         if self.fortest is None:
             print("ForTest-yhteys ei ole käytettävissä")
             return
