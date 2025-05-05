@@ -74,7 +74,7 @@ class ManualScreen(BaseScreen):
         new_state = 1 if self.relay_states[index] else 0
         
         # Päivitä napin ulkoasu
-        self.relay_status_label.setStyleSheet(f"""
+        self.relay_buttons[index].setStyleSheet(f"""
             QPushButton {{
                 background-color: {("#00aa00" if self.relay_states[index] else "#888888")};
                 color: white;
@@ -94,7 +94,8 @@ class ManualScreen(BaseScreen):
                 self.relay_status_label.setText(f"Virhe releen {relay_num} ohjauksessa!")
                 # Palauta napin tila, koska komento epäonnistui
                 self.relay_states[index] = not self.relay_states[index]
-                self.relay_status_label.setStyleSheet(f"""
+                # Päivitä painikkeen tyyli vastaamaan todellista tilaa
+                self.relay_buttons[index].setStyleSheet(f"""
                     QPushButton {{
                         background-color: {("#00aa00" if self.relay_states[index] else "#888888")};
                         color: white;
@@ -106,7 +107,18 @@ class ManualScreen(BaseScreen):
         except Exception as e:
             print(f"Virhe releen {index+1} ohjauksessa: {e}")
             self.relay_status_label.setText(f"Virhe: {str(e)}")
-            
+            # Tässäkin pitäisi palauttaa napin tila ja päivittää sen tyyli
+            self.relay_states[index] = not self.relay_states[index]
+            self.relay_buttons[index].setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {("#00aa00" if self.relay_states[index] else "#888888")};
+                    color: white;
+                    border-radius: 10px;
+                    font-size: 18px;
+                    font-weight: bold;
+                }}
+            """)
+
     def go_back(self):
         """Palaa testaussivulle"""
         if hasattr(self.parent(), 'show_testing'):
