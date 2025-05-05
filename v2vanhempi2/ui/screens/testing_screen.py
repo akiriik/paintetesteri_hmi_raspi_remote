@@ -12,69 +12,6 @@ from PyQt5.QtCore import Qt, QTimer, QRect, pyqtSignal
 from PyQt5.QtGui import QFont
 from ui.screens.base_screen import BaseScreen
 
-class ProgramSelectDialog(QDialog):
-    """Ohjelman valintaikkuna"""
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Valitse ohjelma")
-        self.setFixedSize(400, 600)
-        self.setStyleSheet("""
-            QDialog {
-                background-color: white;
-                border: 2px solid #2196F3;
-                border-radius: 10px;
-            }
-        """)
-        
-        # Layout
-        layout = QVBoxLayout(self)
-        
-        # Lista ohjelmista
-        self.program_list = QListWidget(self)
-        self.program_list.setStyleSheet("""
-            QListWidget {
-                border: 1px solid #dddddd;
-                font-size: 18px;
-            }
-            QListWidget::item {
-                padding: 10px;
-                border-bottom: 1px solid #eeeeee;
-            }
-            QListWidget::item:selected {
-                background-color: #2196F3;
-                color: white;
-            }
-        """)
-        
-        # Lisää ohjelmat 1-30
-        for i in range(1, 31):
-            self.program_list.addItem(f"Ohjelma {i}")
-        
-        layout.addWidget(self.program_list)
-        
-        # Valinnan vahvistus nappi
-        self.select_button = QPushButton("Valitse", self)
-        self.select_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                border-radius: 5px;
-                font-size: 18px;
-                padding: 10px;
-            }
-        """)
-        self.select_button.clicked.connect(self.accept)
-        layout.addWidget(self.select_button)
-        
-        self.selected_program = None
-    
-    def accept(self):
-        # Tallenna valittu ohjelma
-        current_item = self.program_list.currentItem()
-        if current_item:
-            self.selected_program = current_item.text()
-        super().accept()
-
 class TestPanel(QWidget):
     """Yksittäisen testin paneeli"""
     program_selection_requested = pyqtSignal(int)  # Signaali ohjelman valintapyynnölle
@@ -85,7 +22,7 @@ class TestPanel(QWidget):
         self.selected_program = None
         self.is_active = False
         
-        self.setFixedSize(310, 350)
+        self.setFixedSize(300, 600)
         self.setStyleSheet("""
             QWidget {
                 background-color: #f5f5f5;
@@ -97,31 +34,39 @@ class TestPanel(QWidget):
         # Layout
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignTop)
-        layout.setSpacing(40)
+        layout.setSpacing(30)
         
-        # Testin otsikko
-        title = QLabel(f"TESTI {test_number}", self)
-        title.setAlignment(Qt.AlignCenter)
-        title.setFont(QFont("Arial", 20, QFont.Bold))
-        title.setFixedSize(300, 50)
-        layout.addWidget(title)
+        # Painetulos laatikko (kasvatettu ylhäältä)
+        self.pressure_result = QLabel("", self)
+        self.pressure_result.setFixedSize(280, 250)  # Kasvatettu korkeutta
+        self.pressure_result.setAlignment(Qt.AlignCenter)
+        self.pressure_result.setStyleSheet("""
+            background-color: black;
+            color: #33FF33;
+            font-family: 'Consolas', 'Courier', monospace;
+            font-size: 40px;  # Kasvatettu fontti
+            font-weight: bold;
+            border: 2px solid #444444;
+            border-radius: 10px;
+        """)
+        layout.addWidget(self.pressure_result)
         
         # Ohjelmatiedot
         self.program_label = QLabel("Ohjelma: --", self)
-        self.program_label.setFixedSize(300, 50)
+        self.program_label.setFixedSize(280, 60)
         self.program_label.setAlignment(Qt.AlignCenter)
         self.program_label.setFont(QFont("Arial", 14, QFont.Bold))
         layout.addWidget(self.program_label)
         
         # Valitse ohjelma nappi
         self.select_program_btn = QPushButton("VALITSE OHJELMA", self)
-        self.select_program_btn.setFixedSize(300, 50)
+        self.select_program_btn.setFixedSize(280, 80)
         self.select_program_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
                 color: white;
                 border-radius: 5px;
-                font-size: 24px;
+                font-size: 20px;
                 font-weight: bold;
                 padding: 8px;
             }
@@ -131,13 +76,14 @@ class TestPanel(QWidget):
         
         # Aktiivinen nappi
         self.active_btn = QPushButton("AKTIIVINEN", self)
-        self.active_btn.setFixedSize(300, 60)
+        self.active_btn.setFixedSize(280, 80)
         self.active_btn.setStyleSheet("""
             QPushButton {
                 background-color: #888888;
                 color: white;
                 border-radius: 5px;
-                font-size: 14px;
+                font-weight: bold;
+                font-size: 20px;
                 padding: 8px;
             }
         """)
@@ -162,7 +108,8 @@ class TestPanel(QWidget):
                     background-color: #4CAF50;
                     color: white;
                     border-radius: 5px;
-                    font-size: 14px;
+                    font-weight: bold;
+                    font-size: 20px;
                     padding: 8px;
                 }
             """)
@@ -172,72 +119,66 @@ class TestPanel(QWidget):
                     background-color: #888888;
                     color: white;
                     border-radius: 5px;
-                    font-size: 14px;
+                    font-weight: bold;
+                    font-size: 20px;
                     padding: 8px;
                 }
             """)
 
-class BottomControl(QWidget):
-    """Alareunassa oleva ohjauspaneeli"""
+class RightControl(QWidget):
+    """Oikean reunan ohjauspaneeli"""
     def __init__(self, parent=None):
         super().__init__(parent)
         
         # Layout
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignCenter)
         layout.setSpacing(20)
+        
         
         # Painenäyttö
         self.pressure_display = QLabel("0.00", self)
-        self.pressure_display.setFixedSize(200, 100)
+        self.pressure_display.setFixedSize(250, 150)
         self.pressure_display.setStyleSheet("""
             background-color: black;
             color: #33FF33;
             font-family: 'Consolas', 'Courier', monospace;
-            font-size: 48px;
+            font-size: 56px;
             font-weight: bold;
             border: 2px solid #444444;
             border-radius: 10px;
         """)
         self.pressure_display.setAlignment(Qt.AlignCenter)
         
-        # Nappulapaneeli
-        button_container = QWidget(self)
-        button_layout = QVBoxLayout(button_container)
-        button_layout.setContentsMargins(0, 0, 0, 0)
-        button_layout.setSpacing(10)
-        
-        # Käynnistä nappi
+        # Käynnistä nappi (saman levyinen kun painenäyttö)
         self.start_button = QPushButton("KÄYNNISTÄ", self)
-        self.start_button.setFixedSize(150, 50)
+        self.start_button.setFixedSize(250, 120)  # Sama leveys kun painenäyttö
         self.start_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
                 border-radius: 5px;
-                font-size: 18px;
+                font-size: 24px;
                 font-weight: bold;
             }
         """)
         
-        # Pysäytä nappi
+        # Pysäytä nappi (saman levyinen kun painenäyttö)
         self.stop_button = QPushButton("PYSÄYTÄ", self)
-        self.stop_button.setFixedSize(150, 50)
+        self.stop_button.setFixedSize(250, 120)  # Sama leveys kun painenäyttö
         self.stop_button.setStyleSheet("""
             QPushButton {
                 background-color: #F44336;
                 color: white;
                 border-radius: 5px;
-                font-size: 18px;
+                font-size: 24px;
                 font-weight: bold;
             }
         """)
         
-        button_layout.addWidget(self.start_button)
-        button_layout.addWidget(self.stop_button)
-        
         layout.addWidget(self.pressure_display)
-        layout.addWidget(button_container)
+        layout.addWidget(self.start_button)
+        layout.addWidget(self.stop_button)
 
 class MenuButton(QPushButton):
     """Valikko-nappi"""
@@ -295,22 +236,29 @@ class TestingScreen(BaseScreen):
         manual_action.triggered.connect(self.show_manual)
         exit_action.triggered.connect(self.close_application)
         
-        # Testipaneelit keskelle
+        # Testipaneelit
         self.test_panels = []
         for i in range(1, 4):
+            # Luo testin otsikko yläreunaan
+            title = QLabel(f"TESTI {i}", self)
+            title.setFont(QFont("Arial", 24, QFont.Bold))
+            title.setAlignment(Qt.AlignCenter)
+            title.setGeometry(50 + (i-1)*320, 50, 300, 40)  # Siirretty ylös
+            
+            # Luo paneeli
             panel = TestPanel(i, self)
-            panel.move(50 + (i-1)*400, 150)
+            panel.move(40 + (i-1)*320, 100)  # Siirretty ylös
             # Yhdistä signaalit
             panel.program_selection_requested.connect(self.start_program_selection)
-            self.test_panels.append(panel)
+            self.test_panels.append(panel) 
         
-        # Alareuna
-        self.bottom_control = BottomControl(self)
-        self.bottom_control.move(50, 600)
+        # Oikean reunan ohjaus
+        self.right_control = RightControl(self)
+        self.right_control.move(1015, 150)  # Siirretty hieman vasemmalle (keskitys)
         
         # Yhdistä signaalit
-        self.bottom_control.start_button.clicked.connect(self.start_test)
-        self.bottom_control.stop_button.clicked.connect(self.stop_test)
+        self.right_control.start_button.clicked.connect(self.start_test)
+        self.right_control.stop_button.clicked.connect(self.stop_test)
     
     def show_menu(self):
         """Näytä popup-valikko"""
