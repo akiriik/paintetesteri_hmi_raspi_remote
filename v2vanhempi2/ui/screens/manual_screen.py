@@ -74,15 +74,15 @@ class ManualScreen(BaseScreen):
         new_state = 1 if self.relay_states[index] else 0
         
         # Päivitä napin ulkoasu
-        self.relay_buttons[index].setStyleSheet("""
-            QPushButton {
-                background-color: %s;
+        self.relay_status_label.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {("#00aa00" if self.relay_states[index] else "#888888")};
                 color: white;
                 border-radius: 10px;
                 font-size: 18px;
                 font-weight: bold;
-            }
-        """ % ("#00aa00" if self.relay_states[index] else "#888888"))
+            }}
+        """)
         
         # Lähetä Modbus-komento
         try:
@@ -94,15 +94,15 @@ class ManualScreen(BaseScreen):
                 self.relay_status_label.setText(f"Virhe releen {relay_num} ohjauksessa!")
                 # Palauta napin tila, koska komento epäonnistui
                 self.relay_states[index] = not self.relay_states[index]
-                self.relay_buttons[index].setStyleSheet("""
-                    QPushButton {
-                        background-color: %s;
+                self.relay_status_label.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {("#00aa00" if self.relay_states[index] else "#888888")};
                         color: white;
                         border-radius: 10px;
                         font-size: 18px;
                         font-weight: bold;
-                    }
-                """ % ("#00aa00" if self.relay_states[index] else "#888888"))
+                    }}
+                """)
         except Exception as e:
             print(f"Virhe releen {index+1} ohjauksessa: {e}")
             self.relay_status_label.setText(f"Virhe: {str(e)}")

@@ -44,7 +44,7 @@ class TestPanel(QWidget):
         self.pressure_result.setStyleSheet("""
             background-color: black;
             color: #33FF33;
-            font-family: 'Consolas', 'Courier', monospace;
+            font-family: Consolas, Courier, monospace;
             font-size: 40px;  # Kasvatettu fontti
             font-weight: bold;
             border: 2px solid #444444;
@@ -150,7 +150,7 @@ class RightControl(QWidget):
         self.pressure_display.setStyleSheet("""
             background-color: black;
             color: #33FF33;
-            font-family: 'Consolas', 'Courier', monospace;
+            font-family: Consolas, Courier, monospace;
             font-size: 56px;
             font-weight: bold;
             border: 2px solid #444444;
