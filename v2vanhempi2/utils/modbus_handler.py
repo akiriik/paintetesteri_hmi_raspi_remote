@@ -23,7 +23,33 @@ class ModbusHandler:
         except Exception as e:
             self.connected = False
             print(f"Modbus-virhe: {e}")
+
+    # utils/modbus_handler.py lisäys
+    def read_emergency_stop_status(self):
+        """Lue hätäseispiirin tila rekisteristä 19100"""
+        if not self.connected:
+            return None
+        try:
+            result = self.client.read_holding_registers(address=19100, count=1)
+            if result and hasattr(result, 'registers') and len(result.registers) > 0:
+                # 1 = hätäseis pois päältä, 0 = hätäseistila
+                return result.registers[0]
+            return None
+        except Exception as e:
+            print(f"Hätäseispiirin lukuvirhe: {e}")
+            return None
             
+    def write_register(self, address, value):
+        """Kirjoita arvo rekisteriin"""
+        if not self.connected:
+            return False
+        try:
+            result = self.client.write_register(address=address, value=value)
+            return result.isError() == False if hasattr(result, 'isError') else bool(result)
+        except Exception as e:
+            print(f"Rekisterin kirjoitusvirhe: {e}")
+            return False
+
     def toggle_relay(self, relay_num, state):
         if not self.connected:
             return False

@@ -1,7 +1,7 @@
 import sys
 import os
 from PyQt5.QtWidgets import QWidget
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QKeyEvent
 
 # Omat komponentit
@@ -10,6 +10,7 @@ from ui.screens.manual_screen import ManualScreen
 from ui.screens.program_selection_screen import ProgramSelectionScreen
 from utils.modbus_handler import ModbusHandler
 from utils.fortest_handler import ForTestHandler
+from ui.components.emergency_stop_dialog import EmergencyStopDialog
 
 
 class MainWindow(QWidget):
@@ -33,6 +34,14 @@ class MainWindow(QWidget):
             # Luo dummy-ForTestHandler joka ei tee mitään
             self.fortest = DummyForTestHandler()
 
+        # Lisää ajastin hätäseispiirin tilan tarkistamiseen
+        self.emergency_stop_timer = QTimer(self)
+        self.emergency_stop_timer.timeout.connect(self.check_emergency_stop)
+        self.emergency_stop_timer.start(1000)  # Tarkista joka sekunti
+
+        # Hätäseis-dialogi ei ole vielä avoinna
+        self.emergency_dialog_open = False
+
         # Välitä fortest aina testaussivulle
         self.testing_screen = TestingScreen(self, self.fortest)
         self.testing_screen.setGeometry(0, 0, 1280, 720)
@@ -52,7 +61,26 @@ class MainWindow(QWidget):
         
         # Yhdistä signaalit
         self.program_selection_screen.program_selected.connect(self.on_program_selected)
-    
+
+    def check_emergency_stop(self):
+        """Tarkista hätäseispiirin tila"""
+        if not hasattr(self, 'modbus') or not self.modbus.connected:
+            return
+        
+        status = self.modbus.read_emergency_stop_status()
+        
+        # Jos status on 0, hätäseispiiri on aktiivinen
+        if status == 0 and not self.emergency_dialog_open:
+            self.emergency_dialog_open = True
+            dialog = EmergencyStopDialog(self, self.modbus)
+            # Kun dialogi suljetaan, tarkista tila uudelleen välittömästi
+            dialog.finished.connect(self.on_emergency_dialog_closed)
+            dialog.exec_()  # Käytä exec_ metodia show() sijaan, jotta dialogi on modaalinen
+        
+    def on_emergency_dialog_closed(self):
+        """Dialogi suljettu, nollataan lippu"""
+        self.emergency_dialog_open = False
+
     def on_program_selected(self, program_name):
         """Käsittele valittu ohjelma"""
         # Anna valittu ohjelma testaussivulle
