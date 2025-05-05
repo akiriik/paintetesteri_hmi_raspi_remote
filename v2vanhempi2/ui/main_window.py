@@ -11,6 +11,7 @@ from ui.screens.program_selection_screen import ProgramSelectionScreen
 from utils.modbus_handler import ModbusHandler
 from utils.fortest_handler import ForTestHandler
 from ui.components.emergency_stop_dialog import EmergencyStopDialog
+from utils.gpio_handler import GPIOHandler
 
 
 class MainWindow(QWidget):
@@ -33,6 +34,13 @@ class MainWindow(QWidget):
             print(f"Varoitus: ForTest-yhteys epäonnistui: {e}")
             # Luo dummy-ForTestHandler joka ei tee mitään
             self.fortest = DummyForTestHandler()
+
+        # Alusta GPIO-käsittelijä
+        try:
+            self.gpio_handler = GPIOHandler()
+        except Exception as e:
+            print(f"Varoitus: GPIO-alustus epäonnistui: {e}")
+            self.gpio_handler = None
 
         # Lisää ajastin hätäseispiirin tilan tarkistamiseen
         self.emergency_stop_timer = QTimer(self)
@@ -123,4 +131,9 @@ class MainWindow(QWidget):
         # Siivoa resurssit
         self.testing_screen.cleanup()
         self.manual_screen.cleanup()
+        
+        # Siivoa GPIO-resurssit
+        if hasattr(self, 'gpio_handler') and self.gpio_handler:
+            self.gpio_handler.cleanup()
+            
         super().closeEvent(event)

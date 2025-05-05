@@ -133,6 +133,10 @@ class TestPanel(QWidget):
                 # Vaihda tila takaisin jos epäonnistui
                 self.is_active = not self.is_active
                 self.update_button_style()
+        
+        # Aktivoi vastaava GPIO-pinni
+        if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
+            self.parent().parent().gpio_handler.set_output(self.test_number, self.is_active)
     
     def update_button_style(self):
         """Päivitä napin tyyli tilan mukaan"""
@@ -172,14 +176,17 @@ class TestPanel(QWidget):
                         if not hasattr(self, '_last_register_value') or self._last_register_value != 1:
                             self.is_active = not self.is_active
                             self.update_button_style()
+                            
+                            # Päivitä GPIO-tila
+                            if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
+                                self.parent().parent().gpio_handler.set_output(self.test_number, self.is_active)
+                                
                             print(f"Testin {self.test_number} aktiivisuustila vaihdettiin: {self.is_active}")
                         
                     # Tallenna tämä rekisteriarvo muistiin seuraavaa tarkistusta varten
                     self._last_register_value = result.registers[0]
             except Exception as e:
                 print(f"Virhe modbus-rekisterin {self.modbus_register} lukemisessa: {e}")
-
-
 
 class RightControl(QWidget):
     """Oikean reunan ohjauspaneeli"""
