@@ -29,8 +29,7 @@ class EmergencyStopDialog(QDialog):
         self.red_frame.setStyleSheet("""
             background-color: white; 
             border-radius: 20px; 
-            border: 16px solid red;  /* 4x leveämpi reuna */
-            box-shadow: none;        /* Poista varjo */
+            border: 16px solid red;
         """)
         frame_layout = QVBoxLayout(self.red_frame)
         frame_layout.setContentsMargins(20, 20, 20, 20)
