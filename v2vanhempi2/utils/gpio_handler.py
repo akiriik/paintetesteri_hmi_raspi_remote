@@ -12,7 +12,8 @@ class GPIOHandler:
             1: 17,  # PAINE1 -> GPIO17
             2: 27,  # PAINE2 -> GPIO27
             3: 22,  # PAINE3 -> GPIO22
-            4: 23   # Ylimääräinen -> GPIO23
+            4: 23,   # Ylimääräinen -> GPIO23
+            5: 24   # Uusi ylimääräinen -> GPIO24
         }
         
         # Alusta pinnit ulostuloksi
