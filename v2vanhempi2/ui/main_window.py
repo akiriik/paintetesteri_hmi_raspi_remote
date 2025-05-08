@@ -16,7 +16,6 @@ from utils.modbus_manager import ModbusManager
 from utils.fortest_manager import ForTestManager
 from utils.gpio_handler import GPIOHandler
 from utils.program_manager import ProgramManager
-from utils.pressure_reader import PressureReaderThread
 
 class MainWindow(QWidget):
     def __init__(self, parent=None):
@@ -74,29 +73,11 @@ class MainWindow(QWidget):
         self.emergency_dialog_open = False
         self._dialog_opened_time = 0  # Tallentaa milloin dialogi avattiin
         
-        # Alusta paineanturin lukijasäie
-        self.setup_pressure_reader()
-
         # Lisää ajastin kytkimien tilojen tarkistamiseen
         self.switch_read_timer = QTimer(self)
         self.switch_read_timer.timeout.connect(self.check_switches)
         self.switch_read_timer.start(150)  # Tarkista 150ms välein        
 
-    def setup_pressure_reader(self):
-        """Alusta paineanturi ja sen lukijasäie"""
-        try:
-            from utils.pressure_sensor import PressureSensor
-            sensor = PressureSensor()
-            self.pressure_reader = PressureReaderThread(sensor)
-            self.pressure_reader.pressureUpdated.connect(self.on_pressure_updated)
-            self.pressure_reader.start()
-        except Exception as e:
-            print(f"Varoitus: Paineanturin alustus epäonnistui: {e}")
-    
-    def on_pressure_updated(self, pressure):
-        """Käsittele painelukema"""
-        if hasattr(self.testing_screen, 'update_pressure_display'):
-            self.testing_screen.update_pressure_display(pressure)
 
     def check_emergency_stop(self):
         """Tarkista hätäseispiirin tila"""
@@ -254,11 +235,6 @@ class MainWindow(QWidget):
         # Siivoa resurssit
         self.testing_screen.cleanup()
         self.manual_screen.cleanup()
-        
-        # Pysäytä säikeet
-        if hasattr(self, 'pressure_reader'):
-            self.pressure_reader.stop()
-            self.pressure_reader.wait()
         
         self.modbus_manager.cleanup()
         self.fortest_manager.cleanup()

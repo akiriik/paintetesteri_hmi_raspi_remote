@@ -85,7 +85,7 @@ class TestingScreen(BaseScreen):
         
         # Ohjauskomponentti
         self.control_panel = ControlPanel(self)
-        self.control_panel.move(1015, 150)
+        self.control_panel.move(1020, 450)
         self.control_panel.start_clicked.connect(self.start_test)
         self.control_panel.stop_clicked.connect(self.stop_test)
         
@@ -208,10 +208,6 @@ class TestingScreen(BaseScreen):
                 level = "ERROR"
             
             self.log_panel.add_log_entry(message, level)
-    
-    def update_pressure_display(self, value):
-        """Päivitä painenäyttö"""
-        self.control_panel.set_pressure(value)
     
     def cleanup(self):
         """Siivoa resurssit"""
