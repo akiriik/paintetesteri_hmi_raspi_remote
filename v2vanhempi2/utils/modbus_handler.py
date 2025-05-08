@@ -16,7 +16,7 @@ class ModbusHandler:
                 bytesize=8,
                 parity='N',
                 stopbits=1,
-                timeout=1.0
+                timeout=1
             )
             self.connected = self.client.connect()
             print(f"Modbus-yhteys ({self.port}): {'Onnistui' if self.connected else 'Epäonnistui'}")

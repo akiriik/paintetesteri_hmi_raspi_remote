@@ -74,7 +74,7 @@ class MainWindow(QWidget):
         # Kytkimien lukuajastin
         self.switch_read_timer = QTimer(self)
         self.switch_read_timer.timeout.connect(self.check_switches)
-        self.switch_read_timer.start(300)  # Tarkista kytkimet 150ms välein
+        self.switch_read_timer.start(200)  # Tarkista kytkimet 150ms välein
         
         # Kytkimien muistit
         self.switch_memories = {
@@ -118,56 +118,45 @@ class MainWindow(QWidget):
 
 
     def check_switches(self):
-        """Lukee kytkimien tilat modbus-rekistereistä"""
+        """Lukee kytkimien tilat modbus-rekistereistä yhdellä kutsulla"""
         if not self.modbus_manager.is_connected():
             return
         
-        # Suoritetaan kyselyt yksi kerrallaan, tallentaen rekisteri suoraan parametriin
-        for register in [16999, 17000, 17001, 17002, 17003]:
-            self.modbus_manager.read_register(register, 1)
+        # Lue kaikki 5 rekisteriä (16999-17003) yhdellä kutsulla
+        self.modbus_manager.read_register(16999, 5)
 
     def handle_modbus_result(self, result, op_code, error_msg):
-        if error_msg or not result or not hasattr(result, 'registers') or len(result.registers) == 0:
+        """Käsittelee modbus-kyselyn tuloksen"""
+        if error_msg or not result or not hasattr(result, 'registers'):
             return
 
         if op_code == 1:  # Rekisterin luku
-            # Tarkista mistä rekisteristä on kyse
-            if not hasattr(result, 'address'):
-                return
+            base_address = 16999
+            
+            # Käsittele kaikki rekisterit
+            for offset, value in enumerate(result.registers):
+                switch_reg = base_address + offset
+                switch_state = value
                 
-            switch_reg = result.address  # Käytä rekisterin osoitetta suoraan tuloksesta
-            switch_state = result.registers[0]
-            
-            # Haetaan vanha tila
-            old_state = self.switch_memories.get(switch_reg, 0)
-            
-            # Talleta uusi tila muistiin
-            self.switch_memories[switch_reg] = switch_state
-            
-            # KÄSITTELE NOUSEVA REUNA (0->1)
-            if switch_state == 1 and old_state == 0:
-                if switch_reg == 17000:  # START
-                    self.testing_screen.start_test()
-                elif switch_reg == 16999:  # STOP
-                    self.testing_screen.stop_test()
-                elif switch_reg == 17001:  # TESTI 1
-                    panel = self.testing_screen.test_panels[0]
-                    panel.is_active = not panel.is_active
-                    panel.update_button_style()
-                    if self.gpio_handler:
-                        self.gpio_handler.set_output(1, panel.is_active)
-                elif switch_reg == 17002:  # TESTI 2
-                    panel = self.testing_screen.test_panels[1]
-                    panel.is_active = not panel.is_active
-                    panel.update_button_style()
-                    if self.gpio_handler:
-                        self.gpio_handler.set_output(2, panel.is_active)
-                elif switch_reg == 17003:  # TESTI 3
-                    panel = self.testing_screen.test_panels[2]
-                    panel.is_active = not panel.is_active
-                    panel.update_button_style()
-                    if self.gpio_handler:
-                        self.gpio_handler.set_output(3, panel.is_active)
+                # Haetaan vanha tila
+                old_state = self.switch_memories.get(switch_reg, 0)
+                
+                # Talleta uusi tila muistiin
+                self.switch_memories[switch_reg] = switch_state
+                
+                # KÄSITTELE NOUSEVA REUNA (0->1)
+                if switch_state == 1 and old_state == 0:
+                    if switch_reg == 17000:  # START
+                        self.testing_screen.start_test()
+                    elif switch_reg == 16999:  # STOP
+                        self.testing_screen.stop_test()
+                    elif 17001 <= switch_reg <= 17003:  # TESTI 1-3
+                        test_idx = switch_reg - 17001
+                        panel = self.testing_screen.test_panels[test_idx]
+                        panel.is_active = not panel.is_active
+                        panel.update_button_style()
+                        if self.gpio_handler:
+                            self.gpio_handler.set_output(test_idx + 1, panel.is_active)
 
     def handle_fortest_result(self, result, op_code, error_msg):
         """Käsittelee ForTest-laitteen operaatiotulokset"""
