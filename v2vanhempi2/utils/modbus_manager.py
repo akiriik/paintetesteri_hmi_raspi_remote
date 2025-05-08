@@ -11,13 +11,15 @@ class ModbusWorker(QObject):
     
     @pyqtSlot(int, int)
     def read_register(self, address, count=1):
-        """Lue rekisteri taustasäikeessä"""
         if not self.modbus or not self.modbus.connected:
             self.resultReady.emit(None, 1, "Modbus ei yhteydessä")
             return
             
         try:
             result = self.modbus.read_holding_registers(address, count)
+            # Lisää osoite result-objektiin
+            if result:
+                result.address = address
             self.resultReady.emit(result, 1, "")
         except Exception as e:
             self.resultReady.emit(None, 1, f"Virhe rekisterin lukemisessa: {str(e)}")

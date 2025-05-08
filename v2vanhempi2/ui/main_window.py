@@ -74,7 +74,7 @@ class MainWindow(QWidget):
         # Kytkimien lukuajastin
         self.switch_read_timer = QTimer(self)
         self.switch_read_timer.timeout.connect(self.check_switches)
-        self.switch_read_timer.start(150)  # Tarkista kytkimet 150ms välein
+        self.switch_read_timer.start(300)  # Tarkista kytkimet 150ms välein
         
         # Kytkimien muistit
         self.switch_memories = {
@@ -116,68 +116,58 @@ class MainWindow(QWidget):
         self.emergency_dialog_open = False
         self._emergency_dialog = None
 
+
     def check_switches(self):
         """Lukee kytkimien tilat modbus-rekistereistä"""
         if not self.modbus_manager.is_connected():
             return
         
-        # Lue kaikki kytkimet järjestyksessä
+        # Suoritetaan kyselyt yksi kerrallaan, tallentaen rekisteri suoraan parametriin
         for register in [16999, 17000, 17001, 17002, 17003]:
-            self._current_read_address = register
             self.modbus_manager.read_register(register, 1)
 
     def handle_modbus_result(self, result, op_code, error_msg):
-        """Käsittelee modbus-kyselyn tuloksen"""
         if error_msg or not result or not hasattr(result, 'registers') or len(result.registers) == 0:
             return
 
         if op_code == 1:  # Rekisterin luku
-            switch_state = result.registers[0]
-            switch_reg = getattr(self, '_current_read_address', None)
-            
-            if switch_reg is None:
+            # Tarkista mistä rekisteristä on kyse
+            if not hasattr(result, 'address'):
                 return
                 
+            switch_reg = result.address  # Käytä rekisterin osoitetta suoraan tuloksesta
+            switch_state = result.registers[0]
+            
             # Haetaan vanha tila
             old_state = self.switch_memories.get(switch_reg, 0)
             
             # Talleta uusi tila muistiin
             self.switch_memories[switch_reg] = switch_state
             
-            # KÄSITTELE NOUSEVA REUNA (0->1) vain jos kytkimen tila muuttui
+            # KÄSITTELE NOUSEVA REUNA (0->1)
             if switch_state == 1 and old_state == 0:
-                # Käynnistä painetesti
                 if switch_reg == 17000:  # START
                     self.testing_screen.start_test()
-                    
-                # Pysäytä painetesti
                 elif switch_reg == 16999:  # STOP
                     self.testing_screen.stop_test()
-                    
-                # Testin 1 aktivointi/deaktivointi
-                elif switch_reg == 17001:  # TESTI 1 AKTIIVINEN
-                    panel = self.testing_screen.test_panels[0]  # Ensimmäinen paneeli
+                elif switch_reg == 17001:  # TESTI 1
+                    panel = self.testing_screen.test_panels[0]
                     panel.is_active = not panel.is_active
                     panel.update_button_style()
                     if self.gpio_handler:
                         self.gpio_handler.set_output(1, panel.is_active)
-                
-                # Testin 2 aktivointi/deaktivointi
-                elif switch_reg == 17002:  # TESTI 2 AKTIIVINEN
-                    panel = self.testing_screen.test_panels[1]  # Toinen paneeli
+                elif switch_reg == 17002:  # TESTI 2
+                    panel = self.testing_screen.test_panels[1]
                     panel.is_active = not panel.is_active
                     panel.update_button_style()
                     if self.gpio_handler:
                         self.gpio_handler.set_output(2, panel.is_active)
-                
-                # Testin 3 aktivointi/deaktivointi
-                elif switch_reg == 17003:  # TESTI 3 AKTIIVINEN
-                    panel = self.testing_screen.test_panels[2]  # Kolmas paneeli
+                elif switch_reg == 17003:  # TESTI 3
+                    panel = self.testing_screen.test_panels[2]
                     panel.is_active = not panel.is_active
                     panel.update_button_style()
                     if self.gpio_handler:
                         self.gpio_handler.set_output(3, panel.is_active)
-
 
     def handle_fortest_result(self, result, op_code, error_msg):
         """Käsittelee ForTest-laitteen operaatiotulokset"""
