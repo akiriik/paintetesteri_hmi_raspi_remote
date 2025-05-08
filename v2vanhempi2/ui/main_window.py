@@ -102,17 +102,28 @@ class MainWindow(QWidget):
             return
         
         # Lue rekisteri 19100
+        self._last_register_read = 19100
         self.modbus_manager.read_register(19100, 1)
-        self._last_register_read = 19100  # Tallenna luettava rekisteri
-    
+        
+        # Jos dialogi on avoinna, tarkista voiko sen sulkea
+        if self.emergency_dialog_open and hasattr(self, '_latest_emergency_value') and self._latest_emergency_value == 1:
+            # Hätäseis on kuitattu, sulje dialogi jos se on avoinna
+            if hasattr(self, '_emergency_dialog') and self._emergency_dialog is not None:
+                self._emergency_dialog.accept()
+                self._emergency_dialog = None
+                self.emergency_dialog_open = False
+
     def handle_emergency_stop_status(self, value):
         """Käsittele hätäseispiirin tila"""
+        # Tallenna viimeisin arvo
+        self._latest_emergency_value = value
+        
         # Jos status on 0, hätäseispiiri on aktiivinen
         if value == 0 and not self.emergency_dialog_open:
             self.emergency_dialog_open = True
-            dialog = EmergencyStopDialog(self, self.modbus_manager)
-            dialog.finished.connect(self.on_emergency_dialog_closed)
-            dialog.exec_()
+            self._emergency_dialog = EmergencyStopDialog(self, self.modbus_manager)
+            self._emergency_dialog.finished.connect(self.on_emergency_dialog_closed)
+            self._emergency_dialog.exec_()
     
     def on_emergency_dialog_closed(self):
         """Dialogi suljettu, nollataan lippu"""
@@ -121,17 +132,19 @@ class MainWindow(QWidget):
     def handle_modbus_result(self, result, op_code, error_msg):
         """Käsittele Modbus-operaation tulos"""
         if error_msg:
-            # Näytä virheviesti...
-            pass
+            # Näytä virheviesti
+            self.status_notifier.show_message(error_msg, StatusNotifier.ERROR)
+            if hasattr(self.testing_screen, 'log_panel'):
+                self.testing_screen.log_panel.add_log_entry(error_msg, "ERROR")
         
         # Käsittele eri tyyppisten operaatioiden tulokset
         if op_code == 1:  # Rekisterin luku
             if result and hasattr(result, 'registers') and len(result.registers) > 0:
-                if hasattr(self, '_last_register_read'):
+                if hasattr(self, '_last_register_read') and self._last_register_read is not None:
                     if self._last_register_read == 19100:
-                        # Hätäseisrekisterin käsittely
+                        # Hätäseisrekisterin lukutulos
                         self.handle_emergency_stop_status(result.registers[0])
-                    elif self._last_register_read >= 17001 and self._last_register_read <= 17003:
+                    elif isinstance(self._last_register_read, int) and 17001 <= self._last_register_read <= 17003:
                         # Kytkimen tilan käsittely
                         panel_index = self._last_register_read - 17001
                         if panel_index < len(self.testing_screen.test_panels):
@@ -143,9 +156,6 @@ class MainWindow(QWidget):
                                 # Päivitä myös GPIO-tila
                                 if hasattr(self, 'gpio_handler') and self.gpio_handler:
                                     self.gpio_handler.set_output(panel_index + 1, switch_state)
-        
-        # Nollaa rekisterimuistutus
-        self._last_register_read = None
     
     def handle_fortest_result(self, result, op_code, error_msg):
         """Käsittele ForTest-operaation tulos"""
