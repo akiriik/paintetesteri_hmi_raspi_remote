@@ -113,7 +113,7 @@ class MainWindow(QWidget):
             self.status_notifier.show_message(error_msg, StatusNotifier.ERROR)
             if hasattr(self.testing_screen, 'log_panel'):
                 self.testing_screen.log_panel.add_log_entry(error_msg, "ERROR")
-    
+        
         # Rekisterin luku
         if op_code == 1:  # Rekisterin luku
             if result and hasattr(result, 'registers') and len(result.registers) > 0:
@@ -141,30 +141,41 @@ class MainWindow(QWidget):
                                     self._emergency_dialog = None
                                 self.emergency_dialog_open = False
 
-        # Kytkimien tilojen käsittely (testien aktiivinen-tila)
-        if op_code == 1 and result and hasattr(result, 'registers') and len(result.registers) > 0:
-            if hasattr(self, '_last_switch_read') and 17001 <= self._last_switch_read <= 17003:
-                test_idx = self._last_switch_read - 17001
-                switch_state = result.registers[0]
-                
-                # Päivitä testipaneelin tila vain jos se poikkeaa nykyisestä
-                if self.testing_screen.test_panels[test_idx].is_active != bool(switch_state):
-                    self.testing_screen.test_panels[test_idx].is_active = bool(switch_state)
-                    self.testing_screen.test_panels[test_idx].update_button_style()
-                    
-                    # Ohjaa GPIO-lähtö
-                    if hasattr(self, 'gpio_handler') and self.gpio_handler:
-                        self.gpio_handler.set_output(test_idx + 1, bool(switch_state))                                
-
-        # START/STOP-kytkimien käsittely
+        # Kytkimien tilojen käsittely (testien aktiivinen-tila ja start/stop)
         if op_code == 1 and result and hasattr(result, 'registers') and len(result.registers) > 0:
             if hasattr(self, '_last_switch_read'):
-                if self._last_switch_read == 17000 and result.registers[0] == 1:
-                    # START-kytkin painettu
+                switch_reg = self._last_switch_read
+                switch_state = result.registers[0]
+                
+                # Käsittele eri rekisterit erikseen
+                if switch_reg == 17000 and switch_state == 1:  # START-kytkin
+                    print(f"START-kytkin painettu (reg {switch_reg})")
+                    if hasattr(self.testing_screen, 'log_panel'):
+                        self.testing_screen.log_panel.add_log_entry("START-kytkin painettu", "INFO")
                     self.testing_screen.start_test()
-                elif self._last_switch_read == 16999 and result.registers[0] == 1:
-                    # STOP-kytkin painettu
+                
+                elif switch_reg == 16999 and switch_state == 1:  # STOP-kytkin
+                    print(f"STOP-kytkin painettu (reg {switch_reg})")
+                    if hasattr(self.testing_screen, 'log_panel'):
+                        self.testing_screen.log_panel.add_log_entry("STOP-kytkin painettu", "INFO")
                     self.testing_screen.stop_test()
+                
+                elif 17001 <= switch_reg <= 17003:  # Testien aktivointi (17001-17003)
+                    test_idx = switch_reg - 17001
+                    
+                    if hasattr(self.testing_screen, 'log_panel'):
+                        self.testing_screen.log_panel.add_log_entry(
+                            f"Testin {test_idx+1} kytkin tila: {'aktiivinen' if switch_state == 1 else 'ei-aktiivinen'}", 
+                            "INFO")
+                    
+                    # Päivitä testipaneelin tila vain jos se poikkeaa nykyisestä
+                    if self.testing_screen.test_panels[test_idx].is_active != bool(switch_state):
+                        self.testing_screen.test_panels[test_idx].is_active = bool(switch_state)
+                        self.testing_screen.test_panels[test_idx].update_button_style()
+                        
+                        # Ohjaa GPIO-lähtö
+                        if hasattr(self, 'gpio_handler') and self.gpio_handler:
+                            self.gpio_handler.set_output(test_idx + 1, bool(switch_state))
 
     def handle_fortest_result(self, result, op_code, error_msg):
         """Käsittele ForTest-operaation tulos"""
