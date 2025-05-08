@@ -21,7 +21,6 @@ class MainWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # Konfiguroi pääikkuna
         self.setWindowTitle("Painetestaus")
         self.setGeometry(0, 0, 1280, 720)
         self.setStyleSheet("""
@@ -31,70 +30,57 @@ class MainWindow(QWidget):
             }
         """)
 
-        # Alusta managerit
         self.modbus_manager = ModbusManager(port='/dev/ttyUSB0', baudrate=19200)
         self.fortest_manager = ForTestManager(port='/dev/ttyUSB1', baudrate=19200)
         self.program_manager = ProgramManager()
-        
-        # Yhdistä signaalit
+
         self.modbus_manager.resultReady.connect(self.handle_modbus_result)
         self.fortest_manager.resultReady.connect(self.handle_fortest_result)
-        
-        # Luo statusilmoitin
+
         self.status_notifier = StatusNotifier(self)
 
-        # Alusta GPIO-käsittelijä
         try:
             self.gpio_handler = GPIOHandler()
         except Exception as e:
             print(f"Varoitus: GPIO-alustus epäonnistui: {e}")
             self.gpio_handler = None
 
-        # Luo näytöt
         self.testing_screen = TestingScreen(self)
         self.testing_screen.setGeometry(0, 0, 1280, 720)
         self.testing_screen.program_selection_requested.connect(self.show_program_selection)
-        
+
         self.manual_screen = ManualScreen(self)
         self.manual_screen.setGeometry(0, 0, 1280, 720)
         self.manual_screen.hide()
-        
+
         self.program_selection_screen = ProgramSelectionScreen(self)
         self.program_selection_screen.setGeometry(0, 0, 1280, 720)
         self.program_selection_screen.hide()
         self.program_selection_screen.program_selected.connect(self.on_program_selected)
 
-        # Lisää ajastin hätäseispiirin tilan tarkistamiseen
         self.emergency_stop_timer = QTimer(self)
         self.emergency_stop_timer.timeout.connect(self.check_emergency_stop)
-        self.emergency_stop_timer.start(1000)  # Tarkista joka sekunti
+        self.emergency_stop_timer.start(1000)
 
-        # Hätäseis-dialogi ei ole vielä avoinna
         self.emergency_dialog_open = False
-        self._dialog_opened_time = 0  # Tallentaa milloin dialogi avattiin
-        
-        # Lisää ajastin kytkimien tilojen tarkistamiseen
+        self._dialog_opened_time = 0
+
         self.switch_read_timer = QTimer(self)
         self.switch_read_timer.timeout.connect(self.check_switches)
-        self.switch_read_timer.start(150)  # Tarkista 150ms välein        
-
+        self.switch_read_timer.start(150)
 
     def check_emergency_stop(self):
-        """Tarkista hätäseispiirin tila"""
         if not self.modbus_manager.is_connected():
             return
-        
-        # Käytä synkronista lukua
+
         status = self.modbus_manager.read_emergency_stop_status()
-        
-        # Jos status on 1 ja dialogi on avoinna, sulje se
+
         if status == 1 and self.emergency_dialog_open:
             if hasattr(self, '_emergency_dialog') and self._emergency_dialog is not None:
                 self._emergency_dialog.accept()
                 self._emergency_dialog = None
                 self.emergency_dialog_open = False
-        
-        # Jos status on 0, hätäseispiiri on aktiivinen
+
         elif status == 0 and not self.emergency_dialog_open:
             self.emergency_dialog_open = True
             self._emergency_dialog = EmergencyStopDialog(self, self.modbus_manager)
@@ -102,14 +88,10 @@ class MainWindow(QWidget):
             self._emergency_dialog.exec_()
 
     def on_emergency_dialog_closed(self):
-        """Dialogi suljettu, nollataan lippu"""
         self.emergency_dialog_open = False
         self._emergency_dialog = None
 
-
     def handle_modbus_result(self, result, op_code, error_msg):
-        """Käsittele Modbus-operaation tulos"""
-
         if error_msg:
             self.status_notifier.show_message(error_msg, StatusNotifier.ERROR)
             if hasattr(self.testing_screen, 'log_panel'):
@@ -125,14 +107,15 @@ class MainWindow(QWidget):
                 self._read_next_register()
                 return
 
-            if switch_reg == 17000 and switch_state == 1:  # START
+            if switch_reg == 17000 and switch_state == 1:
                 self.testing_screen.start_test()
 
-            elif switch_reg == 16999 and switch_state == 1:  # STOP
+            elif switch_reg == 16999 and switch_state == 1:
                 self.testing_screen.stop_test()
 
             elif 17001 <= switch_reg <= 17003:
                 test_idx = switch_reg - 17001
+                panel = self.testing_screen.test_panels[test_idx]
 
                 if hasattr(self.testing_screen, 'log_panel'):
                     self.testing_screen.log_panel.add_log_entry(
@@ -140,40 +123,36 @@ class MainWindow(QWidget):
                         "INFO"
                     )
 
-                if self.testing_screen.test_panels[test_idx].is_active != bool(switch_state):
-                    self.testing_screen.test_panels[test_idx].is_active = bool(switch_state)
-                    self.testing_screen.test_panels[test_idx].update_button_style()
+                if not hasattr(panel, '_last_register_value'):
+                    panel._last_register_value = 0
 
-                    if hasattr(self, 'gpio_handler') and self.gpio_handler:
-                        self.gpio_handler.set_output(test_idx + 1, bool(switch_state))
+                if switch_state == 1 and panel._last_register_value == 0:
+                    panel.is_active = not panel.is_active
+                    panel.update_button_style()
+                    if self.gpio_handler:
+                        self.gpio_handler.set_output(test_idx + 1, panel.is_active)
+
+                panel._last_register_value = switch_state
 
         self._read_next_register()
+
     def handle_fortest_result(self, result, op_code, error_msg):
-        """Käsittele ForTest-operaation tulos"""
         if error_msg:
-            # Näytä virheviesti
             self.status_notifier.show_message(error_msg, StatusNotifier.ERROR)
             if hasattr(self.testing_screen, 'log_panel'):
                 self.testing_screen.log_panel.add_log_entry(error_msg, "ERROR")
-        
-        # Käsittele onnistuneet operaatiot
+
         if result:
             msg = ""
             msg_type = StatusNotifier.INFO
-            
-            if op_code == 1:  # Käynnistys
+
+            if op_code == 1:
                 msg = "Testi käynnistetty onnistuneesti"
                 msg_type = StatusNotifier.SUCCESS
-            elif op_code == 2:  # Pysäytys
+            elif op_code == 2:
                 msg = "Testi pysäytetty"
                 msg_type = StatusNotifier.INFO
-            elif op_code == 3:  # Tilan luku
-                # Käsittele tila
-                pass
-            elif op_code == 4:  # Tulosten luku
-                # Käsittele tulokset
-                pass
-            
+
             if msg:
                 self.status_notifier.show_message(msg, msg_type)
                 if hasattr(self.testing_screen, 'log_panel'):
@@ -184,11 +163,10 @@ class MainWindow(QWidget):
                         level = "WARNING"
                     elif msg_type == StatusNotifier.ERROR:
                         level = "ERROR"
-                    
+
                     self.testing_screen.log_panel.add_log_entry(msg, level)
 
     def check_switches(self):
-        """Tarkista kytkinten tilat"""
         if not self.modbus_manager.is_connected():
             return
 
@@ -196,62 +174,49 @@ class MainWindow(QWidget):
         self._read_next_register()
 
     def _read_next_register(self):
-        """Lue seuraava rekisteri jonosta"""
         if hasattr(self, '_pending_reads') and self._pending_reads:
             address = self._pending_reads.pop(0)
             self._current_read_address = address
             self.modbus_manager.read_register(address, 1)
 
-
     def on_program_selected(self, program_name):
-        """Käsittele valittu ohjelma"""
         self.testing_screen.set_program_for_test(program_name)
         self.show_testing()
-    
+
     def show_testing(self):
-        """Näytä testaussivu"""
         self.manual_screen.hide()
         self.program_selection_screen.hide()
         self.testing_screen.show()
-    
+
     def show_manual(self):
-        """Näytä käsikäyttösivu"""
         self.testing_screen.hide()
         self.program_selection_screen.hide()
         self.manual_screen.show()
-    
+
     def show_program_selection(self, test_number=None):
-        """Näytä ohjelman valintasivu"""
         if test_number is not None:
             self.testing_screen.current_test_panel = test_number
-        
+
         self.testing_screen.hide()
         self.manual_screen.hide()
         self.program_selection_screen.show()
-    
+
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key_Escape:
-            # ESC palauttaa testaussivulle
             if self.manual_screen.isVisible() or self.program_selection_screen.isVisible():
                 self.show_testing()
             else:
                 self.close()
         super().keyPressEvent(event)
-    
+
     def show(self):
-        # Käynnistä kokoruututilassa
         self.showFullScreen()
 
     def closeEvent(self, event):
-        # Siivoa resurssit
         self.testing_screen.cleanup()
         self.manual_screen.cleanup()
-        
         self.modbus_manager.cleanup()
         self.fortest_manager.cleanup()
-        
-        # Siivoa GPIO-resurssit
         if hasattr(self, 'gpio_handler') and self.gpio_handler:
             self.gpio_handler.cleanup()
-            
         super().closeEvent(event)
