@@ -179,13 +179,19 @@ class TestingScreen(BaseScreen):
                 self.parent().parent().gpio_handler.set_output(self.test_number, self.is_active)          
     
 
+    # Korjattu TestingScreen.toggle_test_active() (ui/screens/testing_screen.py)
     def toggle_test_active(self, test_number, active):
-        """Vaihda testin aktiivisuustila vain GPIO:n ja näkymän osalta"""
-        self.test_panels[test_number - 1].is_active = active
-        self.test_panels[test_number - 1].update_button_style()
+        """Vaihda testin aktiivisuustila vain UI:n ja GPIO:n osalta"""
+        # Varmista että test_number on sallituissa rajoissa
+        if 1 <= test_number <= len(self.test_panels):
+            panel = self.test_panels[test_number - 1]
+            panel.is_active = active
+            panel.update_button_style()
 
-        if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
-            self.parent().parent().gpio_handler.set_output(test_number, active)
+            # Ohjaa vain GPIO-lähtö
+            if hasattr(self.parent(), 'gpio_handler') and self.parent().gpio_handler:
+                self.parent().gpio_handler.set_output(test_number, active)
+                
     def toggle_log_panel(self):
         """Näytä/piilota lokipaneeli"""
         if self.log_panel.isVisible():

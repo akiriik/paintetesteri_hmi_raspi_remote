@@ -92,20 +92,19 @@ class TestPanel(QWidget):
         self.selected_program = program_name
         self.program_label.setText(f" {program_name}")
     
+    # Korjattu TestPanel.toggle_active (ui/components/test_panel.py)
     @pyqtSlot()
     def toggle_active(self):
-        """Vaihda aktiivisuustila ja lähetä signaali"""
+        """Vaihda aktiivisuustila ja päivitä vain UI ja GPIO"""
         self.is_active = not self.is_active
         self.update_button_style()
         
-        # Lähetä signaali pääikkunalle Modbus-käsittelyä varten
-        if hasattr(self.parent(), 'toggle_test_active'):
-            self.parent().toggle_test_active(self.test_number, self.is_active)
-            
-            # Ohjaa myös GPIO-lähtö, jos saatavilla
-            if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
-                self.parent().parent().gpio_handler.set_output(self.test_number, self.is_active)
-    
+        # Käytä vain GPIO-ohjausta, EI ForTest-kommunikointia
+        if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
+            self.parent().parent().gpio_handler.set_output(self.test_number, self.is_active)
+        
+        # Poistettu kaikki modbus- ja fortest-viittaukset
+
     @pyqtSlot(bool, str)
     def handle_toggle_result(self, success, error_msg):
         """Käsittele taustasäikeestä tullut tulos"""
