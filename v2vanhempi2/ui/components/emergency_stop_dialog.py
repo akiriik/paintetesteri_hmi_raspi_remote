@@ -104,15 +104,8 @@ class EmergencyStopDialog(QDialog):
     def reset_emergency_stop(self):
         """Kuittaa hätäseis"""
         if self.modbus:
+            # ModbusManager - käytä aina momentary toimintaa
             if hasattr(self.modbus, 'write_register'):
-                # Suora ModbusHandler - vanha tapa
-                result = self.modbus.write_register(19099, 1)
-                if result:
-                    print("Hätäseis kuitattu - rekisteri 19099 asetettu arvoon 1")
-                    # Nollaa rekisteri hetken kuluttua 
-                    QTimer.singleShot(300, lambda: self.reset_emergency_register_to_zero())
-            else:
-                # ModbusManager - momentary toiminta 
                 self.modbus.write_register(19099, 1)
                 # Nollaa rekisteri hetken kuluttua
                 QTimer.singleShot(300, lambda: self.modbus.write_register(19099, 0))
