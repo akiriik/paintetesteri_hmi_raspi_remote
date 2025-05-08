@@ -101,6 +101,7 @@ class EmergencyStopDialog(QDialog):
                 border: 4px solid red;
             """)
     
+    # In EmergencyStopDialog.reset_emergency_stop method, add a check after reset:
     def reset_emergency_stop(self):
         """Kuittaa hätäseis"""
         if self.modbus:
@@ -109,6 +110,9 @@ class EmergencyStopDialog(QDialog):
                 self.modbus.write_register(19099, 1)
                 # Nollaa rekisteri hetken kuluttua
                 QTimer.singleShot(300, lambda: self.modbus.write_register(19099, 0))
+                
+                # Check status after a short delay to allow the system to update
+                QTimer.singleShot(500, self.check_status_after_reset)
 
     def reset_emergency_register_to_zero(self):
         """Palauta kuittausrekisteri takaisin nollaan"""
