@@ -84,31 +84,13 @@ class ManualScreen(BaseScreen):
             }}
         """)
         
-        # Lähetä Modbus-komento
-        try:
+        # Käytä ModbusManager-luokkaa releen ohjaamiseen
+        if hasattr(self.parent(), 'modbus_manager'):
             relay_num = index + 1
-            success = self.modbus.toggle_relay(relay_num, new_state)
-            if success:
-                self.relay_status_label.setText(f"Rele {relay_num} {'PÄÄLLÄ' if new_state else 'POIS'}")
-            else:
-                self.relay_status_label.setText(f"Virhe releen {relay_num} ohjauksessa!")
-                # Palauta napin tila, koska komento epäonnistui
-                self.relay_states[index] = not self.relay_states[index]
-                # Päivitä painikkeen tyyli vastaamaan todellista tilaa
-                self.relay_buttons[index].setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: {("#00aa00" if self.relay_states[index] else "#888888")};
-                        color: white;
-                        border-radius: 10px;
-                        font-size: 18px;
-                        font-weight: bold;
-                    }}
-                """)
-        except Exception as e:
-            print(f"Virhe releen {index+1} ohjauksessa: {e}")
-            self.relay_status_label.setText(f"Virhe: {str(e)}")
-            # Tässäkin pitäisi palauttaa napin tila ja päivittää sen tyyli
-            self.relay_states[index] = not self.relay_states[index]
+            self.parent().modbus_manager.toggle_relay(relay_num, new_state)
+            # Virheviestit käsitellään automaattisesti MainWindow.handle_modbus_result-metodissa
+        else:
+            self.relay_states[index] = not self.relay_states[index]  # Vaihda tila takaisin
             self.relay_buttons[index].setStyleSheet(f"""
                 QPushButton {{
                     background-color: {("#00aa00" if self.relay_states[index] else "#888888")};
@@ -118,7 +100,6 @@ class ManualScreen(BaseScreen):
                     font-weight: bold;
                 }}
             """)
-
     def go_back(self):
         """Palaa testaussivulle"""
         if hasattr(self.parent(), 'show_testing'):

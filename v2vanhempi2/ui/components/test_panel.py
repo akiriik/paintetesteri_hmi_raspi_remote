@@ -1,6 +1,7 @@
 # ui/components/test_panel.py
 from PyQt5.QtWidgets import QWidget, QLabel, QPushButton, QVBoxLayout
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
+from PyQt5.QtGui import QFont 
 
 class TestPanel(QWidget):
     """Yksittäisen testin paneeli"""

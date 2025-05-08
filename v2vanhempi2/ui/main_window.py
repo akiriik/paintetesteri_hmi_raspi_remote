@@ -1,22 +1,21 @@
+# ui/main_window.py
 import sys
 import os
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QKeyEvent
 
-
-# Omat komponentit
 from ui.screens.testing_screen import TestingScreen
 from ui.screens.manual_screen import ManualScreen
 from ui.screens.program_selection_screen import ProgramSelectionScreen
-from utils.modbus_handler import ModbusHandler
-from utils.fortest_handler import ForTestHandler
 from ui.components.emergency_stop_dialog import EmergencyStopDialog
-from utils.gpio_handler import GPIOHandler
+from ui.components.status_notifier import StatusNotifier
+
 from utils.modbus_manager import ModbusManager
 from utils.fortest_manager import ForTestManager
-from ui.components.status_notifier import StatusNotifier
-from utils.fortest_handler import DummyForTestHandler
+from utils.gpio_handler import GPIOHandler
+from utils.program_manager import ProgramManager
+from utils.pressure_reader import PressureReaderThread
 
 class MainWindow(QWidget):
     def __init__(self, parent=None):
@@ -32,17 +31,17 @@ class MainWindow(QWidget):
             }
         """)
 
-        # Luo Modbus-käsittelijä
-        self.modbus = ModbusHandler(port='/dev/ttyUSB0', baudrate=19200)
-
-        # Alusta ForTest-yhteys
-        try:
-            self.fortest = ForTestHandler(port='/dev/ttyUSB1', baudrate=19200)
-        except Exception as e:
-            print(f"Varoitus: ForTest-yhteys epäonnistui: {e}")
-            # Luo dummy-ForTestHandler joka ei tee mitään
-            from utils.fortest_handler import DummyForTestHandler
-            self.fortest = DummyForTestHandler()
+        # Alusta managerit
+        self.modbus_manager = ModbusManager(port='/dev/ttyUSB0', baudrate=19200)
+        self.fortest_manager = ForTestManager(port='/dev/ttyUSB1', baudrate=19200)
+        self.program_manager = ProgramManager()
+        
+        # Yhdistä signaalit
+        self.modbus_manager.resultReady.connect(self.handle_modbus_result)
+        self.fortest_manager.resultReady.connect(self.handle_fortest_result)
+        
+        # Luo statusilmoitin
+        self.status_notifier = StatusNotifier(self)
 
         # Alusta GPIO-käsittelijä
         try:
@@ -51,6 +50,20 @@ class MainWindow(QWidget):
             print(f"Varoitus: GPIO-alustus epäonnistui: {e}")
             self.gpio_handler = None
 
+        # Luo näytöt
+        self.testing_screen = TestingScreen(self)
+        self.testing_screen.setGeometry(0, 0, 1280, 720)
+        self.testing_screen.program_selection_requested.connect(self.show_program_selection)
+        
+        self.manual_screen = ManualScreen(self)
+        self.manual_screen.setGeometry(0, 0, 1280, 720)
+        self.manual_screen.hide()
+        
+        self.program_selection_screen = ProgramSelectionScreen(self)
+        self.program_selection_screen.setGeometry(0, 0, 1280, 720)
+        self.program_selection_screen.hide()
+        self.program_selection_screen.program_selected.connect(self.on_program_selected)
+
         # Lisää ajastin hätäseispiirin tilan tarkistamiseen
         self.emergency_stop_timer = QTimer(self)
         self.emergency_stop_timer.timeout.connect(self.check_emergency_stop)
@@ -58,70 +71,106 @@ class MainWindow(QWidget):
 
         # Hätäseis-dialogi ei ole vielä avoinna
         self.emergency_dialog_open = False
+        
+        # Alusta paineanturin lukijasäie
+        self.setup_pressure_reader()
 
-        # Välitä fortest aina testaussivulle
-        self.testing_screen = TestingScreen(self, self.fortest)
-        self.testing_screen.setGeometry(0, 0, 1280, 720)
-
-        # Luo käsikäyttösivu
-        self.manual_screen = ManualScreen(self, self.modbus)
-        self.manual_screen.setGeometry(0, 0, 1280, 720)
-        self.manual_screen.hide()
-
-        # Luo ohjelman valintasivu
-        self.program_selection_screen = ProgramSelectionScreen(self)
-        self.program_selection_screen.setGeometry(0, 0, 1280, 720)
-        self.program_selection_screen.hide()
-
-        # Yhdistä signaalit
-        self.program_selection_screen.program_selected.connect(self.on_program_selected)
+    def setup_pressure_reader(self):
+        """Alusta paineanturi ja sen lukijasäie"""
+        try:
+            from utils.pressure_sensor import PressureSensor
+            sensor = PressureSensor()
+            self.pressure_reader = PressureReaderThread(sensor)
+            self.pressure_reader.pressureUpdated.connect(self.on_pressure_updated)
+            self.pressure_reader.start()
+        except Exception as e:
+            print(f"Varoitus: Paineanturin alustus epäonnistui: {e}")
+    
+    def on_pressure_updated(self, pressure):
+        """Käsittele painelukema"""
+        if hasattr(self.testing_screen, 'update_pressure_display'):
+            self.testing_screen.update_pressure_display(pressure)
 
     def check_emergency_stop(self):
         """Tarkista hätäseispiirin tila"""
-        if not hasattr(self, 'modbus') or not self.modbus.connected:
+        if not self.modbus_manager.is_connected():
             return
         
-        status = self.modbus.read_emergency_stop_status()
-        
+        self.modbus_manager.read_register(19100, 1)
+    
+    def handle_emergency_stop_status(self, value):
+        """Käsittele hätäseispiirin tila"""
         # Jos status on 0, hätäseispiiri on aktiivinen
-        if status == 0 and not self.emergency_dialog_open:
+        if value == 0 and not self.emergency_dialog_open:
             self.emergency_dialog_open = True
-            dialog = EmergencyStopDialog(self, self.modbus)
-            # Kun dialogi suljetaan, tarkista tila uudelleen välittömästi
+            dialog = EmergencyStopDialog(self, self.modbus_manager)
             dialog.finished.connect(self.on_emergency_dialog_closed)
-            dialog.exec_()  # Käytä exec_ metodia show() sijaan, jotta dialogi on modaalinen
-        
+            dialog.exec_()
+    
     def on_emergency_dialog_closed(self):
         """Dialogi suljettu, nollataan lippu"""
         self.emergency_dialog_open = False
 
-
-    # Lisää metodit tulosten käsittelyyn:
     def handle_modbus_result(self, result, op_code, error_msg):
         """Käsittele Modbus-operaation tulos"""
         if error_msg:
             # Näytä virheviesti
             self.status_notifier.show_message(error_msg, StatusNotifier.ERROR)
+            if hasattr(self.testing_screen, 'log_panel'):
+                self.testing_screen.log_panel.add_log_entry(error_msg, "ERROR")
         
-        # Delegoi tulos oikealle komponentille
-        # ...
-
+        # Käsittele eri tyyppisten operaatioiden tulokset
+        if op_code == 1:  # Rekisterin luku
+            if result and hasattr(result, 'registers') and len(result.registers) > 0:
+                # Käsittele rekisterikohtainen tulos
+                if hasattr(self, '_last_register_read') and self._last_register_read == 19100:
+                    # Hätäseisrekisterin lukutulos
+                    self.handle_emergency_stop_status(result.registers[0])
+        
+        self._last_register_read = None  # Nollaa lukurekisteri
+    
     def handle_fortest_result(self, result, op_code, error_msg):
         """Käsittele ForTest-operaation tulos"""
         if error_msg:
             # Näytä virheviesti
             self.status_notifier.show_message(error_msg, StatusNotifier.ERROR)
+            if hasattr(self.testing_screen, 'log_panel'):
+                self.testing_screen.log_panel.add_log_entry(error_msg, "ERROR")
         
-        # Delegoi tulos oikealle komponentille
-        # ...
-
-
+        # Käsittele onnistuneet operaatiot
+        if result:
+            msg = ""
+            msg_type = StatusNotifier.INFO
+            
+            if op_code == 1:  # Käynnistys
+                msg = "Testi käynnistetty onnistuneesti"
+                msg_type = StatusNotifier.SUCCESS
+            elif op_code == 2:  # Pysäytys
+                msg = "Testi pysäytetty"
+                msg_type = StatusNotifier.INFO
+            elif op_code == 3:  # Tilan luku
+                # Käsittele tila
+                pass
+            elif op_code == 4:  # Tulosten luku
+                # Käsittele tulokset
+                pass
+            
+            if msg:
+                self.status_notifier.show_message(msg, msg_type)
+                if hasattr(self.testing_screen, 'log_panel'):
+                    level = "INFO"
+                    if msg_type == StatusNotifier.SUCCESS:
+                        level = "SUCCESS"
+                    elif msg_type == StatusNotifier.WARNING:
+                        level = "WARNING"
+                    elif msg_type == StatusNotifier.ERROR:
+                        level = "ERROR"
+                    
+                    self.testing_screen.log_panel.add_log_entry(msg, level)
 
     def on_program_selected(self, program_name):
         """Käsittele valittu ohjelma"""
-        # Anna valittu ohjelma testaussivulle
         self.testing_screen.set_program_for_test(program_name)
-        # Palaa testaussivulle
         self.show_testing()
     
     def show_testing(self):
@@ -136,8 +185,11 @@ class MainWindow(QWidget):
         self.program_selection_screen.hide()
         self.manual_screen.show()
     
-    def show_program_selection(self):
+    def show_program_selection(self, test_number=None):
         """Näytä ohjelman valintasivu"""
+        if test_number is not None:
+            self.testing_screen.current_test_panel = test_number
+        
         self.testing_screen.hide()
         self.manual_screen.hide()
         self.program_selection_screen.show()
@@ -159,6 +211,14 @@ class MainWindow(QWidget):
         # Siivoa resurssit
         self.testing_screen.cleanup()
         self.manual_screen.cleanup()
+        
+        # Pysäytä säikeet
+        if hasattr(self, 'pressure_reader'):
+            self.pressure_reader.stop()
+            self.pressure_reader.wait()
+        
+        self.modbus_manager.cleanup()
+        self.fortest_manager.cleanup()
         
         # Siivoa GPIO-resurssit
         if hasattr(self, 'gpio_handler') and self.gpio_handler:
