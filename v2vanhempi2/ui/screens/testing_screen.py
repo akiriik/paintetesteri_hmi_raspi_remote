@@ -178,14 +178,14 @@ class TestingScreen(BaseScreen):
             if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
                 self.parent().parent().gpio_handler.set_output(self.test_number, self.is_active)          
     
-    def toggle_test_active(self, test_number, active):
-        """Vaihda testin aktiivisuustila"""
-        if hasattr(self.parent(), 'modbus_manager'):
-            reg_address = 17000 + test_number
-            value = 1 if active else 0
-            self.parent().modbus_manager.write_register(reg_address, value)
-            self.log_panel.add_log_entry(f"Testi {test_number} asetettu {'aktiiviseksi' if active else 'ei-aktiiviseksi'}", "INFO")
 
+    def toggle_test_active(self, test_number, active):
+        """Vaihda testin aktiivisuustila vain GPIO:n ja näkymän osalta"""
+        self.test_panels[test_number - 1].is_active = active
+        self.test_panels[test_number - 1].update_button_style()
+
+        if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
+            self.parent().parent().gpio_handler.set_output(test_number, active)
     def toggle_log_panel(self):
         """Näytä/piilota lokipaneeli"""
         if self.log_panel.isVisible():

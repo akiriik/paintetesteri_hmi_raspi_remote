@@ -106,77 +106,48 @@ class MainWindow(QWidget):
         self.emergency_dialog_open = False
         self._emergency_dialog = None
 
+
     def handle_modbus_result(self, result, op_code, error_msg):
         """Käsittele Modbus-operaation tulos"""
+
         if error_msg:
-            # Näytä virheviesti
             self.status_notifier.show_message(error_msg, StatusNotifier.ERROR)
             if hasattr(self.testing_screen, 'log_panel'):
                 self.testing_screen.log_panel.add_log_entry(error_msg, "ERROR")
-        
-        # Rekisterin luku
-        if op_code == 1:  # Rekisterin luku
-            if result and hasattr(result, 'registers') and len(result.registers) > 0:
-                if hasattr(self, '_last_register_read') and self._last_register_read is not None:
-                    if self._last_register_read == 19100:
-                        # Hätäseisrekisterin arvo (0=aktiivinen, 1=ei aktiivinen)
-                        emergency_status = result.registers[0]
-                        
-                        # Tallennetaan viimeisin tila, ei tulosteta terminaaliin
-                        self._last_emergency_state = emergency_status
-                        
-                        if emergency_status == 0 and not self.emergency_dialog_open:
-                            # Hätäseis aktiivinen
-                            self.emergency_dialog_open = True
-                            self._dialog_opened_time = time.time()  # Tallenna avausaika
-                            self._emergency_dialog = EmergencyStopDialog(self, self.modbus_manager)
-                            self._emergency_dialog.finished.connect(self.on_emergency_dialog_closed)
-                            self._emergency_dialog.exec_()
-                        elif emergency_status == 1 and self.emergency_dialog_open:
-                            # Hätäseis ei aktiivinen, mutta estetään vilkkuminen
-                            # Suljetaan dialogi vain jos se on ollut auki vähintään 2 sekuntia
-                            if hasattr(self, '_dialog_opened_time') and time.time() - self._dialog_opened_time > 2:
-                                if hasattr(self, '_emergency_dialog') and self._emergency_dialog is not None:
-                                    self._emergency_dialog.accept()
-                                    self._emergency_dialog = None
-                                self.emergency_dialog_open = False
+            self._read_next_register()
+            return
 
-        # Kytkimien tilojen käsittely (testien aktiivinen-tila ja start/stop)
         if op_code == 1 and result and hasattr(result, 'registers') and len(result.registers) > 0:
-            if hasattr(self, '_last_switch_read'):
-                switch_reg = self._last_switch_read
-                switch_state = result.registers[0]
-                
-                # Käsittele eri rekisterit erikseen
-                if switch_reg == 17000 and switch_state == 1:  # START-kytkin
-                    print(f"START-kytkin painettu (reg {switch_reg})")
-                    if hasattr(self.testing_screen, 'log_panel'):
-                        self.testing_screen.log_panel.add_log_entry("START-kytkin painettu", "INFO")
-                    self.testing_screen.start_test()
-                
-                elif switch_reg == 16999 and switch_state == 1:  # STOP-kytkin
-                    print(f"STOP-kytkin painettu (reg {switch_reg})")
-                    if hasattr(self.testing_screen, 'log_panel'):
-                        self.testing_screen.log_panel.add_log_entry("STOP-kytkin painettu", "INFO")
-                    self.testing_screen.stop_test()
-                
-                elif 17001 <= switch_reg <= 17003:  # Testien aktivointi (17001-17003)
-                    test_idx = switch_reg - 17001
-                    
-                    if hasattr(self.testing_screen, 'log_panel'):
-                        self.testing_screen.log_panel.add_log_entry(
-                            f"Testin {test_idx+1} kytkin tila: {'aktiivinen' if switch_state == 1 else 'ei-aktiivinen'}", 
-                            "INFO")
-                    
-                    # Päivitä testipaneelin tila vain jos se poikkeaa nykyisestä
-                    if self.testing_screen.test_panels[test_idx].is_active != bool(switch_state):
-                        self.testing_screen.test_panels[test_idx].is_active = bool(switch_state)
-                        self.testing_screen.test_panels[test_idx].update_button_style()
-                        
-                        # Ohjaa GPIO-lähtö
-                        if hasattr(self, 'gpio_handler') and self.gpio_handler:
-                            self.gpio_handler.set_output(test_idx + 1, bool(switch_state))
+            switch_state = result.registers[0]
+            switch_reg = getattr(self, '_current_read_address', None)
 
+            if switch_reg is None:
+                self._read_next_register()
+                return
+
+            if switch_reg == 17000 and switch_state == 1:  # START
+                self.testing_screen.start_test()
+
+            elif switch_reg == 16999 and switch_state == 1:  # STOP
+                self.testing_screen.stop_test()
+
+            elif 17001 <= switch_reg <= 17003:
+                test_idx = switch_reg - 17001
+
+                if hasattr(self.testing_screen, 'log_panel'):
+                    self.testing_screen.log_panel.add_log_entry(
+                        f"Testin {test_idx+1} kytkin tila: {'aktiivinen' if switch_state == 1 else 'ei-aktiivinen'}",
+                        "INFO"
+                    )
+
+                if self.testing_screen.test_panels[test_idx].is_active != bool(switch_state):
+                    self.testing_screen.test_panels[test_idx].is_active = bool(switch_state)
+                    self.testing_screen.test_panels[test_idx].update_button_style()
+
+                    if hasattr(self, 'gpio_handler') and self.gpio_handler:
+                        self.gpio_handler.set_output(test_idx + 1, bool(switch_state))
+
+        self._read_next_register()
     def handle_fortest_result(self, result, op_code, error_msg):
         """Käsittele ForTest-operaation tulos"""
         if error_msg:
@@ -220,20 +191,17 @@ class MainWindow(QWidget):
         """Tarkista kytkinten tilat"""
         if not self.modbus_manager.is_connected():
             return
-        
-        # Lue rekisterit 17001-17003 (testien aktiiviset tilat)
-        for i in range(3):
-            reg = 17001 + i
-            self.modbus_manager.read_register(reg, 1)
-            self._last_switch_read = reg
-        
-        # Lue START-kytkin (17000)
-        self.modbus_manager.read_register(17000, 1)
-        self._last_switch_read = 17000
-        
-        # Lue STOP-kytkin (16999)
-        self.modbus_manager.read_register(16999, 1)
-        self._last_switch_read = 16999
+
+        self._pending_reads = [16999, 17000, 17001, 17002, 17003]
+        self._read_next_register()
+
+    def _read_next_register(self):
+        """Lue seuraava rekisteri jonosta"""
+        if hasattr(self, '_pending_reads') and self._pending_reads:
+            address = self._pending_reads.pop(0)
+            self._current_read_address = address
+            self.modbus_manager.read_register(address, 1)
+
 
     def on_program_selected(self, program_name):
         """Käsittele valittu ohjelma"""
