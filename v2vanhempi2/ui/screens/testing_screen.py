@@ -129,7 +129,6 @@ class TestPanel(QWidget):
             value = 1 if self.is_active else 0
             result = modbus.write_register(self.modbus_register, value)
             if not result:
-                print(f"Virhe rekisterin {self.modbus_register} kirjoituksessa")
                 # Vaihda tila takaisin jos epäonnistui
                 self.is_active = not self.is_active
                 self.update_button_style()
@@ -193,8 +192,9 @@ class RightControl(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         
-        # Modbus-rekisteri käynnistysohjaukselle
+        # Modbus-rekisterit käynnistys- ja pysäytysohjaukselle
         self.start_register = 17000
+        self.stop_register = 16999
         
         # Layout
         layout = QVBoxLayout(self)
@@ -248,8 +248,8 @@ class RightControl(QWidget):
         
         # Ajastin rekisterien tilan tarkistukseen
         self.modbus_timer = QTimer(self)
-        self.modbus_timer.timeout.connect(self.check_start_register)
-        self.modbus_timer.start(150)  # Tarkista kerran sekunnissa
+        self.modbus_timer.timeout.connect(self.check_control_registers)
+        self.modbus_timer.start(150)  # Tarkista 150 millisekunnin välein
         
         # Käynnissä tila
         self.is_running = False
@@ -260,15 +260,22 @@ class RightControl(QWidget):
             return self.parent().parent().modbus
         return None
     
-    def check_start_register(self):
-        """Tarkista käynnistys/pysäytys rekisterin tila"""
+    def get_gpio_handler(self):
+        """Hae GPIO-käsittelijä pääikkunalta"""
+        if hasattr(self.parent(), 'parent') and hasattr(self.parent().parent(), 'gpio_handler'):
+            return self.parent().parent().gpio_handler
+        return None
+    
+    def check_control_registers(self):
+        """Tarkista käynnistys- ja pysäytysrekisterien tila"""
         modbus = self.get_modbus()
         if modbus and modbus.connected:
             try:
-                result = modbus.read_holding_registers(self.start_register, 1)
-                if result and hasattr(result, 'registers') and len(result.registers) > 0:
+                # Tarkista käynnistysrekisteri (17000)
+                start_result = modbus.read_holding_registers(self.start_register, 1)
+                if start_result and hasattr(start_result, 'registers') and len(start_result.registers) > 0:
                     # Kun rekisterissä on 1, käynnistä testi jos se ei ole jo käynnissä
-                    if result.registers[0] == 1:
+                    if start_result.registers[0] == 1:
                         # Vain jos edellinen arvo ei ollut 1, vaihdetaan tilaa
                         if not hasattr(self, '_last_start_value') or self._last_start_value != 1:
                             if not self.is_running:
@@ -277,12 +284,41 @@ class RightControl(QWidget):
                                 # Käynnistä testi ForTest-laitteella
                                 if hasattr(self.parent(), 'start_test'):
                                     self.parent().start_test()
-                                print("Testi käynnistetty rekisterin arvon muutoksesta")
+                                # Aktivoi GPIO 23 (ulostulo 4) käynnistyksen yhteydessä
+                                gpio_handler = self.get_gpio_handler()
+                                if gpio_handler:
+                                    gpio_handler.set_output(4, True)  # Aseta ulostulo 4 päälle
+                                    # Aseta ajastin sammuttamaan GPIO 200ms:n kuluttua
+                                    QTimer.singleShot(200, lambda: gpio_handler.set_output(4, False))
                     
                     # Tallenna tämä rekisteriarvo seuraavaa tarkistusta varten
-                    self._last_start_value = result.registers[0]
+                    self._last_start_value = start_result.registers[0]
+                
+                # Tarkista pysäytysrekisteri (16999)
+                stop_result = modbus.read_holding_registers(self.stop_register, 1)
+                if stop_result and hasattr(stop_result, 'registers') and len(stop_result.registers) > 0:
+                    # Kun rekisterissä on 1, pysäytä testi jos se on käynnissä
+                    if stop_result.registers[0] == 1:
+                        # Vain jos edellinen arvo ei ollut 1, pysäytetään testi
+                        if not hasattr(self, '_last_stop_value') or self._last_stop_value != 1:
+                            if self.is_running:
+                                self.is_running = False
+                                self.update_buttons()
+                                # Pysäytä testi ForTest-laitteella
+                                if hasattr(self.parent(), 'stop_test'):
+                                    self.parent().stop_test()
+                                # Aktivoi GPIO 24 (ulostulo 5) pysäytyksen yhteydessä
+                                gpio_handler = self.get_gpio_handler()
+                                if gpio_handler:
+                                    gpio_handler.set_output(5, True)  # Aseta ulostulo 5 päälle
+                                    # Aseta ajastin sammuttamaan GPIO 200ms:n kuluttua
+                                    QTimer.singleShot(200, lambda: gpio_handler.set_output(5, False))
+                    
+                    # Tallenna tämä rekisteriarvo seuraavaa tarkistusta varten
+                    self._last_stop_value = stop_result.registers[0]
+                    
             except Exception as e:
-                print(f"Virhe rekisterin {self.start_register} lukemisessa: {e}")
+                pass  # Älä tulosta virheilmoituksia
     
     def update_buttons(self):
         """Päivitä nappien tyylit tilan mukaan"""
@@ -325,42 +361,68 @@ class RightControl(QWidget):
                 }
             """)
     
-    def reset_start_register(self):
-        """Nollaa käynnistysrekisteri takaisin nollatilaan"""
+    def reset_register(self, register):
+        """Nollaa rekisteri takaisin nollatilaan"""
         modbus = self.get_modbus()
         if modbus and modbus.connected:
-            result = modbus.write_register(self.start_register, 0)
-            if not result:
-                print(f"Virhe rekisterin {self.start_register} nollauksessa")
+            modbus.write_register(register, 0)
     
     def set_start_state(self, state):
         """Aseta käynnistystila ja päivitä modbus-rekisteri"""
         modbus = self.get_modbus()
         if modbus and modbus.connected:
-            # Käyttäjän painaessa nappia, lähetä hetkellinen 1-arvo rekisteriin,
-            # jotta ulkopuoliset laitteet tunnistavat painalluksen
+            # Käyttäjän painaessa käynnistysnappia
             value = 1 if state else 0
             result = modbus.write_register(self.start_register, value)
             
-            # Jos kyseessä on pysäytyskomento, pysäytä testi välittömästi
-            if not state and result:
+            # Aktivoi GPIO 23 (ulostulo 4) käynnistyksen yhteydessä
+            gpio_handler = self.get_gpio_handler()
+            if gpio_handler and state:
+                gpio_handler.set_output(4, True)
+            
+            # Jos kyseessä on käynnistyskomento, päivitetään tila
+            if state and result:
+                self.is_running = True
+                self.update_buttons()
+            
+            # Jos arvo on 1 (käynnistys), nollataan se lyhyen viiveen jälkeen
+            if value == 1:
+                QTimer.singleShot(100, lambda: self.reset_register(self.start_register))
+                # Aseta myös ulostulo 4 pois päältä viiveellä (momentary-tyylisesti)
+                if gpio_handler:
+                    QTimer.singleShot(150, lambda: gpio_handler.set_output(4, False))
+    
+    def set_stop_state(self, state):
+        """Aseta pysäytystila ja päivitä modbus-rekisteri"""
+        modbus = self.get_modbus()
+        gpio_handler = self.get_gpio_handler()
+        
+        # Varmista ensin, että ulostulo 5 on pois päältä (korjaa mahdollisen jumittuneen tilan)
+        if gpio_handler:
+            gpio_handler.set_output(5, False)
+        
+        if modbus and modbus.connected:
+            # Käyttäjän painaessa pysäytysnappia
+            value = 1 if state else 0
+            result = modbus.write_register(self.stop_register, value)
+            
+            # Aktivoi GPIO 24 (ulostulo 5) pysäytyksen yhteydessä
+            if gpio_handler and state:
+                gpio_handler.set_output(5, True)
+                # Varmista että GPIO 24 sammuu tietyn ajan kuluttua (käytä pidempää aikaa)
+                QTimer.singleShot(200, lambda: gpio_handler.set_output(5, False))
+            
+            # Jos kyseessä on pysäytyskomento ja se onnistui
+            if state and result:
                 self.is_running = False
                 self.update_buttons()
                 # Pysäytä testi ForTest-laitteella
                 if hasattr(self.parent(), 'stop_test'):
                     self.parent().stop_test()
-                
-            # Jos kyseessä käynnistyskomento, päivitetään tila
-            if state and result:
-                self.is_running = True
-                self.update_buttons()
             
-            if not result:
-                print(f"Virhe rekisterin {self.start_register} kirjoittamisessa")
-                
-            # Jos arvo on 1 (käynnistys), nollataan se lyhyen viiveen jälkeen
+            # Jos arvo on 1 (pysäytys), nollataan se lyhyen viiveen jälkeen
             if value == 1:
-                QTimer.singleShot(100, lambda: self.reset_start_register())
+                QTimer.singleShot(100, lambda: self.reset_register(self.stop_register))
 
 class MenuButton(QPushButton):
     """Valikko-nappi"""
@@ -484,30 +546,20 @@ class TestingScreen(BaseScreen):
         
         # Käynnistä testi ForTest-laitteella jos saatavilla
         if self.fortest is None:
-            print("ForTest-yhteys ei ole käytettävissä")
             return
         
-        success = self.fortest.start_test()
-        if success:
-            print("Testi käynnistetty")
-        else:
-            print("Testin käynnistys epäonnistui")
+        self.fortest.start_test()
 
     def stop_test(self):
         """Pysäytä testi ja päivitä modbus-rekisteri"""
         # Päivitä modbus-rekisteri
-        self.right_control.set_start_state(False)
+        self.right_control.set_stop_state(True)
         
         # Pysäytä testi ForTest-laitteella jos saatavilla
         if self.fortest is None:
-            print("ForTest-yhteys ei ole käytettävissä")
             return
         
-        success = self.fortest.abort_test()
-        if success:
-            print("Testi pysäytetty")
-        else:
-            print("Testin pysäytys epäonnistui")
+        self.fortest.abort_test()
     
     def cleanup(self):
         """Siivoa resursit"""
