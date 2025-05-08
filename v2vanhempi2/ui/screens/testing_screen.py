@@ -74,11 +74,11 @@ class TestingScreen(BaseScreen):
             title = QLabel(f"TESTI {i}", self)
             title.setFont(QFont("Arial", 24, QFont.Bold))
             title.setAlignment(Qt.AlignCenter)
-            title.setGeometry(50 + (i-1)*320, 50, 300, 40)
+            title.setGeometry(50 + (i-1)*320, 50, 300, 100)
             
             # Testipaneeli
             panel = TestPanel(i, self)
-            panel.move(40 + (i-1)*320, 100)
+            panel.move(40 + (i-1)*320, 130)
             panel.program_selection_requested.connect(self.start_program_selection)
             panel.status_message.connect(self.handle_status_message)
             self.test_panels.append(panel)
