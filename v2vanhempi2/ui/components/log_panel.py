@@ -1,7 +1,7 @@
 # ui/components/log_panel.py
 from PyQt5.QtWidgets import QWidget, QTextEdit, QVBoxLayout, QLabel
 from PyQt5.QtCore import Qt, QDateTime
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QColor
 
 class LogPanel(QWidget):
     """Komponentti testilokien näyttämiseen"""
@@ -15,8 +15,9 @@ class LogPanel(QWidget):
         
         # Otsikko
         self.title = QLabel("VIESTIT / VIRHEET :", self)
-        self.title.setFont(QFont("Arial", 14, QFont.Bold))
+        self.title.setFont(QFont("Arial", 20, QFont.Bold))
         self.title.setAlignment(Qt.AlignCenter)
+        self.title.setStyleSheet("color: #33FF33;")  # Vihreä otsikkoteksti
         layout.addWidget(self.title)
         
         # Lokialue
@@ -24,8 +25,9 @@ class LogPanel(QWidget):
         self.log_area.setReadOnly(True)
         self.log_area.setStyleSheet("""
             QTextEdit {
-                background-color: #f8f8f8;
-                border: 1px solid #ddd;
+                background-color: black;
+                color: #33FF33;
+                border: 1px solid #333333;
                 font-family: Consolas, Courier, monospace;
                 font-size: 12px;
             }
@@ -35,9 +37,9 @@ class LogPanel(QWidget):
         # Muotoilu
         self.setStyleSheet("""
             QWidget {
-                background-color: white;
+                background-color: black;
                 border-radius: 8px;
-                border: 1px solid #ddd;
+                border: 1px solid #333333;
             }
         """)
     
@@ -50,11 +52,11 @@ class LogPanel(QWidget):
         elif level == "WARNING":
             color = "orange"
         elif level == "SUCCESS":
-            color = "green"
+            color = "#00FF00"  # Kirkkaampi vihreä onnistuneille viesteille
         else:  # INFO
-            color = "black"
+            color = "#33FF33"  # Vihreä infoviesteille
         
-        html = f'<span style="color: #888;">[{timestamp}]</span> <span style="color: {color};">{message}</span><br>'
+        html = f'<span style="color: #888888;">[{timestamp}]</span> <span style="color: {color};">{message}</span><br>'
         self.log_area.insertHtml(html)
         
         # Vieritä alas
