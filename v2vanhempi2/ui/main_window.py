@@ -1,6 +1,7 @@
 # ui/main_window.py
 import sys
 import os
+import time
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QKeyEvent
@@ -71,6 +72,7 @@ class MainWindow(QWidget):
 
         # Hätäseis-dialogi ei ole vielä avoinna
         self.emergency_dialog_open = False
+        self._dialog_opened_time = 0  # Tallentaa milloin dialogi avattiin
         
         # Alusta paineanturin lukijasäie
         self.setup_pressure_reader()
@@ -101,16 +103,27 @@ class MainWindow(QWidget):
         if not self.modbus_manager.is_connected():
             return
         
-        # Aseta rekisteri ennen lukua, että handle_modbus_result tunnistaa sen
-        self._last_register_read = 19100
-        # Lue rekisteri
-        self.modbus_manager.read_register(19100, 1)
+        # Käytä synkronista lukua
+        status = self.modbus_manager.read_emergency_stop_status()
         
-
+        # Jos status on 1 ja dialogi on avoinna, sulje se
+        if status == 1 and self.emergency_dialog_open:
+            if hasattr(self, '_emergency_dialog') and self._emergency_dialog is not None:
+                self._emergency_dialog.accept()
+                self._emergency_dialog = None
+                self.emergency_dialog_open = False
+        
+        # Jos status on 0, hätäseispiiri on aktiivinen
+        elif status == 0 and not self.emergency_dialog_open:
+            self.emergency_dialog_open = True
+            self._emergency_dialog = EmergencyStopDialog(self, self.modbus_manager)
+            self._emergency_dialog.finished.connect(self.on_emergency_dialog_closed)
+            self._emergency_dialog.exec_()
 
     def on_emergency_dialog_closed(self):
         """Dialogi suljettu, nollataan lippu"""
         self.emergency_dialog_open = False
+        self._emergency_dialog = None
 
     def handle_modbus_result(self, result, op_code, error_msg):
         """Käsittele Modbus-operaation tulos"""
@@ -128,20 +141,20 @@ class MainWindow(QWidget):
                         # Hätäseisrekisterin arvo (0=aktiivinen, 1=ei aktiivinen)
                         emergency_status = result.registers[0]
                         
-                        # Tulosta arvo debuggausta varten
-                        print(f"Hätäseis rekisterin 19100 arvo: {emergency_status}")
+                        # Tallennetaan viimeisin tila, ei tulosteta terminaaliin
+                        self._last_emergency_state = emergency_status
                         
-                        if emergency_status == 0:
+                        if emergency_status == 0 and not self.emergency_dialog_open:
                             # Hätäseis aktiivinen
-                            if not self.emergency_dialog_open:
-                                self.emergency_dialog_open = True
-                                self._emergency_dialog = EmergencyStopDialog(self, self.modbus_manager)
-                                self._emergency_dialog.finished.connect(self.on_emergency_dialog_closed)
-                                self._emergency_dialog.exec_()
-                        else:
-                            # Hätäseis ei aktiivinen, sulje dialogi jos se on avoinna
-                            if self.emergency_dialog_open:
-                                print("Hätäseis ei enää aktiivinen, suljetaan dialogi")
+                            self.emergency_dialog_open = True
+                            self._dialog_opened_time = time.time()  # Tallenna avausaika
+                            self._emergency_dialog = EmergencyStopDialog(self, self.modbus_manager)
+                            self._emergency_dialog.finished.connect(self.on_emergency_dialog_closed)
+                            self._emergency_dialog.exec_()
+                        elif emergency_status == 1 and self.emergency_dialog_open:
+                            # Hätäseis ei aktiivinen, mutta estetään vilkkuminen
+                            # Suljetaan dialogi vain jos se on ollut auki vähintään 2 sekuntia
+                            if hasattr(self, '_dialog_opened_time') and time.time() - self._dialog_opened_time > 2:
                                 if hasattr(self, '_emergency_dialog') and self._emergency_dialog is not None:
                                     self._emergency_dialog.accept()
                                     self._emergency_dialog = None

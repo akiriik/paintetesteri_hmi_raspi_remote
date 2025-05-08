@@ -105,6 +105,20 @@ class ModbusManager(QObject):
             Q_ARG(int, value)
         )
     
+    def read_emergency_stop_status(self):
+        """Lue hätäseispiirin tila"""
+        if not self.modbus_handler.connected:
+            return None
+        
+        # Lue rekisteri synkronisesti heti (ei taustasäikeessä)
+        try:
+            result = self.modbus_handler.read_holding_registers(19100, 1)
+            if result and hasattr(result, 'registers') and len(result.registers) > 0:
+                return result.registers[0]
+            return None
+        except Exception as e:
+            return None
+
     def toggle_relay(self, relay_num, state):
         """Releen ohjaus taustasäikeessä"""
         if not self.modbus_handler.connected:
