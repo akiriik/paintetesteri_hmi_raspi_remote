@@ -141,6 +141,30 @@ class MainWindow(QWidget):
                                     self._emergency_dialog = None
                                 self.emergency_dialog_open = False
 
+        # Kytkimien tilojen käsittely (testien aktiivinen-tila)
+        if op_code == 1 and result and hasattr(result, 'registers') and len(result.registers) > 0:
+            if hasattr(self, '_last_switch_read') and 17001 <= self._last_switch_read <= 17003:
+                test_idx = self._last_switch_read - 17001
+                switch_state = result.registers[0]
+                
+                # Päivitä testipaneelin tila vain jos se poikkeaa nykyisestä
+                if self.testing_screen.test_panels[test_idx].is_active != bool(switch_state):
+                    self.testing_screen.test_panels[test_idx].is_active = bool(switch_state)
+                    self.testing_screen.test_panels[test_idx].update_button_style()
+                    
+                    # Ohjaa GPIO-lähtö
+                    if hasattr(self, 'gpio_handler') and self.gpio_handler:
+                        self.gpio_handler.set_output(test_idx + 1, bool(switch_state))                                
+
+        # START/STOP-kytkimien käsittely
+        if op_code == 1 and result and hasattr(result, 'registers') and len(result.registers) > 0:
+            if hasattr(self, '_last_switch_read'):
+                if self._last_switch_read == 17000 and result.registers[0] == 1:
+                    # START-kytkin painettu
+                    self.testing_screen.start_test()
+                elif self._last_switch_read == 16999 and result.registers[0] == 1:
+                    # STOP-kytkin painettu
+                    self.testing_screen.stop_test()
 
     def handle_fortest_result(self, result, op_code, error_msg):
         """Käsittele ForTest-operaation tulos"""
@@ -186,11 +210,19 @@ class MainWindow(QWidget):
         if not self.modbus_manager.is_connected():
             return
         
-        # Lue rekisterit 17001-17003 (kolme testiä)
+        # Lue rekisterit 17001-17003 (testien aktiiviset tilat)
         for i in range(3):
             reg = 17001 + i
             self.modbus_manager.read_register(reg, 1)
             self._last_switch_read = reg
+        
+        # Lue START-kytkin (17000)
+        self.modbus_manager.read_register(17000, 1)
+        self._last_switch_read = 17000
+        
+        # Lue STOP-kytkin (16999)
+        self.modbus_manager.read_register(16999, 1)
+        self._last_switch_read = 16999
 
     def on_program_selected(self, program_name):
         """Käsittele valittu ohjelma"""
