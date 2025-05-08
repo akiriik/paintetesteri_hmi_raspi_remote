@@ -101,6 +101,10 @@ class TestPanel(QWidget):
         # Lähetä signaali pääikkunalle Modbus-käsittelyä varten
         if hasattr(self.parent(), 'toggle_test_active'):
             self.parent().toggle_test_active(self.test_number, self.is_active)
+            
+            # Ohjaa myös GPIO-lähtö, jos saatavilla
+            if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
+                self.parent().parent().gpio_handler.set_output(self.test_number, self.is_active)
     
     @pyqtSlot(bool, str)
     def handle_toggle_result(self, success, error_msg):

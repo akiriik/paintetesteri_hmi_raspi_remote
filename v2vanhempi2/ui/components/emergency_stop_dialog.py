@@ -104,21 +104,13 @@ class EmergencyStopDialog(QDialog):
     def reset_emergency_stop(self):
         """Kuittaa hätäseis"""
         if self.modbus:
-            # Kirjoitetaan rekisteriin 19099 arvo 1
-            result = self.modbus.write_register(19099, 1)
-            if result:
-                print("Hätäseis kuitattu - rekisteri 19099 asetettu arvoon 1")
-                
-                # Odota hetki ja palauta rekisteri arvoon 0
-                QTimer.singleShot(300, lambda: self.reset_emergency_register_to_zero())
-                
-                # Tarkista sitten onko hätäseispiiri vapautunut
-                QTimer.singleShot(500, self.check_status_after_reset)
+            if hasattr(self.modbus, 'write_register'):
+                # Suora ModbusHandler
+                result = self.modbus.write_register(19099, 1)
             else:
-                print("Hätäseissin kuittaus epäonnistui")
-        else:
-            print("Modbus-yhteyttä ei ole saatavilla")
-            self.accept()
+                # ModbusManager
+                self.modbus.write_register(19099, 1)
+                return
 
     def reset_emergency_register_to_zero(self):
         """Palauta kuittausrekisteri takaisin nollaan"""

@@ -75,6 +75,11 @@ class MainWindow(QWidget):
         # Alusta paineanturin lukijasäie
         self.setup_pressure_reader()
 
+        # Lisää ajastin kytkimien tilojen tarkistamiseen
+        self.switch_read_timer = QTimer(self)
+        self.switch_read_timer.timeout.connect(self.check_switches)
+        self.switch_read_timer.start(150)  # Tarkista 150ms välein        
+
     def setup_pressure_reader(self):
         """Alusta paineanturi ja sen lukijasäie"""
         try:
@@ -96,7 +101,9 @@ class MainWindow(QWidget):
         if not self.modbus_manager.is_connected():
             return
         
+        # Lue rekisteri 19100
         self.modbus_manager.read_register(19100, 1)
+        self._last_register_read = 19100  # Tallenna luettava rekisteri
     
     def handle_emergency_stop_status(self, value):
         """Käsittele hätäseispiirin tila"""
@@ -114,20 +121,31 @@ class MainWindow(QWidget):
     def handle_modbus_result(self, result, op_code, error_msg):
         """Käsittele Modbus-operaation tulos"""
         if error_msg:
-            # Näytä virheviesti
-            self.status_notifier.show_message(error_msg, StatusNotifier.ERROR)
-            if hasattr(self.testing_screen, 'log_panel'):
-                self.testing_screen.log_panel.add_log_entry(error_msg, "ERROR")
+            # Näytä virheviesti...
+            pass
         
         # Käsittele eri tyyppisten operaatioiden tulokset
         if op_code == 1:  # Rekisterin luku
             if result and hasattr(result, 'registers') and len(result.registers) > 0:
-                # Käsittele rekisterikohtainen tulos
-                if hasattr(self, '_last_register_read') and self._last_register_read == 19100:
-                    # Hätäseisrekisterin lukutulos
-                    self.handle_emergency_stop_status(result.registers[0])
+                if hasattr(self, '_last_register_read'):
+                    if self._last_register_read == 19100:
+                        # Hätäseisrekisterin käsittely
+                        self.handle_emergency_stop_status(result.registers[0])
+                    elif self._last_register_read >= 17001 and self._last_register_read <= 17003:
+                        # Kytkimen tilan käsittely
+                        panel_index = self._last_register_read - 17001
+                        if panel_index < len(self.testing_screen.test_panels):
+                            panel = self.testing_screen.test_panels[panel_index]
+                            switch_state = result.registers[0] == 1
+                            if panel.is_active != switch_state:
+                                panel.is_active = switch_state
+                                panel.update_button_style()
+                                # Päivitä myös GPIO-tila
+                                if hasattr(self, 'gpio_handler') and self.gpio_handler:
+                                    self.gpio_handler.set_output(panel_index + 1, switch_state)
         
-        self._last_register_read = None  # Nollaa lukurekisteri
+        # Nollaa rekisterimuistutus
+        self._last_register_read = None
     
     def handle_fortest_result(self, result, op_code, error_msg):
         """Käsittele ForTest-operaation tulos"""
@@ -167,6 +185,17 @@ class MainWindow(QWidget):
                         level = "ERROR"
                     
                     self.testing_screen.log_panel.add_log_entry(msg, level)
+
+    def check_switches(self):
+        """Tarkista kytkinten tilat"""
+        if not self.modbus_manager.is_connected():
+            return
+        
+        # Lue rekisterit 17001-17003 (kolme testiä)
+        for i in range(3):
+            reg = 17001 + i
+            self.modbus_manager.read_register(reg, 1)
+            self._last_switch_read = reg
 
     def on_program_selected(self, program_name):
         """Käsittele valittu ohjelma"""

@@ -164,6 +164,19 @@ class TestingScreen(BaseScreen):
         # Pysäytä testi ForTestManager-luokan avulla
         if hasattr(self.parent(), 'fortest_manager'):
             self.parent().fortest_manager.abort_test()
+
+    def toggle_active(self):
+        """Vaihda aktiivisuustila ja lähetä signaali"""
+        self.is_active = not self.is_active
+        self.update_button_style()
+        
+        # Lähetä signaali pääikkunalle Modbus-käsittelyä varten
+        if hasattr(self.parent(), 'toggle_test_active'):
+            self.parent().toggle_test_active(self.test_number, self.is_active)
+            
+            # Aktivoi myös GPIO-lähtö
+            if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
+                self.parent().parent().gpio_handler.set_output(self.test_number, self.is_active)          
     
     def toggle_test_active(self, test_number, active):
         """Vaihda testin aktiivisuustila"""
