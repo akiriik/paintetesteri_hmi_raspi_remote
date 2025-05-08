@@ -367,23 +367,29 @@ class RightControl(QWidget):
         if modbus and modbus.connected:
             modbus.write_register(register, 0)
     
-    def set_start_state(self, state):
-        """Aseta käynnistystila ja päivitä modbus-rekisteri"""
-        modbus = self.get_modbus()
-        if modbus and modbus.connected:
-            # Käyttäjän painaessa käynnistysnappia
-            value = 1 if state else 0
-            result = modbus.write_register(self.start_register, value)
+def set_start_state(self, state):
+    # Lisää lippu estämään rekursiota
+    if hasattr(self, '_is_handling_stop') and self._is_handling_stop:
+        return
+        
+    modbus = self.get_modbus()
+    if modbus and modbus.connected:
+        value = 1 if state else 0
+        result = modbus.write_register(self.start_register, value)
+        
+        if not state and result:
+            self.is_running = False
+            self.update_buttons()
             
-            # Aktivoi GPIO 23 (ulostulo 4) käynnistyksen yhteydessä
-            gpio_handler = self.get_gpio_handler()
-            if gpio_handler and state:
-                gpio_handler.set_output(4, True)
-            
-            # Jos kyseessä on käynnistyskomento, päivitetään tila
-            if state and result:
-                self.is_running = True
-                self.update_buttons()
+            # Merkitään että käsitellään stop-toimintoa
+            self._is_handling_stop = True
+            if hasattr(self.parent(), 'stop_test'):
+                self.parent().stop_test()
+            self._is_handling_stop = False
+                
+        if state and result:
+            self.is_running = True
+            self.update_buttons()
             
             # Jos arvo on 1 (käynnistys), nollataan se lyhyen viiveen jälkeen
             if value == 1:

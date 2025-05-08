@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import QWidget
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QKeyEvent
 
+
 # Omat komponentit
 from ui.screens.testing_screen import TestingScreen
 from ui.screens.manual_screen import ManualScreen
@@ -12,12 +13,15 @@ from utils.modbus_handler import ModbusHandler
 from utils.fortest_handler import ForTestHandler
 from ui.components.emergency_stop_dialog import EmergencyStopDialog
 from utils.gpio_handler import GPIOHandler
-
+from utils.modbus_manager import ModbusManager
+from utils.fortest_manager import ForTestManager
+from ui.components.status_notifier import StatusNotifier
+from utils.fortest_handler import DummyForTestHandler
 
 class MainWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        
+
         # Konfiguroi pääikkuna
         self.setWindowTitle("Painetestaus")
         self.setGeometry(0, 0, 1280, 720)
@@ -27,12 +31,17 @@ class MainWindow(QWidget):
                 color: #333333;
             }
         """)
-        
+
+        # Luo Modbus-käsittelijä
+        self.modbus = ModbusHandler(port='/dev/ttyUSB0', baudrate=19200)
+
+        # Alusta ForTest-yhteys
         try:
             self.fortest = ForTestHandler(port='/dev/ttyUSB1', baudrate=19200)
         except Exception as e:
             print(f"Varoitus: ForTest-yhteys epäonnistui: {e}")
             # Luo dummy-ForTestHandler joka ei tee mitään
+            from utils.fortest_handler import DummyForTestHandler
             self.fortest = DummyForTestHandler()
 
         # Alusta GPIO-käsittelijä
@@ -54,19 +63,16 @@ class MainWindow(QWidget):
         self.testing_screen = TestingScreen(self, self.fortest)
         self.testing_screen.setGeometry(0, 0, 1280, 720)
 
-        # Luo Modbus-käsittelijä
-        self.modbus = ModbusHandler(port='/dev/ttyUSB0', baudrate=19200)
-        
         # Luo käsikäyttösivu
         self.manual_screen = ManualScreen(self, self.modbus)
         self.manual_screen.setGeometry(0, 0, 1280, 720)
         self.manual_screen.hide()
-        
+
         # Luo ohjelman valintasivu
         self.program_selection_screen = ProgramSelectionScreen(self)
         self.program_selection_screen.setGeometry(0, 0, 1280, 720)
         self.program_selection_screen.hide()
-        
+
         # Yhdistä signaalit
         self.program_selection_screen.program_selected.connect(self.on_program_selected)
 
@@ -88,6 +94,28 @@ class MainWindow(QWidget):
     def on_emergency_dialog_closed(self):
         """Dialogi suljettu, nollataan lippu"""
         self.emergency_dialog_open = False
+
+
+    # Lisää metodit tulosten käsittelyyn:
+    def handle_modbus_result(self, result, op_code, error_msg):
+        """Käsittele Modbus-operaation tulos"""
+        if error_msg:
+            # Näytä virheviesti
+            self.status_notifier.show_message(error_msg, StatusNotifier.ERROR)
+        
+        # Delegoi tulos oikealle komponentille
+        # ...
+
+    def handle_fortest_result(self, result, op_code, error_msg):
+        """Käsittele ForTest-operaation tulos"""
+        if error_msg:
+            # Näytä virheviesti
+            self.status_notifier.show_message(error_msg, StatusNotifier.ERROR)
+        
+        # Delegoi tulos oikealle komponentille
+        # ...
+
+
 
     def on_program_selected(self, program_name):
         """Käsittele valittu ohjelma"""
