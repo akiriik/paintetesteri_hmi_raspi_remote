@@ -105,7 +105,7 @@ class ManualScreen(BaseScreen):
         if hasattr(self.parent(), 'show_testing'):
             self.parent().show_testing()
     
-    def cleanup(self):
-        # Sulje Modbus-yhteys
-        if hasattr(self, 'modbus'):
-            self.modbus.close()
+def cleanup(self):
+    # Sulje Modbus-yhteys vain jos se on olemassa
+    if hasattr(self, 'modbus') and self.modbus is not None:
+        self.modbus.close()
