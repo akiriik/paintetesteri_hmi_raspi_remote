@@ -32,8 +32,6 @@ class MainWindow(QWidget):
         # Alusta hallintamanagerit
         self.modbus_manager = ModbusManager(port='/dev/ttyUSB0', baudrate=19200)
         self.fortest_manager = ForTestManager(port='/dev/ttyUSB1', baudrate=19200)
-        if isinstance(self.fortest_manager.worker.fortest, DummyForTestHandler):
-            self.testing_screen.update_status("ForTest-yhteys epäonnistui - laite ei ole kytkettynä", "WARNING")
         self.program_manager = ProgramManager()
 
         # Yhdistä signaalit
@@ -51,6 +49,10 @@ class MainWindow(QWidget):
         self.testing_screen = TestingScreen(self)
         self.testing_screen.setGeometry(0, 0, 1280, 720)
         self.testing_screen.program_selection_requested.connect(self.show_program_selection)
+
+        if isinstance(self.fortest_manager.worker.fortest, DummyForTestHandler):
+            self.testing_screen.update_status("ForTest-yhteys epäonnistui - laite ei ole kytkettynä", "WARNING")
+
 
         self.manual_screen = ManualScreen(self)
         self.manual_screen.setGeometry(0, 0, 1280, 720)
