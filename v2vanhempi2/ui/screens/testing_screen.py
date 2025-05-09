@@ -30,6 +30,7 @@ class TestingScreen(BaseScreen):
         super().__init__(parent)
         self.current_test_panel = None
         self.is_running = False
+        self.init_ui()
         
     def init_ui(self):
         # Valikko-nappi
@@ -201,11 +202,7 @@ class TestingScreen(BaseScreen):
         self.status_label.setStyleSheet(style + " background-color: transparent;")
         self.status_label.setText(message)
     
-    def handle_status_message(self, message, message_type):
-        """Käsittele tilaviesti TestPanel-komponentista"""
-        if hasattr(self.parent(), 'status_notifier'):
-            self.parent().status_notifier.show_message(message, message_type)
-        
+    def handle_status_message(self, message, message_type):        
         # Päivitä tilaviesti myös näkymään
         level = "INFO"
         if message_type == 1:

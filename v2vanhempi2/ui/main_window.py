@@ -10,7 +10,6 @@ from ui.screens.testing_screen import TestingScreen
 from ui.screens.manual_screen import ManualScreen
 from ui.screens.program_selection_screen import ProgramSelectionScreen
 from ui.components.emergency_stop_dialog import EmergencyStopDialog
-from ui.components.status_notifier import StatusNotifier
 from utils.fortest_handler import DummyForTestHandler
 from utils.modbus_manager import ModbusManager
 from utils.fortest_manager import ForTestManager
@@ -41,9 +40,6 @@ class MainWindow(QWidget):
         self.modbus_manager.resultReady.connect(self.handle_modbus_result)
         self.fortest_manager.resultReady.connect(self.handle_fortest_result)
 
-        # Tilaviestien näyttö
-        self.status_notifier = StatusNotifier(self)
-
         # Alusta GPIO jos mahdollista
         try:
             self.gpio_handler = GPIOHandler()
@@ -54,6 +50,7 @@ class MainWindow(QWidget):
         # Näytöt
         self.testing_screen = TestingScreen(self)
         self.testing_screen.setGeometry(0, 0, 1280, 720)
+        self.testing_screen.init_ui()
         self.testing_screen.program_selection_requested.connect(self.show_program_selection)
 
         self.manual_screen = ManualScreen(self)
@@ -93,7 +90,7 @@ class MainWindow(QWidget):
         
         if isinstance(self.fortest_manager.worker.fortest, DummyForTestHandler):
             self.testing_screen.update_status("ForTest-laite ei kytkettynä", "WARNING")
-            
+
     def check_emergency_stop(self):
         """Tarkista hätäseistila"""
         if not hasattr(self, 'modbus_manager') or not self.modbus_manager or not self.modbus_manager.is_connected():
@@ -175,7 +172,6 @@ class MainWindow(QWidget):
     def handle_fortest_result(self, result, op_code, error_msg):
         """Käsittelee ForTest-laitteen operaatiotulokset"""
         if op_code == 999:  # Erityinen koodi yhteyden epäonnistumiselle
-            self.status_notifier.show_message(error_msg, StatusNotifier.WARNING)
             self.testing_screen.update_status(error_msg, "WARNING")
             return
 
@@ -193,7 +189,6 @@ class MainWindow(QWidget):
                 msg_type = StatusNotifier.INFO
 
             if msg:
-                self.status_notifier.show_message(msg, msg_type)
                 # Päivitä tilaviesti myös päänäkymään
                 self.testing_screen.update_status(msg, level)
 
