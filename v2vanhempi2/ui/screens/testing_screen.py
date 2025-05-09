@@ -31,7 +31,7 @@ class TestingScreen(BaseScreen):
         self.current_test_panel = None
         self.is_running = False
         self.init_ui()
-        
+
     def init_ui(self):
         # Valikko-nappi
         self.menu_button = MenuButton(self)
@@ -190,6 +190,7 @@ class TestingScreen(BaseScreen):
     
     def update_status(self, message, message_type="INFO"):
         """Päivitä tilaviesti suoraan näkymään"""
+        print(f"update_status kutsuttu: {message}, {message_type}")
         style = "color: #33FF33;"  # Normaali viesti (vihreä)
         
         if message_type == "ERROR":
@@ -198,7 +199,7 @@ class TestingScreen(BaseScreen):
             style = "color: orange; font-weight: bold;"
         elif message_type == "SUCCESS":
             style = "color: #00FF00; font-weight: bold;"
-            
+                
         self.status_label.setStyleSheet(style + " background-color: transparent;")
         self.status_label.setText(message)
     
