@@ -13,8 +13,9 @@ class ForTestWorker(QObject):
             print(f"ForTest-yhteys epäonnistui: {e}")
             from utils.fortest_handler import DummyForTestHandler
             self.fortest = DummyForTestHandler()
-            # Lähetä virheviesti resultReady-signaalin kautta
-            self.resultReady.emit(False, 999, "ForTest-yhteys epäonnistui - laite ei kytkettynä")
+            # Lähetä signaali hieman viiveellä, jotta vastaanottaja ehtii yhdistää sen
+            QTimer.singleShot(0, lambda: self.resultReady.emit(False, 999, "ForTest-yhteys epäonnistui - laite ei kytkettynä"))
+
     
     @pyqtSlot()
     def start_test(self):
