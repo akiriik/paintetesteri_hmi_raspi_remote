@@ -1,12 +1,12 @@
-# ui/screens/testing_screen.py
-from PyQt5.QtWidgets import QLabel, QPushButton, QFrame, QWidget, QMenu
+# Muutokset tiedostoon ui/screens/testing_screen.py
+from PyQt5.QtWidgets import QLabel, QPushButton, QFrame, QWidget, QMenu, QScrollArea
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 
 from ui.screens.base_screen import BaseScreen
 from ui.components.test_panel import TestPanel
 from ui.components.control_panel import ControlPanel
-from ui.components.log_panel import LogPanel
+# Poistettu tuonti: from ui.components.log_panel import LogPanel
 
 class MenuButton(QPushButton):
     """Valikko-nappi"""
@@ -89,27 +89,24 @@ class TestingScreen(BaseScreen):
         self.control_panel.start_clicked.connect(self.start_test)
         self.control_panel.stop_clicked.connect(self.stop_test)
         
-        # Lokipaneeli
-        self.log_panel = LogPanel(self)
-        self.log_panel.setGeometry(40, 100, 940, 600)
-        self.log_panel.hide()  # Piilota aluksi
-
-        # Lisää LOG-nappi vasempaan ylänurkkaan
-        self.log_button = QPushButton("LOG", self)
-        self.log_button.setGeometry(20, 20, 80, 40)
-        self.log_button.setStyleSheet("""
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
+        # Uusi tilaviestialue (korvaa LOG-paneelin)
+        self.status_area = QFrame(self)
+        self.status_area.setGeometry(50, 10, 920, 50)
+        self.status_area.setStyleSheet("""
+            QFrame {
+                background-color: black;
+                color: #33FF33;
                 border-radius: 5px;
-                font-size: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #1976D2;
+                border: 1px solid #333333;
             }
         """)
-        self.log_button.clicked.connect(self.toggle_log_panel)
+        
+        # Tilaviestikenttä
+        self.status_label = QLabel("", self.status_area)
+        self.status_label.setGeometry(10, 8, 920, 30)
+        self.status_label.setFont(QFont("Consolas", 16))
+        self.status_label.setStyleSheet("color: #33FF33; background-color: transparent;")
+        self.status_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
     
     def show_menu(self):
         """Näytä popup-valikko"""
@@ -143,13 +140,13 @@ class TestingScreen(BaseScreen):
             panel = self.test_panels[self.current_test_panel - 1]
             panel.set_program(program_name)
             self.current_test_panel = None
-            self.log_panel.add_log_entry(f"Testin {self.current_test_panel} ohjelmaksi asetettu: {program_name}", "INFO")
+            # Poistettu tarpeeton lokitus
     
     def start_test(self):
         """Käynnistä testi ForTestManager-luokan avulla"""
         self.is_running = True
         self.control_panel.update_button_states(True)
-        self.log_panel.add_log_entry("Testi käynnistetty", "INFO")
+        # Poistettu lokitus, ei näytetä vain napinpainallusta
         
         # Käynnistä testi ForTestManager-luokan avulla
         if hasattr(self.parent(), 'fortest_manager'):
@@ -159,7 +156,7 @@ class TestingScreen(BaseScreen):
         """Pysäytä testi ForTestManager-luokan avulla"""
         self.is_running = False
         self.control_panel.update_button_states(False)
-        self.log_panel.add_log_entry("Testi pysäytetty", "INFO")
+        # Poistettu lokitus, ei näytetä vain napinpainallusta
         
         # Pysäytä testi ForTestManager-luokan avulla
         if hasattr(self.parent(), 'fortest_manager'):
@@ -178,8 +175,6 @@ class TestingScreen(BaseScreen):
             if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
                 self.parent().parent().gpio_handler.set_output(self.test_number, self.is_active)          
     
-
-    # Korjattu TestingScreen.toggle_test_active() (ui/screens/testing_screen.py)
     def toggle_test_active(self, test_number, active):
         """Vaihda testin aktiivisuustila vain UI:n ja GPIO:n osalta"""
         # Varmista että test_number on sallituissa rajoissa
@@ -191,29 +186,36 @@ class TestingScreen(BaseScreen):
             # Ohjaa vain GPIO-lähtö
             if hasattr(self.parent(), 'gpio_handler') and self.parent().gpio_handler:
                 self.parent().gpio_handler.set_output(test_number, active)
-                
-    def toggle_log_panel(self):
-        """Näytä/piilota lokipaneeli"""
-        if self.log_panel.isVisible():
-            self.log_panel.hide()
-        else:
-            self.log_panel.show()
+    
+    def update_status(self, message, message_type="INFO"):
+        """Päivitä tilaviesti suoraan näkymään"""
+        style = "color: #33FF33;"  # Normaali viesti (vihreä)
+        
+        if message_type == "ERROR":
+            style = "color: red; font-weight: bold;"
+        elif message_type == "WARNING":
+            style = "color: orange; font-weight: bold;"
+        elif message_type == "SUCCESS":
+            style = "color: #00FF00; font-weight: bold;"
+            
+        self.status_label.setStyleSheet(style + " background-color: transparent;")
+        self.status_label.setText(message)
     
     def handle_status_message(self, message, message_type):
         """Käsittele tilaviesti TestPanel-komponentista"""
         if hasattr(self.parent(), 'status_notifier'):
             self.parent().status_notifier.show_message(message, message_type)
-            
-            # Lisää myös lokiin
-            level = "INFO"
-            if message_type == 1:
-                level = "SUCCESS"
-            elif message_type == 2:
-                level = "WARNING"
-            elif message_type == 3:
-                level = "ERROR"
-            
-            self.log_panel.add_log_entry(message, level)
+        
+        # Päivitä tilaviesti myös näkymään
+        level = "INFO"
+        if message_type == 1:
+            level = "SUCCESS"
+        elif message_type == 2:
+            level = "WARNING"
+        elif message_type == 3:
+            level = "ERROR"
+        
+        self.update_status(message, level)
     
     def cleanup(self):
         """Siivoa resurssit"""

@@ -27,7 +27,7 @@ class TestPanel(QWidget):
         # Layout
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignTop)
-        layout.setSpacing(30)
+        layout.setSpacing(10)
         
         # Painetulos laatikko
         self.pressure_result = QLabel("", self)

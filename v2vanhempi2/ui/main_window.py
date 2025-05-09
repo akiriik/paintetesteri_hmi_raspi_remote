@@ -11,7 +11,7 @@ from ui.screens.manual_screen import ManualScreen
 from ui.screens.program_selection_screen import ProgramSelectionScreen
 from ui.components.emergency_stop_dialog import EmergencyStopDialog
 from ui.components.status_notifier import StatusNotifier
-
+from utils.fortest_handler import DummyForTestHandler
 from utils.modbus_manager import ModbusManager
 from utils.fortest_manager import ForTestManager
 from utils.gpio_handler import GPIOHandler
@@ -33,6 +33,8 @@ class MainWindow(QWidget):
         # Alusta hallintamanagerit
         self.modbus_manager = ModbusManager(port='/dev/ttyUSB0', baudrate=19200)
         self.fortest_manager = ForTestManager(port='/dev/ttyUSB1', baudrate=19200)
+        if isinstance(self.fortest_manager.worker.fortest, DummyForTestHandler):
+            self.testing_screen.update_status("ForTest-yhteys epäonnistui - laite ei ole kytkettynä", "WARNING")
         self.program_manager = ProgramManager()
 
         # Yhdistä signaalit
@@ -85,6 +87,13 @@ class MainWindow(QWidget):
             17003: 0   # TEST3
         }
 
+        # Tarkista käynnistyksen jälkeen yhteydet
+        if not self.modbus_manager.is_connected():
+            self.testing_screen.update_status("Modbus-yhteys epäonnistui", "WARNING")
+        
+        if isinstance(self.fortest_manager.worker.fortest, DummyForTestHandler):
+            self.testing_screen.update_status("ForTest-laite ei kytkettynä", "WARNING")
+            
     def check_emergency_stop(self):
         """Tarkista hätäseistila"""
         if not hasattr(self, 'modbus_manager') or not self.modbus_manager or not self.modbus_manager.is_connected():
@@ -127,7 +136,12 @@ class MainWindow(QWidget):
 
     def handle_modbus_result(self, result, op_code, error_msg):
         """Käsittelee modbus-kyselyn tuloksen"""
-        if error_msg or not result or not hasattr(result, 'registers'):
+        if error_msg:
+            # Päivitä tilaviesti päänäkymään
+            self.testing_screen.update_status(error_msg, "ERROR")
+            return
+        
+        if not result or not hasattr(result, 'registers'):
             return
 
         if op_code == 1:  # Rekisterin luku
@@ -160,34 +174,28 @@ class MainWindow(QWidget):
 
     def handle_fortest_result(self, result, op_code, error_msg):
         """Käsittelee ForTest-laitteen operaatiotulokset"""
-        if error_msg:
-            self.status_notifier.show_message(error_msg, StatusNotifier.ERROR)
-            if hasattr(self.testing_screen, 'log_panel'):
-                self.testing_screen.log_panel.add_log_entry(error_msg, "ERROR")
+        if op_code == 999:  # Erityinen koodi yhteyden epäonnistumiselle
+            self.status_notifier.show_message(error_msg, StatusNotifier.WARNING)
+            self.testing_screen.update_status(error_msg, "WARNING")
+            return
 
         if result:
             msg = ""
             msg_type = StatusNotifier.INFO
+            level = "INFO"
 
             if op_code == 1:  # Testin käynnistys
                 msg = "Testi käynnistetty onnistuneesti"
                 msg_type = StatusNotifier.SUCCESS
+                level = "SUCCESS"
             elif op_code == 2:  # Testin pysäytys
                 msg = "Testi pysäytetty"
                 msg_type = StatusNotifier.INFO
 
             if msg:
                 self.status_notifier.show_message(msg, msg_type)
-                if hasattr(self.testing_screen, 'log_panel'):
-                    level = "INFO"
-                    if msg_type == StatusNotifier.SUCCESS:
-                        level = "SUCCESS"
-                    elif msg_type == StatusNotifier.WARNING:
-                        level = "WARNING"
-                    elif msg_type == StatusNotifier.ERROR:
-                        level = "ERROR"
-
-                    self.testing_screen.log_panel.add_log_entry(msg, level)
+                # Päivitä tilaviesti myös päänäkymään
+                self.testing_screen.update_status(msg, level)
 
     def toggle_test_active(self, test_number, active):
         """Vaihda testin aktiivisuustila vain UI:n ja GPIO:n osalta"""
