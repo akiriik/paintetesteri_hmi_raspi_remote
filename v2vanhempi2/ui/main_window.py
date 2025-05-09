@@ -50,7 +50,6 @@ class MainWindow(QWidget):
         # Näytöt
         self.testing_screen = TestingScreen(self)
         self.testing_screen.setGeometry(0, 0, 1280, 720)
-        self.testing_screen.init_ui()
         self.testing_screen.program_selection_requested.connect(self.show_program_selection)
 
         self.manual_screen = ManualScreen(self)
