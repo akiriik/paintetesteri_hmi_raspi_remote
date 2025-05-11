@@ -16,7 +16,7 @@ class TestPanel(QWidget):
         self.is_active = False
         self.modbus_register = 17000 + self.test_number  # PAINE 1-3 AKTIIVINEN rekisterit: 17001-17003
         
-        self.setFixedSize(380,600)
+        self.setFixedSize(400,600)
         self.setStyleSheet("""
             QWidget {
                 background-color: #f5f5f5;
@@ -35,7 +35,7 @@ class TestPanel(QWidget):
 
         # Painetulos laatikko
         self.pressure_result = QLabel("", self)
-        self.pressure_result.setFixedSize(360, 250)
+        self.pressure_result.setFixedSize(380, 250)
         self.pressure_result.setAlignment(Qt.AlignCenter)
         self.pressure_result.setStyleSheet("""
             background-color: black;
@@ -280,7 +280,7 @@ class TestPanel(QWidget):
                 background-color: black;
                 color: white;
                 font-family: 'Digital-7', 'Consolas', monospace;
-                font-size: 26px;
+                font-size: 28px;
                 text-align: left;
                 border: 2px solid #444444;
                 border-radius: 10px;

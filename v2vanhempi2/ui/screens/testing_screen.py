@@ -75,18 +75,18 @@ class TestingScreen(BaseScreen):
             title = QLabel(f"TESTI {i}", self)
             title.setFont(QFont("Arial", 24, QFont.Bold))
             title.setAlignment(Qt.AlignCenter)
-            title.setGeometry(50 + (i-1)*380, 50, 300, 100)
+            title.setGeometry(50 + (i-1)*400, 50, 300, 100)
             
             # Testipaneeli
             panel = TestPanel(i, self)
-            panel.move(40 + (i-1)*380, 130)
+            panel.move(10 + (i-1)*400, 130)
             panel.program_selection_requested.connect(self.start_program_selection)
             panel.status_message.connect(self.handle_status_message)
             self.test_panels.append(panel)
         
         # Ohjauskomponentti
         self.control_panel = ControlPanel(self)
-        self.control_panel.move(1100, 450)
+        self.control_panel.move(1170, 510)
         self.control_panel.start_clicked.connect(self.start_test)
         self.control_panel.stop_clicked.connect(self.stop_test)
         
@@ -314,39 +314,45 @@ class TestingScreen(BaseScreen):
             self.last_status = status
 
     def update_status_from_fortest(self, result):
-        """Päivitä tilatieto ForTest-datan perusteella"""
         if not result or not hasattr(result, 'registers'):
             return
         
-        # Tarkista rekisterin 50-51 arvo (ForTest Position 3-4)
         if len(result.registers) >= 2:
-            status_value = result.registers[1]  # Last active status
+            status_value = result.registers[1]
             
-            # Tarkistetaan jos tila on muuttunut TESTISTÄ -> VALMIS
+            # Tarkista tilamuutos testin päättymiselle
             if status_value == 0 and hasattr(self, 'last_status') and self.last_status == 1:
-                # Testi on päättynyt, haetaan tulokset
                 if hasattr(self.parent(), 'fortest_manager'):
                     self.parent().fortest_manager.read_results()
             
-            # Tallenna nykyinen tila
             self.last_status = status_value
             
-            # Näytä merkityksellisimmät tilat
-            if status_value == 1:
-                self.update_status("TESTI KÄYNNISSÄ", "INFO") 
-            elif status_value == 2:
+            # Näytä vain merkittävät tilamuutokset
+            if status_value == 1 and (not hasattr(self, 'last_shown_status') or self.last_shown_status != 1):
+                self.update_status("TESTI KÄYNNISSÄ", "INFO")
+                self.last_shown_status = 1
+            elif status_value == 2 and (not hasattr(self, 'last_shown_status') or self.last_shown_status != 2):
                 self.update_status("AUTOZERO", "INFO")
-            elif status_value == 3:
+                self.last_shown_status = 2
+            elif status_value == 3 and (not hasattr(self, 'last_shown_status') or self.last_shown_status != 3):
                 self.update_status("PURKU", "INFO")
-            elif status_value > 3:
-                self.update_status(f"TILA: {status_value}", "INFO")
+                self.last_shown_status = 3
 
     def update_fortest_data(self):
-        """Lue ForTest statustiedot"""
+        """Lue ForTest statustiedot ja tulokset"""
         if hasattr(self.parent(), 'fortest_manager'):
             # Lue ForTest tila
             self.parent().fortest_manager.read_status()
-            # Tulokset luetaan vain tilamuutoksen jälkeen
+            
+            # Lue myös tulokset säännöllisesti
+            if hasattr(self, 'results_read_counter'):
+                self.results_read_counter += 1
+                # Lue tulokset harvemmin (esim. joka 5. kerta)
+                if self.results_read_counter >= 5:
+                    self.parent().fortest_manager.read_results()
+                    self.results_read_counter = 0
+            else:
+                self.results_read_counter = 0
 
     def cleanup(self):
         """Siivoa resurssit"""
