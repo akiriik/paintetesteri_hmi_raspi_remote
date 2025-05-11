@@ -175,7 +175,7 @@ class TestPanel(QWidget):
                     text-align: left;
                 """)
                 # OK vasemmalla, aika oikealla
-                result_text = f"OK{' '*20}{time_str}"
+                result_text = f"OK  {' '*14}{time_str}"
             elif test_result == 2:  # Bad
                 self.pressure_result.setStyleSheet("""
                     background-color: black;
@@ -185,7 +185,7 @@ class TestPanel(QWidget):
                     text-align: left;
                 """)
                 # FAIL vasemmalla, aika oikealla
-                result_text = f"FAIL{' '*38}{time_str}"
+                result_text = f"FAIL{' '*14}{time_str}"
             else:
                 self.pressure_result.setStyleSheet("""
                     background-color: black;
