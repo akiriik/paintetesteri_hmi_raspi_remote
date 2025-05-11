@@ -148,3 +148,94 @@ class TestPanel(QWidget):
                     padding: 8px;
                 }
             """)
+
+    def update_test_status(self, status_data):
+        """Update the test status display based on ForTest data"""
+        if not status_data or not hasattr(status_data, 'registers'):
+            return
+        
+        # Get status information from registers
+        # Based on the ForTest protocol document:
+        # Status register (0x0030)
+        # ForTest Position 3-4: Last active status
+        # Values: 0 = Waiting, 1 = Test in progress, etc.
+        if len(status_data.registers) >= 3:
+            last_active_status = status_data.registers[1]  # Position 3-4 maps to register index 1
+            
+            if last_active_status == 1:  # Test in progress
+                self.pressure_result.setText("TESTI KÄYNNISSÄ")
+            elif last_active_status == 0:  # Waiting
+                self.pressure_result.setText("VALMIS")
+            elif last_active_status == 2:  # Autozero
+                self.pressure_result.setText("AUTOZERO")
+            elif last_active_status == 3:  # Discharge
+                self.pressure_result.setText("PURKU")
+            else:
+                self.pressure_result.setText(f"TILA: {last_active_status}")
+
+        # Show pressure and decay when test is complete
+        if last_active_status == 0 and len(status_data.registers) >= 36:
+            # Check if pressure and decay values are available
+            pressure_sign = status_data.registers[15]  # Position 31-32 maps to register index 15
+            pressure_high = status_data.registers[16]  # Position 33-34 maps to register index 16
+            pressure_low = status_data.registers[17]   # Position 35-36 maps to register index 17
+            decay_sign = status_data.registers[20]     # Position 41-42 maps to register index 20
+            decay_high = status_data.registers[21]     # Position 43-44 maps to register index 21
+            decay_low = status_data.registers[22]      # Position 45-46 maps to register index 22
+            
+            # Combine high and low to get the full value
+            pressure_value = (pressure_high << 16) | pressure_low
+            decay_value = (decay_high << 16) | decay_low
+            
+            # Apply sign
+            if pressure_sign == 1:
+                pressure_value = -pressure_value
+            if decay_sign == 1:
+                decay_value = -decay_value
+            
+            # Display values
+            self.pressure_result.setText(f"P: {pressure_value/1000:.3f} mbar\nV: {decay_value/1000:.3f} mbar/s")
+
+    def update_test_results(self, result):
+        """Päivitä testitulokset ForTest tulosdatan perusteella"""
+        if not result or not hasattr(result, 'registers'):
+            return
+        
+        # Tarkistetaan rekisterit taulukon perusteella
+        # qModMaster Register 73-74 (ForTest Position 19-20) sisältää testin tuloksen
+        if len(result.registers) >= 10:
+            test_result = result.registers[9]  # Result of test (Indeksi 9 vastaa rekisteriä 73-74)
+            
+            # Ei näytetä mitään jos ei ole tulosta
+            if test_result == 0:  # No result
+                return
+            
+            result_text = ""
+            if test_result == 1:  # Good
+                result_text = "OK"
+                self.pressure_result.setStyleSheet("color: #00FF00; font-size: 36px; font-weight: bold;")  # Vihreä
+            elif test_result == 2:  # Bad
+                result_text = "FAIL"
+                self.pressure_result.setStyleSheet("color: red; font-size: 36px; font-weight: bold;")  # Punainen
+            else:
+                result_text = f"TULOS: {test_result}"
+                self.pressure_result.setStyleSheet("color: orange; font-size: 24px; font-weight: bold;")  # Oranssi
+            
+            # Haetaan vuotoarvo
+            # qModMaster Register 85-86 (ForTest Position 43-44) ja 86-87 (ForTest Position 45-46) sisältää vuodon
+            if len(result.registers) >= 22:
+                decay_sign = result.registers[20]  # Sign of decay (Position 41-42)
+                decay_high = result.registers[21]  # Decay HIGH (Position 43-44)
+                decay_low = result.registers[22]   # Decay LOW (Position 45-46)
+                
+                # Yhdistä korkeat ja matalat arvot
+                decay_value = (decay_high << 16) | decay_low
+                
+                # Sovelletaan etumerkki
+                if decay_sign == 1:
+                    decay_value = -decay_value
+                
+                # Liitetään vuotoarvo tulostekstiin
+                result_text += f"\nVuoto: {decay_value/1000:.3f} mbar/s"
+            
+            self.pressure_result.setText(result_text)

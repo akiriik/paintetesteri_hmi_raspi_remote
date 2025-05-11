@@ -109,6 +109,17 @@ class TestingScreen(BaseScreen):
         self.status_label.setStyleSheet("color: #33FF33; background-color: transparent;")
         self.status_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
     
+        # Add status update timer
+        self.status_timer = QTimer(self)
+        self.status_timer.timeout.connect(self.update_test_statuses)
+        self.status_timer.start(1000)  # Update every second
+
+        # Ajastin statuksen päivitykseen
+        self.status_timer = QTimer(self)
+        self.status_timer.timeout.connect(self.update_fortest_data)
+        self.status_timer.start(1000)  # Päivitys sekunnin välein
+
+
     def show_menu(self):
         """Näytä popup-valikko"""
         pos = self.menu_button.mapToGlobal(self.menu_button.rect().bottomLeft())
@@ -260,7 +271,48 @@ class TestingScreen(BaseScreen):
             level = "ERROR"
         
         self.update_status(message, level)
-    
+
+    def update_test_statuses(self):
+        """Read and update test statuses from ForTest"""
+        if hasattr(self.parent(), 'fortest_manager'):
+            self.parent().fortest_manager.read_status()
+
+    def handle_fortest_status(self, result, op_code):
+        """Process ForTest status results"""
+        if op_code == 3 and result:  # Status read operation
+            # Update active test panels with status information
+            for panel in self.test_panels:
+                if panel.is_active:
+                    panel.update_test_status(result)
+
+    def update_status_from_fortest(self, result):
+        """Päivitä tilatieto ForTest-datan perusteella"""
+        if not result or not hasattr(result, 'registers'):
+            return
+        
+        # Tarkista rekisterin 50-51 arvo (ForTest Position 3-4)
+        if len(result.registers) >= 2:
+            status_value = result.registers[1]  # Last active status
+            
+            if status_value == 0:
+                self.update_status("VALMIS", "INFO")
+            elif status_value == 1:
+                self.update_status("TESTI KÄYNNISSÄ", "INFO") 
+            elif status_value == 2:
+                self.update_status("AUTOZERO", "INFO")
+            elif status_value == 3:
+                self.update_status("PURKU", "INFO")
+            else:
+                self.update_status(f"TILA: {status_value}", "INFO")
+
+    def update_fortest_data(self):
+        """Lue ForTest statustiedot ja tulokset"""
+        if hasattr(self.parent(), 'fortest_manager'):
+            # Lue ForTest tila
+            self.parent().fortest_manager.read_status()
+            # Lue ForTest tulokset
+            self.parent().fortest_manager.read_results()
+
     def cleanup(self):
         """Siivoa resurssit"""
         pass

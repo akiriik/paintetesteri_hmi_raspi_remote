@@ -202,6 +202,15 @@ class MainWindow(QWidget):
             if msg:
                 self.testing_screen.update_status(msg, level)
 
+        if op_code == 3:  # Status read
+            # Välitä status testingscreen:lle
+            self.testing_screen.update_status_from_fortest(result)
+        elif op_code == 4:  # Results read
+            # Välitä tulokset aktiivisille paneeleille
+            for panel in self.testing_screen.test_panels:
+                if panel.is_active:
+                    panel.update_test_results(result)
+
     def toggle_test_active(self, test_number, active):
         """Vaihda testin aktiivisuustila vain UI:n ja GPIO:n osalta"""
         # Varmista että test_number on sallituissa rajoissa
