@@ -157,6 +157,7 @@ class TestPanel(QWidget):
             """)
 
     def update_test_results(self, result):
+        # Poistettu debug-tulostukset
         if not result or not hasattr(result, 'registers'):
             return
         
@@ -166,35 +167,33 @@ class TestPanel(QWidget):
             if test_result == 0 or test_result == 99:  # 99 = "Test in progress"
                 return
             
-            # Tarkista, että tulos liittyy tämän paneelin ohjelmaan
             if hasattr(self, 'program_number') and result.registers[6] != self.program_number:
-                # Tulosdata ei kuulu tälle paneelille
                 return
                     
-            # Ohita kaikki tulokset, jos paneelia ei ole vielä käynnistetty
             if not hasattr(self, 'results_started') or not self.results_started:
                 return
                     
-            # Tarkista onko tämä uusi tulos
             hours = result.registers[0]
             minutes = result.registers[1]
-            seconds = result.registers[2]  # Lisää sekuntien luku
-            time_str = f"{hours:02d}:{minutes:02d}"
-
-            # Käytetään tarkempaa tunnistetta, joka sisältää ohjelman numeron
-            program_number = result.registers[6]
-            current_result_id = f"{time_str}-{test_result}-{program_number}"
-
-            # Tarkista onko tämä tulos jo käsitelty
+            seconds = result.registers[2]
+            day = result.registers[3]
+            month = result.registers[4]
+            year = result.registers[5]
+            
+            display_time = f"{hours:02d}:{minutes:02d}"
+            
+            timestamp = f"{day:02d}.{month:02d}.{year} {hours:02d}:{minutes:02d}:{seconds:02d}"
+            current_result_id = f"{timestamp}-{test_result}-{result.registers[6]}"
+            
             if hasattr(self, 'last_result_id') and self.last_result_id == current_result_id:
                 return
-                    
+                
             self.last_result_id = current_result_id
             
             # Määritä tulos, teksti ja väri
             result_texts = {
                 0: "Ei tulosta",
-                1: "OK",
+                1: "OK", 
                 2: "FAIL",
                 3: "OK?",
                 4: "NOK?",
@@ -214,14 +213,14 @@ class TestPanel(QWidget):
             
             result_status = result_texts.get(test_result, f"TULOS: {test_result}")
             
-            # Väri ja näyttötapa tuloksen mukaan
-            if test_result == 1:  # OK - vihreä
+            # Väri ja näyttötapa
+            if test_result == 1:
                 result_color = "#00FF00"
-            elif test_result == 2:  # FAIL - punainen
+            elif test_result == 2:
                 result_color = "red"
-            elif test_result in [3, 4]:  # OK?, NOK? - oranssi
+            elif test_result in [3, 4]:
                 result_color = "orange"
-            else:  # Muut - punainen
+            else:
                 result_color = "red"
                 
             # Haetaan vuotoarvo
@@ -256,7 +255,7 @@ class TestPanel(QWidget):
             # Luo tulos näytettävän tyypin mukaan
             if test_result in [1, 2, 3, 4]:
                 # Näytetään normaali tulos värikoodattuna
-                new_result = f"{time_str}   <span style='color:{result_color};'>{formatted_decay}</span> {decay_unit}   <span style='color:{result_color};'>{result_status}</span>"
+                new_result = f"{display_time}   <span style='color:{result_color};'>{formatted_decay}</span> {decay_unit}   <span style='color:{result_color};'>{result_status}</span>"
             else:
                 # Näytetään vain virheilmoitus
                 new_result = f"<span style='color:{result_color};'>{result_status}</span>"

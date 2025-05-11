@@ -322,24 +322,31 @@ class TestingScreen(BaseScreen):
         if len(result.registers) >= 2:
             status_value = result.registers[1]  # Last active status
             
-            if status_value == 0:
-                self.update_status("VALMIS", "INFO")
-            elif status_value == 1:
+            # Tarkistetaan jos tila on muuttunut TESTISTÄ -> VALMIS
+            if status_value == 0 and hasattr(self, 'last_status') and self.last_status == 1:
+                # Testi on päättynyt, haetaan tulokset
+                if hasattr(self.parent(), 'fortest_manager'):
+                    self.parent().fortest_manager.read_results()
+            
+            # Tallenna nykyinen tila
+            self.last_status = status_value
+            
+            # Näytä merkityksellisimmät tilat
+            if status_value == 1:
                 self.update_status("TESTI KÄYNNISSÄ", "INFO") 
             elif status_value == 2:
                 self.update_status("AUTOZERO", "INFO")
             elif status_value == 3:
                 self.update_status("PURKU", "INFO")
-            else:
+            elif status_value > 3:
                 self.update_status(f"TILA: {status_value}", "INFO")
 
     def update_fortest_data(self):
-        """Lue ForTest statustiedot ja tulokset"""
+        """Lue ForTest statustiedot"""
         if hasattr(self.parent(), 'fortest_manager'):
             # Lue ForTest tila
             self.parent().fortest_manager.read_status()
-            # Lue ForTest tulokset
-            self.parent().fortest_manager.read_results()
+            # Tulokset luetaan vain tilamuutoksen jälkeen
 
     def cleanup(self):
         """Siivoa resurssit"""

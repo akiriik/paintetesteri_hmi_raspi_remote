@@ -170,7 +170,10 @@ class MainWindow(QWidget):
                             self.gpio_handler.set_output(test_idx + 1, panel.is_active)
 
     def handle_fortest_result(self, result, op_code, error_msg):
-        print(f"handle_fortest_result: op_code={op_code}, error_msg={error_msg}")
+        # Rajoita tulostusta vain tärkeisiin tapahtumiin
+        if op_code != 3 and op_code != 4:  # Älä tulosta status ja results kyselyjen tuloksia
+            print(f"handle_fortest_result: op_code={op_code}, error_msg={error_msg}")
+ 
         """Käsittelee ForTest-laitteen operaatiotulokset"""
         if op_code == 999:  # Erityinen koodi yhteyden epäonnistumiselle
             self.testing_screen.update_status(error_msg, "WARNING")
