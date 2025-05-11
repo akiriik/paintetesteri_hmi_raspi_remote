@@ -199,13 +199,18 @@ class TestingScreen(BaseScreen):
         
     def _continue_start_test(self):
         """Jatka testin käynnistystä ohjelmavaihdon jälkeen"""
+        # Merkitse aktiiviset paneelit keräämään tuloksia
+        for panel in self.test_panels:
+            if panel.is_active:
+                panel.results_started = True
+                
         self.is_running = True
         self.control_panel.update_button_states(True)
         
         # Käynnistä testi ForTestManager-luokan avulla
         if hasattr(self.parent(), 'fortest_manager'):
             self.parent().fortest_manager.start_test()
-            
+                
         # Aseta GPIO-pinnit
         if hasattr(self.parent(), 'gpio_handler') and self.parent().gpio_handler:
             self.parent().gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
@@ -226,17 +231,20 @@ class TestingScreen(BaseScreen):
             self.parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
 
     def toggle_active(self):
-        """Vaihda aktiivisuustila ja lähetä signaali"""
+        """Vaihda aktiivisuustila ja päivitä vain UI ja GPIO"""
         self.is_active = not self.is_active
         self.update_button_style()
         
-        # Lähetä signaali pääikkunalle Modbus-käsittelyä varten
-        if hasattr(self.parent(), 'toggle_test_active'):
-            self.parent().toggle_test_active(self.test_number, self.is_active)
-            
-            # Aktivoi myös GPIO-lähtö
-            if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
-                self.parent().parent().gpio_handler.set_output(self.test_number, self.is_active)          
+        # Aseta tulosten aloituslippu aktivoinnin yhteydessä
+        if self.is_active:
+            self.results_started = False  # Asetetaan True vasta testikäynnistyksessä
+            # Älä tyhjennä tuloshistoriaa: self.results_history = []
+            # Älä tyhjennä näyttöä: self.pressure_result.setText("")
+        
+        # Käytä GPIO-ohjausta
+        if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
+            self.parent().parent().gpio_handler.set_output(self.test_number, self.is_active)
+        
     
     def toggle_test_active(self, test_number, active):
         """Vaihda testin aktiivisuustila vain UI:n ja GPIO:n osalta"""

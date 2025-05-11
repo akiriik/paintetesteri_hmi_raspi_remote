@@ -107,16 +107,16 @@ class TestPanel(QWidget):
         self.is_active = not self.is_active
         self.update_button_style()
         
-        # Aseta tulosten aloituslippu
+        # Aseta tulosten aloituslippu aktivoinnin yhteydessä
         if self.is_active:
-            self.results_started = False  # Uusi aktivointi, älä näytä vanhoja tuloksia
-            self.results_history = []
-            self.pressure_result.setText("")
+            self.results_started = False  # Asetetaan True vasta testikäynnistyksessä
+            # Älä tyhjennä tuloshistoriaa: self.results_history = []
+            # Älä tyhjennä näyttöä: self.pressure_result.setText("")
         
         # Käytä GPIO-ohjausta
         if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
             self.parent().parent().gpio_handler.set_output(self.test_number, self.is_active)
-            
+
     @pyqtSlot(bool, str)
     def handle_toggle_result(self, success, error_msg):
         """Käsittele taustasäikeestä tullut tulos"""
@@ -163,10 +163,15 @@ class TestPanel(QWidget):
         if len(result.registers) >= 10:
             test_result = result.registers[9]
             
-            # Tarkista että tulos on olemassa
+            # Tarkista että tulos on olemassa ja testi ei ole käynnissä
             if test_result == 0 or test_result == 99:  # 99 = "Test in progress"
                 return
             
+            # Tarkista, että tulos liittyy tämän paneelin ohjelmaan
+            if hasattr(self, 'program_number') and result.registers[6] != self.program_number:
+                # Tulosdata ei kuulu tälle paneelille (ohjelmanumero ei täsmää)
+                return
+                
             # Ohita kaikki tulokset, jos paneelia ei ole vielä käynnistetty
             if not hasattr(self, 'results_started') or not self.results_started:
                 return
