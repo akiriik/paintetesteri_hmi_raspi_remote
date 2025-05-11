@@ -28,7 +28,10 @@ class TestPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignTop)
         layout.setSpacing(10)
-        
+
+        # Tuloslista, max 3 riviä
+        self.results_history = []  # Tallentaa max 3 viimeisintä tulosta        
+
         # Painetulos laatikko
         self.pressure_result = QLabel("", self)
         self.pressure_result.setFixedSize(280, 250)
@@ -44,6 +47,17 @@ class TestPanel(QWidget):
         """)
         layout.addWidget(self.pressure_result)
         
+        # Tuloshistoriaa varten käytetään QLabel + vieritys
+        self.results_area = QTextEdit(self.result_frame)
+        self.results_area.setGeometry(10, 60, 260, 180)
+        self.results_area.setReadOnly(True)
+        self.results_area.setStyleSheet("""
+            background-color: transparent;
+            color: #33FF33;
+            font-size: 16px;
+            border: none;
+        """)
+
         # Ohjelmatiedot
         self.program_label = QLabel("Ohjelma: --", self)
         self.program_label.setFixedSize(280, 60)
@@ -197,24 +211,16 @@ class TestPanel(QWidget):
             self.pressure_result.setText(f"P: {pressure_value/1000:.3f} mbar\nV: {decay_value/1000:.3f} mbar/s")
 
     def update_test_results(self, result):
-        """Päivitä testitulokset ForTest tulosdatan perusteella"""
         if not result or not hasattr(result, 'registers'):
             return
         
-        # Tarkistetaan rekisterit
         if len(result.registers) >= 10:
             test_result = result.registers[9]
             
-            if test_result == 0:  # No result
+            if test_result == 0:
                 return
             
-            # Muuta laatikon taustaväri harmaaksi mutta pidä teksti tausta mustana
-            self.pressure_result.setStyleSheet("""
-                background-color: #444444;
-                color: #33FF33;
-            """)
-            
-            # Hae aika testeriltä (tunnit, minuutit, sekunnit)
+            # Hae aika testeriltä
             hours = result.registers[0]
             minutes = result.registers[1]
             seconds = result.registers[2]
@@ -222,45 +228,61 @@ class TestPanel(QWidget):
             
             result_text = ""
             if test_result == 1:  # Good
-                result_text = "OK"
                 self.pressure_result.setStyleSheet("""
                     background-color: black;
                     color: #00FF00;
                     font-size: 20px;
                     font-weight: bold;
+                    text-align: left;
                 """)
+                # OK vasemmalla, aika oikealla
+                result_text = f"OK{' '*40}{time_str}"
             elif test_result == 2:  # Bad
-                result_text = "FAIL"
                 self.pressure_result.setStyleSheet("""
                     background-color: black;
                     color: red;
                     font-size: 20px;
                     font-weight: bold;
+                    text-align: left;
                 """)
+                # FAIL vasemmalla, aika oikealla
+                result_text = f"FAIL{' '*38}{time_str}"
             else:
-                result_text = f"TULOS: {test_result}"
                 self.pressure_result.setStyleSheet("""
                     background-color: black;
                     color: orange;
                     font-size: 12px;
                     font-weight: bold;
+                    text-align: left;
                 """)
+                # Muu tulos vasemmalla, aika oikealla
+                result_text = f"TULOS: {test_result}{' '*32}{time_str}"
             
             # Haetaan vuotoarvo
+            decay_value = 0
             if len(result.registers) >= 24:
-                decay_sign = result.registers[20]    # Etumerkki (255 = negatiivinen)
-                decay_value = result.registers[21]   # Vuodon arvo
-                decay_decimals = result.registers[24]  # Desimaalipisteet
+                decay_sign = result.registers[20]
+                decay_value = result.registers[21]
+                decay_decimals = result.registers[24]
                 
-                # Skaalaa arvo oikein desimaalipisteen avulla
                 if decay_decimals > 0:
                     decay_value = decay_value / (10 ** decay_decimals)
                 
-                # Korjattu etumerkin käsittely: 255 = negatiivinen
                 if decay_sign == 255:
                     decay_value = -decay_value
-                
-                # Lisää vuotoarvo ja aika tulostekstiin
-                result_text += f"\nVuoto: {decay_value:.3f} mbar/s\n{time_str}"
             
-            self.pressure_result.setText(result_text)
+            # Lisää tulos historiaan
+            result_status = "OK" if test_result == 1 else "FAIL" if test_result == 2 else f"TULOS: {test_result}"
+            new_result = f"Vuoto: {decay_value:.3f} mbar/s ({time_str})"
+            
+            # Rajoita historia 3 tulokseen
+            self.results_history.insert(0, f"{result_status} - {new_result}")
+            if len(self.results_history) > 3:
+                self.results_history.pop()
+            
+            # Näytä tulokset historiassa (uusin alimpana)
+            results_text = ""
+            for idx, res in enumerate(reversed(self.results_history)):
+                results_text += f"{res}\n"
+            
+            self.results_area.setText(results_text)
