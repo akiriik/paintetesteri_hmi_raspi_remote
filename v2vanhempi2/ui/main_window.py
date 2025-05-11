@@ -80,33 +80,31 @@ class MainWindow(QWidget):
         # Poistettu kytkimien modbus-lukuajastin
         
     def handle_button_press(self, button_name, is_pressed):
-        """Käsittelee GPIO-nappulan painalluksen"""
-        # Reagoi vain painallukseen (laskeva reuna), ei nostoon
-        if is_pressed:
-            print(f"Nappi painettu: {button_name}")
-            
-            if button_name == "START":
-                self.testing_screen.start_test()
-            elif button_name == "STOP":
-                self.testing_screen.stop_test()
-            elif button_name == "TEST1":
-                panel = self.testing_screen.test_panels[0]
-                panel.is_active = not panel.is_active
-                panel.update_button_style()
-                if self.gpio_handler:
-                    self.gpio_handler.set_output(1, panel.is_active)
-            elif button_name == "TEST2":
-                panel = self.testing_screen.test_panels[1]
-                panel.is_active = not panel.is_active
-                panel.update_button_style()
-                if self.gpio_handler:
-                    self.gpio_handler.set_output(2, panel.is_active)
-            elif button_name == "TEST3":
-                panel = self.testing_screen.test_panels[2]
-                panel.is_active = not panel.is_active
-                panel.update_button_style()
-                if self.gpio_handler:
-                    self.gpio_handler.set_output(3, panel.is_active)
+        """Käsittelee GPIO-nappulan painalluksen - reagoidaan vain painallukseen"""
+        # Tässä tapauksessa is_pressed on aina True (vain painallus tulee signaalina)
+        print(f"Nappi painettu: {button_name}")
+        
+        if button_name == "START":
+            self.testing_screen.start_test()
+        elif button_name == "STOP":
+            self.testing_screen.stop_test()
+        elif button_name == "TEST1":
+            self.toggle_test(0)
+        elif button_name == "TEST2":
+            self.toggle_test(1)
+        elif button_name == "TEST3":
+            self.toggle_test(2)
+                
+    def toggle_test(self, panel_index):
+        """Vaihda testin tila hallitusti"""
+        panel = self.testing_screen.test_panels[panel_index]
+        panel.is_active = not panel.is_active
+        panel.update_button_style()
+        
+        # Aseta GPIO-lähtö uudessa tilassa
+        if self.gpio_handler:
+            self.gpio_handler.set_output(panel_index + 1, panel.is_active)
+            print(f"Testi {panel_index + 1} tila vaihdettu: {panel.is_active}")
 
     def check_emergency_stop(self):
         """Tarkista hätäseistila"""

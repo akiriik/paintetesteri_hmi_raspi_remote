@@ -2,6 +2,7 @@
 
 import sys
 import os
+import time
 import RPi.GPIO as GPIO
 from PyQt5.QtCore import QObject, pyqtSignal
 
@@ -35,18 +36,24 @@ class GPIOInputHandler(QObject):
             # Alusta pinnit sisääntuloiksi pullup-vastuksilla
             for pin in self.button_pins.values():
                 GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+            
+            # Tallenna nappien tilat ja ajastimet
+            self.button_states = {button: False for button in self.button_pins}
+            self.last_press_time = {button: 0 for button in self.button_pins}
+            self.debounce_time = 200  # 500ms debounce aika
+            
+            # Lue alkutilat
+            for button, pin in self.button_pins.items():
+                self.button_states[button] = not GPIO.input(pin)
                 
-            # Lisää reunantunnistus jokaiselle napille
+            # Lisää vain yksi tapahtumakäsittelijä jokaiselle napille
             for button_name, pin in self.button_pins.items():
                 GPIO.add_event_detect(
                     pin, 
-                    GPIO.FALLING,  # Tarkkaile laskevaa reunaa (nappi painettu)
+                    GPIO.BOTH,  # Tarkkaile molempia reunoja
                     callback=lambda channel, btn=button_name: self._button_callback(btn, channel),
-                    bouncetime=300  # Debounce aika millisekunteina
+                    bouncetime=100  # Lyhyempi bouncetime, sillä käsittelemme debounce-logiikan itse
                 )
-                
-            # Tallenna nappien edellinen tila
-            self.button_states = {button: False for button in self.button_pins}
                 
         finally:
             # Palauta tulosteet
@@ -54,23 +61,38 @@ class GPIOInputHandler(QObject):
             sys.stderr = self._original_stderr
     
     def _button_callback(self, button_name, channel):
-        """Käsittele napin painallus"""
+        """Käsittele napin painallus reagoiden vain laskevaan reunaan"""
+        current_time = time.time() * 1000  # millisekunteina
+        last_time = self.last_press_time[button_name]
+        
+        # Tarkista onko debounce-aika kulunut
+        if current_time - last_time < self.debounce_time:
+            return
+            
         # Lue pinnin tila (aktiivinen alhaalla, joten käännä logiikka)
         is_pressed = not GPIO.input(channel)
         
-        # Tarkista onko tila muuttunut
-        if self.button_states[button_name] != is_pressed:
-            self.button_states[button_name] = is_pressed
-            self.button_changed.emit(button_name, is_pressed)
+        # Reagoi vain painallukseen (laskeva reuna, nappi painettu alas)
+        if is_pressed:
+            # Päivitä viimeinen painallus aika
+            self.last_press_time[button_name] = current_time
+            
+            # Lähetä signaali napista riippumatta edellisestä tilasta
+            print(f"Nappi {button_name} painettu, lähetetään signaali")
+            self.button_changed.emit(button_name, True)
     
     def read_button_state(self, button_name):
         """Lue napin tämänhetkinen tila"""
         if button_name in self.button_pins:
-            # Päivitä myös tallennettu tila
+            # Lue nykyinen tila pinnistä
             pin = self.button_pins[button_name]
-            is_pressed = not GPIO.input(pin)  # Käänteinen logiikka (aktiivinen alhaalla)
-            self.button_states[button_name] = is_pressed
-            return is_pressed
+            current_state = not GPIO.input(pin)  # Käänteinen logiikka (aktiivinen alhaalla)
+            
+            # Päivitä tallennettu tila vain jos eri
+            if current_state != self.button_states[button_name]:
+                self.button_states[button_name] = current_state
+                
+            return self.button_states[button_name]
         return False
     
     def cleanup(self):
