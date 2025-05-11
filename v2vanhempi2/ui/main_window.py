@@ -82,7 +82,6 @@ class MainWindow(QWidget):
     def handle_button_press(self, button_name, is_pressed):
         """Käsittelee GPIO-nappulan painalluksen - reagoidaan vain painallukseen"""
         # Tässä tapauksessa is_pressed on aina True (vain painallus tulee signaalina)
-        print(f"Nappi painettu: {button_name}")
         
         if button_name == "START":
             self.testing_screen.start_test()
@@ -104,7 +103,6 @@ class MainWindow(QWidget):
         # Aseta GPIO-lähtö uudessa tilassa
         if self.gpio_handler:
             self.gpio_handler.set_output(panel_index + 1, panel.is_active)
-            print(f"Testi {panel_index + 1} tila vaihdettu: {panel.is_active}")
 
     def check_emergency_stop(self):
         """Tarkista hätäseistila"""

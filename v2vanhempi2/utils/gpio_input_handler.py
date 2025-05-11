@@ -40,7 +40,7 @@ class GPIOInputHandler(QObject):
             # Tallenna nappien tilat ja ajastimet
             self.button_states = {button: False for button in self.button_pins}
             self.last_press_time = {button: 0 for button in self.button_pins}
-            self.debounce_time = 200  # 500ms debounce aika
+            self.debounce_time = 200  # 200ms debounce aika
             
             # Lue alkutilat
             for button, pin in self.button_pins.items():
@@ -78,7 +78,6 @@ class GPIOInputHandler(QObject):
             self.last_press_time[button_name] = current_time
             
             # Lähetä signaali napista riippumatta edellisestä tilasta
-            print(f"Nappi {button_name} painettu, lähetetään signaali")
             self.button_changed.emit(button_name, True)
     
     def read_button_state(self, button_name):
