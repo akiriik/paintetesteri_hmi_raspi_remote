@@ -132,7 +132,7 @@ class TestingScreen(BaseScreen):
         """Käynnistä ohjelman valinta tietylle testille"""
         self.current_test_panel = test_number
         # Kerro pääikkunalle, että halutaan näyttää ohjelman valintasivu
-        self.program_selection_requested.emit(test_number)''
+        self.program_selection_requested.emit(test_number)
     
     def set_program_for_test(self, program_name):
         """Aseta ohjelma valitulle testille"""
