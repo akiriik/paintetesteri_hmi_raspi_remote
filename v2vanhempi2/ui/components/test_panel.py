@@ -160,7 +160,6 @@ class TestPanel(QWidget):
                 return
             
             # Tarkista onko tämä uusi tulos
-            # Käytetään aikaleimaa ja testitulosta tunnistamiseen
             hours = result.registers[0]
             minutes = result.registers[1]
             time_str = f"{hours:02d}:{minutes:02d}"
@@ -177,16 +176,29 @@ class TestPanel(QWidget):
             
             # Haetaan vuotoarvo
             decay_value = 0
-            if len(result.registers) >= 24:
+            if len(result.registers) >= 25:
                 decay_sign = result.registers[20]
                 decay_value = result.registers[21]
+                decay_unit_code = result.registers[23]  # Unit measure of decay
                 decay_decimals = result.registers[24]
                 
                 if decay_decimals > 0:
                     decay_value = decay_value / (10 ** decay_decimals)
                 
-                if decay_sign == 255:
+                if decay_sign == 255:  # Alkuperäinen logiikka
                     decay_value = -decay_value
+                
+                # Muunna yksikkökoodi yksiköksi Table - Unit measures mukaan
+                units = {
+                    20: "mbar/s", 21: "bar/s", 22: "hPa/s", 23: "Pa/s", 24: "Psi/s",
+                    40: "cc/h", 41: "cc/min", 42: "l/h", 43: "l/min",
+                    0: "mbar", 1: "bar", 2: "hPa", 3: "Pa", 4: "Psi",
+                    60: "s", 61: "min", 70: "cc", 71: "l"
+                }
+                
+                decay_unit = units.get(decay_unit_code, "mbar/s")
+            else:
+                decay_unit = "mbar/s"  # Oletusyksikkö
             
             # Määritä tulos ja tyylit
             if test_result == 1:  # Good
@@ -200,9 +212,7 @@ class TestPanel(QWidget):
                 result_color = "orange"
             
             # Luo uusi tulosrivi
-            new_result = f"{time_str}   {decay_value:.3f} mbar/s   {result_status}"
-            
-
+            new_result = f"{time_str}   {decay_value:.3f} {decay_unit}   {result_status}"
             
             # Lisää uusi tulos historiaan
             if not hasattr(self, 'results_history'):
@@ -221,7 +231,10 @@ class TestPanel(QWidget):
             self.pressure_result.setStyleSheet(f"""
                 background-color: black;
                 color: {self.results_history[-1][1]};
+                font-family: 'Digital-7', 'Consolas', monospace;
                 font-size: 20px;
                 font-weight: bold;
                 text-align: left;
+                border: 2px solid #444444;
+                border-radius: 10px;
             """)
