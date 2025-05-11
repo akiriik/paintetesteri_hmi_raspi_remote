@@ -201,41 +201,66 @@ class TestPanel(QWidget):
         if not result or not hasattr(result, 'registers'):
             return
         
-        # Tarkistetaan rekisterit taulukon perusteella
-        # qModMaster Register 73-74 (ForTest Position 19-20) sisältää testin tuloksen
+        # Tarkistetaan rekisterit
         if len(result.registers) >= 10:
-            test_result = result.registers[9]  # Result of test (Indeksi 9 vastaa rekisteriä 73-74)
+            test_result = result.registers[9]
             
-            # Ei näytetä mitään jos ei ole tulosta
             if test_result == 0:  # No result
                 return
+            
+            # Muuta laatikon taustaväri harmaaksi mutta pidä teksti tausta mustana
+            self.pressure_result.setStyleSheet("""
+                background-color: #444444;
+                color: #33FF33;
+            """)
+            
+            # Hae aika testeriltä (tunnit, minuutit, sekunnit)
+            hours = result.registers[0]
+            minutes = result.registers[1]
+            seconds = result.registers[2]
+            time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
             
             result_text = ""
             if test_result == 1:  # Good
                 result_text = "OK"
-                self.pressure_result.setStyleSheet("color: #00FF00; font-size: 36px; font-weight: bold;")  # Vihreä
+                self.pressure_result.setStyleSheet("""
+                    background-color: black;
+                    color: #00FF00;
+                    font-size: 20px;
+                    font-weight: bold;
+                """)
             elif test_result == 2:  # Bad
                 result_text = "FAIL"
-                self.pressure_result.setStyleSheet("color: red; font-size: 36px; font-weight: bold;")  # Punainen
+                self.pressure_result.setStyleSheet("""
+                    background-color: black;
+                    color: red;
+                    font-size: 20px;
+                    font-weight: bold;
+                """)
             else:
                 result_text = f"TULOS: {test_result}"
-                self.pressure_result.setStyleSheet("color: orange; font-size: 24px; font-weight: bold;")  # Oranssi
+                self.pressure_result.setStyleSheet("""
+                    background-color: black;
+                    color: orange;
+                    font-size: 12px;
+                    font-weight: bold;
+                """)
             
             # Haetaan vuotoarvo
-            # qModMaster Register 85-86 (ForTest Position 43-44) ja 86-87 (ForTest Position 45-46) sisältää vuodon
-            if len(result.registers) >= 22:
-                decay_sign = result.registers[20]  # Sign of decay (Position 41-42)
-                decay_high = result.registers[21]  # Decay HIGH (Position 43-44)
-                decay_low = result.registers[22]   # Decay LOW (Position 45-46)
+            if len(result.registers) >= 24:
+                decay_sign = result.registers[20]    # Etumerkki (255 = negatiivinen)
+                decay_value = result.registers[21]   # Vuodon arvo
+                decay_decimals = result.registers[24]  # Desimaalipisteet
                 
-                # Yhdistä korkeat ja matalat arvot
-                decay_value = (decay_high << 16) | decay_low
+                # Skaalaa arvo oikein desimaalipisteen avulla
+                if decay_decimals > 0:
+                    decay_value = decay_value / (10 ** decay_decimals)
                 
-                # Sovelletaan etumerkki
-                if decay_sign == 1:
+                # Korjattu etumerkin käsittely: 255 = negatiivinen
+                if decay_sign == 255:
                     decay_value = -decay_value
                 
-                # Liitetään vuotoarvo tulostekstiin
-                result_text += f"\nVuoto: {decay_value/1000:.3f} mbar/s"
+                # Lisää vuotoarvo ja aika tulostekstiin
+                result_text += f"\nVuoto: {decay_value:.3f} mbar/s\n{time_str}"
             
             self.pressure_result.setText(result_text)
