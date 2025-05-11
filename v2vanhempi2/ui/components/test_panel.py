@@ -163,57 +163,33 @@ class TestPanel(QWidget):
         if len(result.registers) >= 10:
             test_result = result.registers[9]
             
-            # Tarkista että tulos on olemassa ja testi ei ole käynnissä
             if test_result == 0 or test_result == 99:  # 99 = "Test in progress"
                 return
             
             # Tarkista, että tulos liittyy tämän paneelin ohjelmaan
             if hasattr(self, 'program_number') and result.registers[6] != self.program_number:
-                # Tulosdata ei kuulu tälle paneelille (ohjelmanumero ei täsmää)
+                # Tulosdata ei kuulu tälle paneelille
                 return
-                
+                    
             # Ohita kaikki tulokset, jos paneelia ei ole vielä käynnistetty
             if not hasattr(self, 'results_started') or not self.results_started:
                 return
-                
+                    
             # Tarkista onko tämä uusi tulos
             hours = result.registers[0]
             minutes = result.registers[1]
+            seconds = result.registers[2]  # Lisää sekuntien luku
             time_str = f"{hours:02d}:{minutes:02d}"
-            
-            # Muodosta tunnistetieto
-            current_result_id = f"{time_str}-{test_result}"
-            
+
+            # Käytetään tarkempaa tunnistetta, joka sisältää ohjelman numeron
+            program_number = result.registers[6]
+            current_result_id = f"{time_str}-{test_result}-{program_number}"
+
             # Tarkista onko tämä tulos jo käsitelty
             if hasattr(self, 'last_result_id') and self.last_result_id == current_result_id:
                 return
-                
+                    
             self.last_result_id = current_result_id
-            
-            # Haetaan vuotoarvo ja yksikkö
-            decay_value = 0
-            if len(result.registers) >= 25:
-                decay_sign = result.registers[20]
-                decay_value = result.registers[21]
-                decay_unit_code = result.registers[23]
-                decay_decimals = result.registers[24]
-                
-                if decay_decimals > 0:
-                    decay_value = decay_value / (10 ** decay_decimals)
-                
-                if decay_sign == 255:
-                    decay_value = -decay_value
-                
-                units = {
-                    20: "mbar/s", 21: "bar/s", 22: "hPa/s", 23: "Pa/s", 24: "Psi/s",
-                    40: "cc/h", 41: "cc/min", 42: "l/h", 43: "l/min",
-                    0: "mbar", 1: "bar", 2: "hPa", 3: "Pa", 4: "Psi",
-                    60: "s", 61: "min", 70: "cc", 71: "l"
-                }
-                
-                decay_unit = units.get(decay_unit_code, "mbar/s")
-            else:
-                decay_unit = "mbar/s"
             
             # Määritä tulos, teksti ja väri
             result_texts = {
@@ -239,25 +215,50 @@ class TestPanel(QWidget):
             result_status = result_texts.get(test_result, f"TULOS: {test_result}")
             
             # Väri ja näyttötapa tuloksen mukaan
-            if test_result == 1:
-                # OK - näytä normaali tulos vihreällä
+            if test_result == 1:  # OK - vihreä
                 result_color = "#00FF00"
-                new_result = f"{time_str}   <span style='color:{result_color};'>{decay_value:.3f}</span> {decay_unit}   <span style='color:{result_color};'>{result_status}</span>"
-            elif test_result == 2:
-                # FAIL - näytä normaali tulos punaisella
+            elif test_result == 2:  # FAIL - punainen
                 result_color = "red"
-                new_result = f"{time_str}   <span style='color:{result_color};'>{decay_value:.3f}</span> {decay_unit}   <span style='color:{result_color};'>{result_status}</span>"
-            elif test_result == 3:
-                # OK? - näytä normaali tulos oranssilla
+            elif test_result in [3, 4]:  # OK?, NOK? - oranssi
                 result_color = "orange"
-                new_result = f"{time_str}   <span style='color:{result_color};'>{decay_value:.3f}</span> {decay_unit}   <span style='color:{result_color};'>{result_status}</span>"
-            elif test_result == 4:
-                # NOK? - näytä normaali tulos oranssilla
-                result_color = "orange"
-                new_result = f"{time_str}   <span style='color:{result_color};'>{decay_value:.3f}</span> {decay_unit}   <span style='color:{result_color};'>{result_status}</span>"
+            else:  # Muut - punainen
+                result_color = "red"
+                
+            # Haetaan vuotoarvo
+            decay_value = 0
+            if len(result.registers) >= 25:
+                decay_sign = result.registers[20]
+                decay_value = result.registers[21]
+                decay_unit_code = result.registers[23]
+                decay_decimals = result.registers[24]
+                
+                if decay_decimals > 0:
+                    decay_value = decay_value / (10 ** decay_decimals)
+                
+                if decay_sign == 255:
+                    decay_value = -decay_value
+                
+                # Formatoi arvo käyttäen desimaalilukua
+                formatted_decay = f"{decay_value:.{decay_decimals}f}"
+                
+                units = {
+                    20: "mbar/s", 21: "bar/s", 22: "hPa/s", 23: "Pa/s", 24: "Psi/s",
+                    40: "cc/h", 41: "cc/min", 42: "l/h", 43: "l/min",
+                    0: "mbar", 1: "bar", 2: "hPa", 3: "Pa", 4: "Psi",
+                    60: "s", 61: "min", 70: "cc", 71: "l"
+                }
+                
+                decay_unit = units.get(decay_unit_code, "mbar/s")
             else:
-                # Muut tyypit - näytä vain virheilmoitus punaisella
-                result_color = "red"
+                decay_unit = "mbar/s"
+                formatted_decay = f"{decay_value:.3f}"
+            
+            # Luo tulos näytettävän tyypin mukaan
+            if test_result in [1, 2, 3, 4]:
+                # Näytetään normaali tulos värikoodattuna
+                new_result = f"{time_str}   <span style='color:{result_color};'>{formatted_decay}</span> {decay_unit}   <span style='color:{result_color};'>{result_status}</span>"
+            else:
+                # Näytetään vain virheilmoitus
                 new_result = f"<span style='color:{result_color};'>{result_status}</span>"
             
             # Lisää uusi tulos historiaan
@@ -266,10 +267,10 @@ class TestPanel(QWidget):
                 
             self.results_history.append(new_result)
             
-            # Pidä vain 3 viimeisintä tulosta
+            # Pidä vain 5 viimeisintä tulosta
             if len(self.results_history) > 5:
                 self.results_history.pop(0)
-            
+
             # Rakenna näyttöteksti (uusin alimmaisena)
             display_html = "<br>".join(self.results_history)
             

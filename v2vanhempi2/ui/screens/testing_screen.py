@@ -158,6 +158,11 @@ class TestingScreen(BaseScreen):
         """Käynnistä testi ForTestManager-luokan avulla, vaihda ensin ohjelmat"""
         # Tarkista, mitkä testipaneelit ovat aktiivisia
         active_panels = [panel for panel in self.test_panels if panel.is_active]
+        
+        # Jos yhtään paneelia ei ole aktiivisena, testiä ei voi käynnistää
+        if not active_panels:
+            self.update_status("Valitse vähintään yksi testi aktiiviseksi ennen käynnistystä", "WARNING")
+            return
 
         if active_panels:
             # Vaihda ohjelma ensimmäisen aktiivisen testin mukaan
@@ -225,7 +230,7 @@ class TestingScreen(BaseScreen):
         if hasattr(self.parent(), 'fortest_manager'):
             self.parent().fortest_manager.abort_test()
             
-        # Aseta GPIO-pinnit
+        # Aseta GPIO-pinnitdef start_test(self
         if hasattr(self.parent(), 'gpio_handler') and self.parent().gpio_handler:
             self.parent().gpio_handler.set_output(4, True)   # GPIO 23 (vihreä) päälle
             self.parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
@@ -290,13 +295,23 @@ class TestingScreen(BaseScreen):
         if hasattr(self.parent(), 'fortest_manager'):
             self.parent().fortest_manager.read_status()
 
-    def handle_fortest_status(self, result, op_code):
-        """Process ForTest status results"""
-        if op_code == 3 and result:  # Status read operation
-            # Update active test panels with status information
-            for panel in self.test_panels:
-                if panel.is_active:
-                    panel.update_test_status(result)
+    def handle_fortest_status(self, result):
+        """Käsittele ForTest-laitteen tilatiedot"""
+        if not result or not hasattr(result, 'registers'):
+            return
+        
+        # Hae nykyinen tila (register 51)
+        if len(result.registers) >= 2:
+            status = result.registers[1]
+            
+            # Jos tila on "WAITING" (0) ja edellinen tila oli jokin muu, testi on päättynyt
+            if status == 0 and hasattr(self, 'last_status') and self.last_status != 0:
+                # Lue tulokset
+                if hasattr(self.parent(), 'fortest_manager'):
+                    self.parent().fortest_manager.read_results()
+            
+            # Tallenna nykyinen tila
+            self.last_status = status
 
     def update_status_from_fortest(self, result):
         """Päivitä tilatieto ForTest-datan perusteella"""
