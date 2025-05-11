@@ -163,8 +163,7 @@ class TestPanel(QWidget):
             # Käytetään aikaleimaa ja testitulosta tunnistamiseen
             hours = result.registers[0]
             minutes = result.registers[1]
-            seconds = result.registers[2]
-            time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+            time_str = f"{hours:02d}:{minutes:02d}"
             
             # Muodosta tunnistetieto (aika + tulos)
             current_result_id = f"{time_str}-{test_result}"
@@ -201,7 +200,7 @@ class TestPanel(QWidget):
                 result_color = "orange"
             
             # Luo uusi tulosrivi
-            new_result = f"{time_str} {decay_value:.3f} mbar/s {result_status}"
+            new_result = f"{time_str}   {decay_value:.3f} mbar/s   {result_status}"
             
 
             
