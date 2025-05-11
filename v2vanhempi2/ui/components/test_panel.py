@@ -159,43 +159,22 @@ class TestPanel(QWidget):
             if test_result == 0:
                 return
             
-            # Hae aika testeriltä
+            # Tarkista onko tämä uusi tulos
+            # Käytetään aikaleimaa ja testitulosta tunnistamiseen
             hours = result.registers[0]
             minutes = result.registers[1]
             seconds = result.registers[2]
             time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
             
-            result_text = ""
-            if test_result == 1:  # Good
-                self.pressure_result.setStyleSheet("""
-                    background-color: black;
-                    color: #00FF00;
-                    font-size: 20px;
-                    font-weight: bold;
-                    text-align: left;
-                """)
-                # OK vasemmalla, aika oikealla
-                result_text = f"OK  {' '*14}{time_str}"
-            elif test_result == 2:  # Bad
-                self.pressure_result.setStyleSheet("""
-                    background-color: black;
-                    color: red;
-                    font-size: 20px;
-                    font-weight: bold;
-                    text-align: left;
-                """)
-                # FAIL vasemmalla, aika oikealla
-                result_text = f"FAIL{' '*14}{time_str}"
-            else:
-                self.pressure_result.setStyleSheet("""
-                    background-color: black;
-                    color: orange;
-                    font-size: 12px;
-                    font-weight: bold;
-                    text-align: left;
-                """)
-                # Muu tulos vasemmalla, aika oikealla
-                result_text = f"TULOS: {test_result}{' '*32}{time_str}"
+            # Muodosta tunnistetieto (aika + tulos)
+            current_result_id = f"{time_str}-{test_result}"
+            
+            # Tarkista onko tämä tulos jo käsitelty
+            if hasattr(self, 'last_result_id') and self.last_result_id == current_result_id:
+                return
+            
+            # Tallenna tämän tuloksen tunniste
+            self.last_result_id = current_result_id
             
             # Haetaan vuotoarvo
             decay_value = 0
@@ -210,11 +189,40 @@ class TestPanel(QWidget):
                 if decay_sign == 255:
                     decay_value = -decay_value
             
-            # Lisää tulos historiaan
-            result_status = "OK" if test_result == 1 else "FAIL" if test_result == 2 else f"TULOS: {test_result}"
-            new_result = f"Vuoto: {decay_value:.3f} mbar/s ({time_str})"
+            # Määritä tulos ja tyylit
+            if test_result == 1:  # Good
+                result_status = "OK"
+                result_color = "#00FF00"
+            elif test_result == 2:  # Bad
+                result_status = "FAIL"
+                result_color = "red"
+            else:
+                result_status = f"TULOS: {test_result}"
+                result_color = "orange"
             
-            # Lisää vuotoarvo tulostekstiin
-            result_text += f"\nVuoto: {decay_value:.3f} mbar/s"
+            # Luo uusi tulosrivi
+            new_result = f"{time_str} {decay_value:.3f} mbar/s {result_status}"
             
-            self.pressure_result.setText(result_text)
+
+            
+            # Lisää uusi tulos historiaan
+            if not hasattr(self, 'results_history'):
+                self.results_history = []
+            self.results_history.append((new_result, result_color))
+            
+            # Pidä vain 3 viimeisintä tulosta
+            if len(self.results_history) > 3:
+                self.results_history.pop(0)
+            
+            # Rakenna näyttöteksti (uusin alimmaisena)
+            display_text = "\n".join([result[0] for result in self.results_history])
+            
+            # Päivitä tulosteksti ja tyyli
+            self.pressure_result.setText(display_text)
+            self.pressure_result.setStyleSheet(f"""
+                background-color: black;
+                color: {self.results_history[-1][1]};
+                font-size: 20px;
+                font-weight: bold;
+                text-align: left;
+            """)
