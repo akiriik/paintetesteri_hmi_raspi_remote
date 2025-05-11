@@ -176,9 +176,17 @@ class MainWindow(QWidget):
             if op_code == 1:  # Testin käynnistys
                 msg = "Testi käynnistetty onnistuneesti"
                 level = "SUCCESS"
+                # Käynnissä: punainen päällä, vihreä pois
+                if self.gpio_handler:
+                    self.gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
+                    self.gpio_handler.set_output(5, True)   # GPIO 24 (punainen) päälle
             elif op_code == 2:  # Testin pysäytys
                 msg = "Testi pysäytetty"
                 level = "INFO"
+                # Pysäytetty: vihreä päällä, punainen pois
+                if self.gpio_handler:
+                    self.gpio_handler.set_output(4, True)   # GPIO 23 (vihreä) päälle
+                    self.gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
 
             if msg:
                 self.testing_screen.update_status(msg, level)

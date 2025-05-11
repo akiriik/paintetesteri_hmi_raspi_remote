@@ -132,7 +132,7 @@ class TestingScreen(BaseScreen):
         """Käynnistä ohjelman valinta tietylle testille"""
         self.current_test_panel = test_number
         # Kerro pääikkunalle, että halutaan näyttää ohjelman valintasivu
-        self.program_selection_requested.emit(test_number)
+        self.program_selection_requested.emit(test_number)''
     
     def set_program_for_test(self, program_name):
         """Aseta ohjelma valitulle testille"""
@@ -147,21 +147,29 @@ class TestingScreen(BaseScreen):
         """Käynnistä testi ForTestManager-luokan avulla"""
         self.is_running = True
         self.control_panel.update_button_states(True)
-        # Poistettu lokitus, ei näytetä vain napinpainallusta
         
         # Käynnistä testi ForTestManager-luokan avulla
         if hasattr(self.parent(), 'fortest_manager'):
             self.parent().fortest_manager.start_test()
-    
+            
+        # Aseta GPIO-pinnit
+        if hasattr(self.parent(), 'gpio_handler') and self.parent().gpio_handler:
+            self.parent().gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
+            self.parent().gpio_handler.set_output(5, True)   # GPIO 24 (punainen) päälle
+
     def stop_test(self):
         """Pysäytä testi ForTestManager-luokan avulla"""
         self.is_running = False
         self.control_panel.update_button_states(False)
-        # Poistettu lokitus, ei näytetä vain napinpainallusta
         
         # Pysäytä testi ForTestManager-luokan avulla
         if hasattr(self.parent(), 'fortest_manager'):
             self.parent().fortest_manager.abort_test()
+            
+        # Aseta GPIO-pinnit
+        if hasattr(self.parent(), 'gpio_handler') and self.parent().gpio_handler:
+            self.parent().gpio_handler.set_output(4, True)   # GPIO 23 (vihreä) päälle
+            self.parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
 
     def toggle_active(self):
         """Vaihda aktiivisuustila ja lähetä signaali"""
