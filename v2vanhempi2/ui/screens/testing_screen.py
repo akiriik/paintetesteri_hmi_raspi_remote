@@ -158,7 +158,7 @@ class TestingScreen(BaseScreen):
         """Käynnistä testi ForTestManager-luokan avulla, vaihda ensin ohjelmat"""
         # Tarkista, mitkä testipaneelit ovat aktiivisia
         active_panels = [panel for panel in self.test_panels if panel.is_active]
-        
+
         if active_panels:
             # Vaihda ohjelma ensimmäisen aktiivisen testin mukaan
             first_panel = active_panels[0]
@@ -188,7 +188,12 @@ class TestingScreen(BaseScreen):
                         self.update_status(f"Virhe ohjelman vaihdossa: {str(e)}", "ERROR")
                 else:
                     self.update_status("ForTest-manageria ei saatavilla", "ERROR")
-        
+
+        # Merkitse aktiiviset paneelit keräämään tuloksia
+        for panel in self.test_panels:
+            if panel.is_active:
+                panel.results_started = True
+
         # Jos ei onnistunut tai ei ole aktiivisia testejä, käynnistetään ilman ohjelman vaihtoa
         self._continue_start_test()
         

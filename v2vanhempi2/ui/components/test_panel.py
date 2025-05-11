@@ -2,6 +2,7 @@
 from PyQt5.QtWidgets import QWidget, QLabel, QPushButton, QVBoxLayout, QTextEdit, QFrame
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QFont 
+import time
 
 class TestPanel(QWidget):
     """Yksittäisen testin paneeli"""
@@ -106,10 +107,16 @@ class TestPanel(QWidget):
         self.is_active = not self.is_active
         self.update_button_style()
         
-        # Käytä vain GPIO-ohjausta, EI ForTest-kommunikointia
+        # Aseta tulosten aloituslippu
+        if self.is_active:
+            self.results_started = False  # Uusi aktivointi, älä näytä vanhoja tuloksia
+            self.results_history = []
+            self.pressure_result.setText("")
+        
+        # Käytä GPIO-ohjausta
         if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
             self.parent().parent().gpio_handler.set_output(self.test_number, self.is_active)
-    
+            
     @pyqtSlot(bool, str)
     def handle_toggle_result(self, success, error_msg):
         """Käsittele taustasäikeestä tullut tulos"""
@@ -156,9 +163,14 @@ class TestPanel(QWidget):
         if len(result.registers) >= 10:
             test_result = result.registers[9]
             
-            if test_result == 0:
+            # Tarkista että tulos on olemassa
+            if test_result == 0 or test_result == 99:  # 99 = "Test in progress"
                 return
             
+            # Ohita kaikki tulokset, jos paneelia ei ole vielä käynnistetty
+            if not hasattr(self, 'results_started') or not self.results_started:
+                return
+                
             # Tarkista onko tämä uusi tulos
             hours = result.registers[0]
             minutes = result.registers[1]
@@ -170,10 +182,10 @@ class TestPanel(QWidget):
             # Tarkista onko tämä tulos jo käsitelty
             if hasattr(self, 'last_result_id') and self.last_result_id == current_result_id:
                 return
-            
+                
             self.last_result_id = current_result_id
             
-            # Haetaan vuotoarvo
+            # Haetaan vuotoarvo ja yksikkö
             decay_value = 0
             if len(result.registers) >= 25:
                 decay_sign = result.registers[20]
@@ -198,35 +210,67 @@ class TestPanel(QWidget):
             else:
                 decay_unit = "mbar/s"
             
-            # Määritä tulos ja tyylit
+            # Määritä tulos, teksti ja väri
+            result_texts = {
+                0: "Ei tulosta",
+                1: "OK",
+                2: "FAIL",
+                3: "OK?",
+                4: "NOK?",
+                5: "Virheellinen referenssi",
+                6: "Virheellinen soitto",
+                7: "Virtaus alle rajan",
+                8: "Paine yli asteikon",
+                9: "VOUT yli asteikon",
+                10: "Paine alle toleranssin",
+                11: "Paine yli toleranssin",
+                12: "Painetasoa ei saavutettu",
+                13: "Keskeytetty",
+                14: "Virtaus yli rajan", 
+                15: "Täyttöaika min",
+                16: "Virhe tilavuusreferenssi"
+            }
+            
+            result_status = result_texts.get(test_result, f"TULOS: {test_result}")
+            
+            # Väri ja näyttötapa tuloksen mukaan
             if test_result == 1:
-                result_status = "OK"
+                # OK - näytä normaali tulos vihreällä
                 result_color = "#00FF00"
+                new_result = f"{time_str}   <span style='color:{result_color};'>{decay_value:.3f}</span> {decay_unit}   <span style='color:{result_color};'>{result_status}</span>"
             elif test_result == 2:
-                result_status = "FAIL"
+                # FAIL - näytä normaali tulos punaisella
                 result_color = "red"
-            else:
-                result_status = f"TULOS: {test_result}"
+                new_result = f"{time_str}   <span style='color:{result_color};'>{decay_value:.3f}</span> {decay_unit}   <span style='color:{result_color};'>{result_status}</span>"
+            elif test_result == 3:
+                # OK? - näytä normaali tulos oranssilla
                 result_color = "orange"
+                new_result = f"{time_str}   <span style='color:{result_color};'>{decay_value:.3f}</span> {decay_unit}   <span style='color:{result_color};'>{result_status}</span>"
+            elif test_result == 4:
+                # NOK? - näytä normaali tulos oranssilla
+                result_color = "orange"
+                new_result = f"{time_str}   <span style='color:{result_color};'>{decay_value:.3f}</span> {decay_unit}   <span style='color:{result_color};'>{result_status}</span>"
+            else:
+                # Muut tyypit - näytä vain virheilmoitus punaisella
+                result_color = "red"
+                new_result = f"<span style='color:{result_color};'>{result_status}</span>"
             
             # Lisää uusi tulos historiaan
             if not hasattr(self, 'results_history'):
                 self.results_history = []
                 
-            # Käytetään HTML-muotoilua värjäämään vain tilan teksti
-            new_result = f"{time_str}   <span style='color:{result_color};'>{decay_value:.3f}</span> {decay_unit}   <span style='color:{result_color};'>{result_status}</span>"
             self.results_history.append(new_result)
             
             # Pidä vain 3 viimeisintä tulosta
-            if len(self.results_history) > 3:
+            if len(self.results_history) > 5:
                 self.results_history.pop(0)
             
             # Rakenna näyttöteksti (uusin alimmaisena)
             display_html = "<br>".join(self.results_history)
             
-            # Päivitä tulosteksti ja tyyli
-            self.pressure_result.setText("")  # Tyhjennä ensin
-            self.pressure_result.setTextFormat(Qt.RichText)  # Käytä rich text -muotoilua
+            # Päivitä tulosteksti
+            self.pressure_result.setText("")
+            self.pressure_result.setTextFormat(Qt.RichText)
             self.pressure_result.setStyleSheet("""
                 background-color: black;
                 color: white;
