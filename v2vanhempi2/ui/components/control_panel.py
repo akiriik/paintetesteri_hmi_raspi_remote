@@ -18,7 +18,7 @@ class ControlPanel(QWidget):
 
         # Käynnistä nappi
         self.start_button = QPushButton("KÄYNNISTÄ", self)
-        self.start_button.setFixedSize(200, 100)
+        self.start_button.setFixedSize(160, 100)
         self.start_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
@@ -32,7 +32,7 @@ class ControlPanel(QWidget):
         
         # Pysäytä nappi
         self.stop_button = QPushButton("PYSÄYTÄ", self)
-        self.stop_button.setFixedSize(200, 100)
+        self.stop_button.setFixedSize(160, 100)
         self.stop_button.setStyleSheet("""
             QPushButton {
                 background-color: #F44336;

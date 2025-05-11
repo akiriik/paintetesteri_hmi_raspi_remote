@@ -15,7 +15,7 @@ class TestPanel(QWidget):
         self.is_active = False
         self.modbus_register = 17000 + self.test_number  # PAINE 1-3 AKTIIVINEN rekisterit: 17001-17003
         
-        self.setFixedSize(300, 600)
+        self.setFixedSize(380,600)
         self.setStyleSheet("""
             QWidget {
                 background-color: #f5f5f5;
@@ -34,7 +34,7 @@ class TestPanel(QWidget):
 
         # Painetulos laatikko
         self.pressure_result = QLabel("", self)
-        self.pressure_result.setFixedSize(280, 250)
+        self.pressure_result.setFixedSize(360, 250)
         self.pressure_result.setAlignment(Qt.AlignCenter)
         self.pressure_result.setStyleSheet("""
             background-color: black;
@@ -164,14 +164,13 @@ class TestPanel(QWidget):
             minutes = result.registers[1]
             time_str = f"{hours:02d}:{minutes:02d}"
             
-            # Muodosta tunnistetieto (aika + tulos)
+            # Muodosta tunnistetieto
             current_result_id = f"{time_str}-{test_result}"
             
             # Tarkista onko tämä tulos jo käsitelty
             if hasattr(self, 'last_result_id') and self.last_result_id == current_result_id:
                 return
             
-            # Tallenna tämän tuloksen tunniste
             self.last_result_id = current_result_id
             
             # Haetaan vuotoarvo
@@ -179,16 +178,15 @@ class TestPanel(QWidget):
             if len(result.registers) >= 25:
                 decay_sign = result.registers[20]
                 decay_value = result.registers[21]
-                decay_unit_code = result.registers[23]  # Unit measure of decay
+                decay_unit_code = result.registers[23]
                 decay_decimals = result.registers[24]
                 
                 if decay_decimals > 0:
                     decay_value = decay_value / (10 ** decay_decimals)
                 
-                if decay_sign == 255:  # Alkuperäinen logiikka
+                if decay_sign == 255:
                     decay_value = -decay_value
                 
-                # Muunna yksikkökoodi yksiköksi Table - Unit measures mukaan
                 units = {
                     20: "mbar/s", 21: "bar/s", 22: "hPa/s", 23: "Pa/s", 24: "Psi/s",
                     40: "cc/h", 41: "cc/min", 42: "l/h", 43: "l/min",
@@ -198,43 +196,44 @@ class TestPanel(QWidget):
                 
                 decay_unit = units.get(decay_unit_code, "mbar/s")
             else:
-                decay_unit = "mbar/s"  # Oletusyksikkö
+                decay_unit = "mbar/s"
             
             # Määritä tulos ja tyylit
-            if test_result == 1:  # Good
+            if test_result == 1:
                 result_status = "OK"
                 result_color = "#00FF00"
-            elif test_result == 2:  # Bad
+            elif test_result == 2:
                 result_status = "FAIL"
                 result_color = "red"
             else:
                 result_status = f"TULOS: {test_result}"
                 result_color = "orange"
             
-            # Luo uusi tulosrivi
-            new_result = f"{time_str}   {decay_value:.3f} {decay_unit}   {result_status}"
-            
             # Lisää uusi tulos historiaan
             if not hasattr(self, 'results_history'):
                 self.results_history = []
-            self.results_history.append((new_result, result_color))
+                
+            # Käytetään HTML-muotoilua värjäämään vain tilan teksti
+            new_result = f"{time_str}   <span style='color:{result_color};'>{decay_value:.3f}</span> {decay_unit}   <span style='color:{result_color};'>{result_status}</span>"
+            self.results_history.append(new_result)
             
             # Pidä vain 3 viimeisintä tulosta
             if len(self.results_history) > 3:
                 self.results_history.pop(0)
             
             # Rakenna näyttöteksti (uusin alimmaisena)
-            display_text = "\n".join([result[0] for result in self.results_history])
+            display_html = "<br>".join(self.results_history)
             
             # Päivitä tulosteksti ja tyyli
-            self.pressure_result.setText(display_text)
-            self.pressure_result.setStyleSheet(f"""
+            self.pressure_result.setText("")  # Tyhjennä ensin
+            self.pressure_result.setTextFormat(Qt.RichText)  # Käytä rich text -muotoilua
+            self.pressure_result.setStyleSheet("""
                 background-color: black;
-                color: {self.results_history[-1][1]};
+                color: white;
                 font-family: 'Digital-7', 'Consolas', monospace;
-                font-size: 20px;
-                font-weight: bold;
+                font-size: 26px;
                 text-align: left;
                 border: 2px solid #444444;
                 border-radius: 10px;
             """)
+            self.pressure_result.setText(display_html)
