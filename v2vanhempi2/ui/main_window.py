@@ -127,10 +127,21 @@ class MainWindow(QWidget):
             self.testing_screen.update_status(error_msg, "ERROR")
             return
         
-        if not result or not hasattr(result, 'registers'):
+        if not result:
             return
 
-        if op_code == 1:  # Rekisterin luku
+        # Ohjelmanvaihdon tulos (Write Single Register, 0x06)
+        if op_code == 2:  # Rekisterin kirjoitus
+            if hasattr(result, 'isError') and not result.isError():
+                # Ohjelmanvaihto onnistui, jatka testin käynnistystä
+                self.testing_screen.update_status(f"Ohjelma vaihdettu onnistuneesti", "SUCCESS")
+            else:
+                # Ohjelmanvaihto epäonnistui
+                self.testing_screen.update_status("Ohjelmanvaihto epäonnistui", "ERROR")
+            return
+            
+        # Jos kyseessä on rekisterin luku, käsitellään kytkimien tilat
+        if op_code == 1 and hasattr(result, 'registers'):
             base_address = 16999
             
             # Käsittele kaikki rekisterit

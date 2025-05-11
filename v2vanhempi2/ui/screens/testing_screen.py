@@ -1,6 +1,6 @@
 # Muutokset tiedostoon ui/screens/testing_screen.py
 from PyQt5.QtWidgets import QLabel, QPushButton, QFrame, QWidget, QMenu, QScrollArea
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont
 
 from ui.screens.base_screen import BaseScreen
@@ -144,7 +144,45 @@ class TestingScreen(BaseScreen):
             # Poistettu tarpeeton lokitus
     
     def start_test(self):
-        """Käynnistä testi ForTestManager-luokan avulla"""
+        """Käynnistä testi ForTestManager-luokan avulla, vaihda ensin ohjelmat"""
+        # Tarkista, mitkä testipaneelit ovat aktiivisia
+        active_panels = [panel for panel in self.test_panels if panel.is_active]
+        
+        if active_panels:
+            # Vaihda ohjelma ensimmäisen aktiivisen testin mukaan
+            first_panel = active_panels[0]
+            if hasattr(first_panel, 'program_number') and first_panel.program_number > 0:
+                print(f"Vaihdetaan ohjelma: {first_panel.program_number}")
+                
+                # Ohjelman vaihto ForTestHandler-luokan kautta
+                # ForTest käyttää ttyUSB1 porttia
+                if hasattr(self.parent(), 'fortest_manager'):
+                    try:
+                        # Käytä suoraan modbus_handler-objektia fortest_managerista
+                        if hasattr(self.parent().fortest_manager.worker, 'fortest') and \
+                        hasattr(self.parent().fortest_manager.worker.fortest, 'modbus'):
+                            modbus = self.parent().fortest_manager.worker.fortest.modbus
+                            result = modbus.write_register(0x0060, first_panel.program_number)
+                            self.update_status(f"Vaihdetaan ohjelmaan {first_panel.program_number}...", "INFO")
+                            
+                            # Jos vaihto onnistui, jatka testiä viiveellä
+                            if result:
+                                QTimer.singleShot(1000, self._continue_start_test)
+                                return
+                            else:
+                                self.update_status("Ohjelman vaihto epäonnistui", "ERROR")
+                        else:
+                            self.update_status("ForTest-yhteyttä ei saatavilla", "ERROR")
+                    except Exception as e:
+                        self.update_status(f"Virhe ohjelman vaihdossa: {str(e)}", "ERROR")
+                else:
+                    self.update_status("ForTest-manageria ei saatavilla", "ERROR")
+        
+        # Jos ei onnistunut tai ei ole aktiivisia testejä, käynnistetään ilman ohjelman vaihtoa
+        self._continue_start_test()
+        
+    def _continue_start_test(self):
+        """Jatka testin käynnistystä ohjelmavaihdon jälkeen"""
         self.is_running = True
         self.control_panel.update_button_states(True)
         

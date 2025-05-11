@@ -90,6 +90,11 @@ class TestPanel(QWidget):
     def set_program(self, program_name):
         """Aseta valittu ohjelma"""
         self.selected_program = program_name
+        # Poimi ohjelmanumero (esim. "Ohjelma 5" -> 5)
+        try:
+            self.program_number = int(program_name.split(" ")[1])
+        except (IndexError, ValueError):
+            self.program_number = 0
         self.program_label.setText(f" {program_name}")
     
     # Korjattu TestPanel.toggle_active (ui/components/test_panel.py)
