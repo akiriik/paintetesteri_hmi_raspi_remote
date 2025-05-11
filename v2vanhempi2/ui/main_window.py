@@ -254,14 +254,20 @@ class MainWindow(QWidget):
     def closeEvent(self, event):
         """Käsittelee sovelluksen sulkemisen"""
         try:
+            # Siivoa ensin GPIO-nappuloiden tapahtumakuuntelijat
+            if hasattr(self, 'gpio_input_handler') and self.gpio_input_handler:
+                self.gpio_input_handler.cleanup()
+                
+            # Sitten muut resurssit
             self.testing_screen.cleanup()
             self.manual_screen.cleanup()
             self.modbus_manager.cleanup()
             self.fortest_manager.cleanup()
-            if self.gpio_handler:
+            
+            # Lopuksi GPIO-outputit
+            if hasattr(self, 'gpio_handler') and self.gpio_handler:
                 self.gpio_handler.cleanup()
-            if self.gpio_input_handler:
-                self.gpio_input_handler.cleanup()
         except Exception as e:
-            print(f"Virhe sulkemisvaiheessa: {e}")
+            # Virhetilanteessa älä tulosta täyttä virhettä
+            print("Virhe sovelluksen sulkemisessa")
         super().closeEvent(event)

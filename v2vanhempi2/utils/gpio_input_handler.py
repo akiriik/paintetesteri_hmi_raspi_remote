@@ -101,10 +101,13 @@ class GPIOInputHandler(QObject):
         try:
             # Poista tapahtumakäsittelijät
             for pin in self.button_pins.values():
-                GPIO.remove_event_detect(pin)
+                try:
+                    GPIO.remove_event_detect(pin)
+                except:
+                    pass
                 
-            # Nollaa GPIO-asetukset
-            GPIO.cleanup()
+            # Älä nollaa GPIO-asetuksia täällä, koska GPIOHandler tekee sen
+            # GPIO.cleanup() - poistettu
         finally:
             sys.stdout = self._original_stdout
             sys.stderr = self._original_stderr
