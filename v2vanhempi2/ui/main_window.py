@@ -14,6 +14,7 @@ from utils.fortest_handler import DummyForTestHandler
 from utils.modbus_manager import ModbusManager
 from utils.fortest_manager import ForTestManager
 from utils.gpio_handler import GPIOHandler
+from utils.gpio_input_handler import GPIOInputHandler
 from utils.program_manager import ProgramManager
 
 class MainWindow(QWidget):
@@ -58,6 +59,15 @@ class MainWindow(QWidget):
         except Exception as e:
             print(f"Varoitus: GPIO-alustus epäonnistui: {e}")
             self.gpio_handler = None
+            
+        # Alusta GPIO-nappulat
+        try:
+            self.gpio_input_handler = GPIOInputHandler()
+            # Yhdistä nappulasignaalit
+            self.gpio_input_handler.button_changed.connect(self.handle_button_press)
+        except Exception as e:
+            print(f"Varoitus: GPIO-nappuloiden alustus epäonnistui: {e}")
+            self.gpio_input_handler = None
 
         # Ajastimet
         self.emergency_stop_timer = QTimer(self)
@@ -66,20 +76,37 @@ class MainWindow(QWidget):
 
         self.emergency_dialog_open = False
         self._dialog_opened_time = 0
-
-        # Kytkimien lukuajastin
-        self.switch_read_timer = QTimer(self)
-        self.switch_read_timer.timeout.connect(self.check_switches)
-        self.switch_read_timer.start(200)  # Tarkista kytkimet 200ms välein
         
-        # Kytkimien muistit
-        self.switch_memories = {
-            16999: 0,  # STOP
-            17000: 0,  # START
-            17001: 0,  # TEST1
-            17002: 0,  # TEST2
-            17003: 0   # TEST3
-        }
+        # Poistettu kytkimien modbus-lukuajastin
+        
+    def handle_button_press(self, button_name, is_pressed):
+        """Käsittelee GPIO-nappulan painalluksen"""
+        # Reagoi vain painallukseen (laskeva reuna), ei nostoon
+        if is_pressed:
+            print(f"Nappi painettu: {button_name}")
+            
+            if button_name == "START":
+                self.testing_screen.start_test()
+            elif button_name == "STOP":
+                self.testing_screen.stop_test()
+            elif button_name == "TEST1":
+                panel = self.testing_screen.test_panels[0]
+                panel.is_active = not panel.is_active
+                panel.update_button_style()
+                if self.gpio_handler:
+                    self.gpio_handler.set_output(1, panel.is_active)
+            elif button_name == "TEST2":
+                panel = self.testing_screen.test_panels[1]
+                panel.is_active = not panel.is_active
+                panel.update_button_style()
+                if self.gpio_handler:
+                    self.gpio_handler.set_output(2, panel.is_active)
+            elif button_name == "TEST3":
+                panel = self.testing_screen.test_panels[2]
+                panel.is_active = not panel.is_active
+                panel.update_button_style()
+                if self.gpio_handler:
+                    self.gpio_handler.set_output(3, panel.is_active)
 
     def check_emergency_stop(self):
         """Tarkista hätäseistila"""
@@ -112,14 +139,6 @@ class MainWindow(QWidget):
         self.emergency_dialog_open = False
         self._emergency_dialog = None
 
-    def check_switches(self):
-        """Lukee kytkimien tilat modbus-rekistereistä yhdellä kutsulla"""
-        if not self.modbus_manager.is_connected():
-            return
-        
-        # Lue kaikki 5 rekisteriä (16999-17003) yhdellä kutsulla
-        self.modbus_manager.read_register(16999, 5)
-
     def handle_modbus_result(self, result, op_code, error_msg):
         """Käsittelee modbus-kyselyn tuloksen"""
         if error_msg:
@@ -139,35 +158,6 @@ class MainWindow(QWidget):
                 # Ohjelmanvaihto epäonnistui
                 self.testing_screen.update_status("Ohjelmanvaihto epäonnistui", "ERROR")
             return
-            
-        # Jos kyseessä on rekisterin luku, käsitellään kytkimien tilat
-        if op_code == 1 and hasattr(result, 'registers'):
-            base_address = 16999
-            
-            # Käsittele kaikki rekisterit
-            for offset, value in enumerate(result.registers):
-                switch_reg = base_address + offset
-                switch_state = value
-                
-                # Haetaan vanha tila
-                old_state = self.switch_memories.get(switch_reg, 0)
-                
-                # Talleta uusi tila muistiin
-                self.switch_memories[switch_reg] = switch_state
-                
-                # KÄSITTELE NOUSEVA REUNA (0->1)
-                if switch_state == 1 and old_state == 0:
-                    if switch_reg == 17000:  # START
-                        self.testing_screen.start_test()
-                    elif switch_reg == 16999:  # STOP
-                        self.testing_screen.stop_test()
-                    elif 17001 <= switch_reg <= 17003:  # TESTI 1-3
-                        test_idx = switch_reg - 17001
-                        panel = self.testing_screen.test_panels[test_idx]
-                        panel.is_active = not panel.is_active
-                        panel.update_button_style()
-                        if self.gpio_handler:
-                            self.gpio_handler.set_output(test_idx + 1, panel.is_active)
 
     def handle_fortest_result(self, result, op_code, error_msg):
         # Rajoita tulostusta vain tärkeisiin tapahtumiin
@@ -274,6 +264,8 @@ class MainWindow(QWidget):
             self.fortest_manager.cleanup()
             if self.gpio_handler:
                 self.gpio_handler.cleanup()
+            if self.gpio_input_handler:
+                self.gpio_input_handler.cleanup()
         except Exception as e:
             print(f"Virhe sulkemisvaiheessa: {e}")
         super().closeEvent(event)
