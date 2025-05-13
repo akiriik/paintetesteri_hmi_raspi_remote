@@ -94,11 +94,17 @@ class TestPanel(QWidget):
     def set_program(self, program_name):
         """Aseta valittu ohjelma"""
         self.selected_program = program_name
-        # Poimi ohjelmanumero (esim. "Ohjelma 5" -> 5)
-        try:
-            self.program_number = int(program_name.split(" ")[1])
-        except (IndexError, ValueError):
-            self.program_number = 0
+        # Poimi ohjelmanumero (esim. "7. Perustestaus" -> 7)
+        import re
+        match = re.match(r"(\d+)[\.\s]", program_name)
+        if match:
+            self.program_number = int(match.group(1))
+        else:
+            try:
+                # Yritä vanhaa tapaa varmuuden vuoksi (esim. "Ohjelma 5" -> 5)
+                self.program_number = int(program_name.split(" ")[1])
+            except (IndexError, ValueError):
+                self.program_number = 0
         self.program_label.setText(f" {program_name}")
     
     @pyqtSlot()
