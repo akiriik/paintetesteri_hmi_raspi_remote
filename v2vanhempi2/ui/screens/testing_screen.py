@@ -1,5 +1,5 @@
-from PyQt5.QtWidgets import QLabel, QPushButton, QFrame, QWidget, QMenu, QMessageBox, QScrollArea, QVBoxLayout, QHBoxLayout
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer
+from PyQt5.QtWidgets import QLabel, QPushButton, QFrame, QWidget, QMenu, QMessageBox, QScrollArea, QVBoxLayout, QHBoxLayout, QStyle
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize
 from PyQt5.QtGui import QFont, QIcon
 
 from ui.screens.base_screen import BaseScreen
@@ -34,32 +34,34 @@ class ShutdownDialog(QMessageBox):
         """)
 
 class IconButton(QPushButton):
-    """Kuvakepainike"""
-    def __init__(self, icon_name, tooltip, parent=None):
+    """Kuvakepainike järjestelmäikoneilla"""
+    def __init__(self, icon_style, tooltip, parent=None):
         super().__init__(parent)
-        self.setFixedSize(60, 60)
         
-        if icon_name == "hand":
-            self.setText("🖐️")
+        
+        # Aseta järjestelmäikoni
+        self.setIcon(self.style().standardIcon(icon_style))
+        self.setIconSize(QSize(32, 32))
+        
+        if icon_style == QStyle.SP_DirIcon:  # Käsikäyttö
+            self.setFixedSize(60, 60)
             self.setStyleSheet("""
                 QPushButton {
                     background-color: #2196F3;
                     color: white;
                     border-radius: 10px;
-                    font-size: 30px;
                 }
                 QPushButton:hover {
                     background-color: #1976D2;
                 }
             """)
-        elif icon_name == "power":
-            self.setText("⏻")
+        elif icon_style == QStyle.SP_DialogCancelButton:  # Sammuta
+            self.setFixedSize(80, 80)
             self.setStyleSheet("""
                 QPushButton {
                     background-color: #F44336;
                     color: white;
                     border-radius: 10px;
-                    font-size: 30px;
                 }
                 QPushButton:hover {
                     background-color: #D32F2F;
@@ -80,13 +82,13 @@ class TestingScreen(BaseScreen):
     def init_ui(self):
         # Ikonipainikkeet
         # Käsikäyttö-painike
-        self.manual_button = IconButton("hand", "Käsikäyttö", self)
-        self.manual_button.move(1120, 20)
+        self.manual_button = IconButton(QStyle.SP_DialogResetButton, "Käsikäyttö", self)
+        self.manual_button.move(5, 5)
         self.manual_button.clicked.connect(self.show_manual)
         
         # Sammutus-painike
-        self.shutdown_button = IconButton("power", "Sammuta", self)
-        self.shutdown_button.move(1200, 20)
+        self.shutdown_button = IconButton(QStyle.SP_DialogCancelButton, "Sammuta", self)
+        self.shutdown_button.move(1180, 20)
         self.shutdown_button.clicked.connect(self.show_shutdown_dialog)
         
         # Testipaneelit
@@ -96,7 +98,7 @@ class TestingScreen(BaseScreen):
             title = QLabel(f"TESTI {i}", self)
             title.setFont(QFont("Arial", 24, QFont.Bold))
             title.setAlignment(Qt.AlignCenter)
-            title.setGeometry(50 + (i-1)*400, 50, 300, 100)
+            title.setGeometry(60 + (i-1)*400, 80, 150, 50)
             
             # Testipaneeli
             panel = TestPanel(i, self)
@@ -111,23 +113,17 @@ class TestingScreen(BaseScreen):
         self.control_panel.start_clicked.connect(self.start_test)
         self.control_panel.stop_clicked.connect(self.stop_test)
         
-        # Tilaviestialue
-        self.status_area = QFrame(self)
-        self.status_area.setGeometry(50, 10, 920, 50)
-        self.status_area.setStyleSheet("""
-            QFrame {
-                background-color: black;
-                color: #33FF33;
-                border-radius: 5px;
-                border: 1px solid #333333;
-            }
-        """)
-        
         # Tilaviestikenttä
-        self.status_label = QLabel("", self.status_area)
-        self.status_label.setGeometry(10, 8, 920, 30)
-        self.status_label.setFont(QFont("Consolas", 16))
-        self.status_label.setStyleSheet("color: #33FF33; background-color: transparent;")
+        self.status_label = QLabel("", self)
+        self.status_label.setGeometry(265, 5, 750, 40)  # Laajennettu korkeus, koska ei ole ulkoista kehystä
+        self.status_label.setFont(QFont("Consolas", 14))
+        self.status_label.setIndent(10)
+        self.status_label.setStyleSheet("""
+            color: #33FF33;
+            background-color: black;
+            border-radius: 5px;
+            border: 1px solid #333333;
+        """)
         self.status_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
     
         # Ajastin statuksen päivitykseen
