@@ -1,27 +1,72 @@
-# Muutokset tiedostoon ui/screens/testing_screen.py
-from PyQt5.QtWidgets import QLabel, QPushButton, QFrame, QWidget, QMenu, QScrollArea
+from PyQt5.QtWidgets import QLabel, QPushButton, QFrame, QWidget, QMenu, QMessageBox, QScrollArea, QVBoxLayout, QHBoxLayout
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QIcon
 
 from ui.screens.base_screen import BaseScreen
 from ui.components.test_panel import TestPanel
 from ui.components.control_panel import ControlPanel
-# Poistettu tuonti: from ui.components.log_panel import LogPanel
 
-class MenuButton(QPushButton):
-    """Valikko-nappi"""
+class ShutdownDialog(QMessageBox):
+    """Sammutusvalikko"""
     def __init__(self, parent=None):
-        super().__init__("☰", parent)
-        self.setFixedSize(60, 60)
+        super().__init__(parent)
+        self.setWindowTitle("Sammutusvalikko")
+        self.setText("Valitse toiminto:")
+        
+        self.addButton("Sammuta Raspberry Pi", QMessageBox.AcceptRole)
+        self.addButton("Käynnistä ohjelma uudelleen", QMessageBox.ActionRole)
+        self.addButton("Sammuta ohjelma", QMessageBox.DestructiveRole)
+        self.addButton("Peruuta", QMessageBox.RejectRole)
+        
         self.setStyleSheet("""
+            QMessageBox {
+                background-color: white;
+                font-size: 18px;
+            }
             QPushButton {
-                background-color: #2196F3;
-                color: white;
-                border-radius: 10px;
-                font-size: 30px;
-                font-weight: bold;
+                background-color: #f0f0f0;
+                border-radius: 5px;
+                padding: 10px;
+                min-width: 200px;
+                min-height: 40px;
+                font-size: 16px;
             }
         """)
+
+class IconButton(QPushButton):
+    """Kuvakepainike"""
+    def __init__(self, icon_name, tooltip, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(60, 60)
+        
+        if icon_name == "hand":
+            self.setText("🖐️")
+            self.setStyleSheet("""
+                QPushButton {
+                    background-color: #2196F3;
+                    color: white;
+                    border-radius: 10px;
+                    font-size: 30px;
+                }
+                QPushButton:hover {
+                    background-color: #1976D2;
+                }
+            """)
+        elif icon_name == "power":
+            self.setText("⏻")
+            self.setStyleSheet("""
+                QPushButton {
+                    background-color: #F44336;
+                    color: white;
+                    border-radius: 10px;
+                    font-size: 30px;
+                }
+                QPushButton:hover {
+                    background-color: #D32F2F;
+                }
+            """)
+        
+        self.setToolTip(tooltip)
 
 class TestingScreen(BaseScreen):
     program_selection_requested = pyqtSignal(int)
@@ -33,40 +78,16 @@ class TestingScreen(BaseScreen):
         self.init_ui()
 
     def init_ui(self):
-        # Valikko-nappi
-        self.menu_button = MenuButton(self)
-        self.menu_button.move(1200, 20)
-        self.menu_button.clicked.connect(self.show_menu)
+        # Ikonipainikkeet
+        # Käsikäyttö-painike
+        self.manual_button = IconButton("hand", "Käsikäyttö", self)
+        self.manual_button.move(1120, 20)
+        self.manual_button.clicked.connect(self.show_manual)
         
-        # Luo menu
-        self.menu = QMenu(self)
-        self.menu.setStyleSheet("""
-            QMenu {
-                background-color: white;
-                border: 2px solid #2196F3;
-                border-radius: 8px;
-                font-size: 18px;
-                min-width: 150px;
-            }
-            QMenu::item {
-                padding: 10px 15px;
-            }
-            QMenu::item:selected {
-                background-color: #2196F3;
-                color: white;
-            }
-        """)
-        
-        # Valikon toiminnot
-        program_action = self.menu.addAction("Ohjelmat")
-        manual_action = self.menu.addAction("Käsikäyttö")
-        self.menu.addSeparator()
-        exit_action = self.menu.addAction("SAMMUTA")
-        
-        # Yhdistä toiminnot
-        program_action.triggered.connect(self.show_programs)
-        manual_action.triggered.connect(self.show_manual)
-        exit_action.triggered.connect(self.close_application)
+        # Sammutus-painike
+        self.shutdown_button = IconButton("power", "Sammuta", self)
+        self.shutdown_button.move(1200, 20)
+        self.shutdown_button.clicked.connect(self.show_shutdown_dialog)
         
         # Testipaneelit
         self.test_panels = []
@@ -90,7 +111,7 @@ class TestingScreen(BaseScreen):
         self.control_panel.start_clicked.connect(self.start_test)
         self.control_panel.stop_clicked.connect(self.stop_test)
         
-        # Uusi tilaviestialue (korvaa LOG-paneelin)
+        # Tilaviestialue
         self.status_area = QFrame(self)
         self.status_area.setGeometry(50, 10, 920, 50)
         self.status_area.setStyleSheet("""
@@ -109,15 +130,42 @@ class TestingScreen(BaseScreen):
         self.status_label.setStyleSheet("color: #33FF33; background-color: transparent;")
         self.status_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
     
-        # Add status update timer
-        self.status_timer = QTimer(self)
-        self.status_timer.timeout.connect(self.update_test_statuses)
-        self.status_timer.start(1000)  # Update every second
-
         # Ajastin statuksen päivitykseen
         self.status_timer = QTimer(self)
-        self.status_timer.timeout.connect(self.update_fortest_data)
+        self.status_timer.timeout.connect(self.update_test_statuses)
         self.status_timer.start(1000)  # Päivitys sekunnin välein
+
+        # Ajastin ForTest-datan päivitykseen
+        self.fortest_timer = QTimer(self)
+        self.fortest_timer.timeout.connect(self.update_fortest_data)
+        self.fortest_timer.start(1000)  # Päivitys sekunnin välein
+
+    def show_manual(self):
+        """Siirry käsikäyttösivulle"""
+        if hasattr(self.parent(), 'show_manual'):
+            self.parent().show_manual()
+    
+    def show_shutdown_dialog(self):
+        """Näytä sammutusvalikko"""
+        dialog = ShutdownDialog(self)
+        result = dialog.exec_()
+        
+        selected_button = dialog.clickedButton()
+        button_role = dialog.buttonRole(selected_button)
+        
+        if button_role == QMessageBox.AcceptRole:  # Sammuta Raspberry Pi
+            self.update_status("Sammutetaan Raspberry Pi...", "INFO")
+            import os
+            os.system("sudo shutdown -h now")
+        elif button_role == QMessageBox.ActionRole:  # Käynnistä ohjelma uudelleen
+            self.update_status("Käynnistetään ohjelma uudelleen...", "INFO")
+            self.window().close()
+            import os
+            import sys
+            os.execv(sys.executable, ['python'] + sys.argv)
+        elif button_role == QMessageBox.DestructiveRole:  # Sammuta ohjelma
+            self.update_status("Sammutetaan ohjelma...", "INFO")
+            self.window().close()
 
 
     def show_menu(self):
