@@ -30,7 +30,10 @@ class MainWindow(QWidget):
             }
         """)
 
-        # Näytöt - luodaan ensin että update_status toimii
+        # Alusta ohjelmamanageri ensin
+        self.program_manager = ProgramManager()
+
+        # Näytöt
         self.testing_screen = TestingScreen(self)
         self.testing_screen.setGeometry(0, 0, 1280, 720)
         self.testing_screen.program_selection_requested.connect(self.show_program_selection)
@@ -39,19 +42,22 @@ class MainWindow(QWidget):
         self.manual_screen.setGeometry(0, 0, 1280, 720)
         self.manual_screen.hide()
 
-        self.program_selection_screen = ProgramSelectionScreen(self)
+        # Välitä ohjelmamanageri ohjelmanvalintanäkymälle
+        self.program_selection_screen = ProgramSelectionScreen(self, self.program_manager)
         self.program_selection_screen.setGeometry(0, 0, 1280, 720)
         self.program_selection_screen.hide()
         self.program_selection_screen.program_selected.connect(self.on_program_selected)
 
-        # Alusta hallintamanagerit
+        # Alusta modbus-hallinta
         self.modbus_manager = ModbusManager(port='/dev/ttyUSB0', baudrate=19200)
         self.fortest_manager = ForTestManager(port='/dev/ttyUSB1', baudrate=19200)
-        self.program_manager = ProgramManager()
 
         # Yhdistä signaalit
         self.modbus_manager.resultReady.connect(self.handle_modbus_result)
         self.fortest_manager.resultReady.connect(self.handle_fortest_result)
+        
+        # Yhdistä ohjelmamanagerin signaali ohjelmiston päivitykseen
+        self.program_manager.program_list_updated.connect(self.program_selection_screen.update_program_list)
 
         # Alusta GPIO jos mahdollista
         try:
@@ -76,8 +82,6 @@ class MainWindow(QWidget):
 
         self.emergency_dialog_open = False
         self._dialog_opened_time = 0
-        
-        # Poistettu kytkimien modbus-lukuajastin
         
     def handle_button_press(self, button_name, is_pressed):
         """Käsittelee GPIO-nappulan painalluksen - reagoidaan vain painallukseen"""
