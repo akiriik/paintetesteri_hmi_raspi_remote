@@ -32,13 +32,13 @@ class ProgramManager(QObject):
                             self.programs.append(program_name)
             else:
                 # Jos tiedostoa ei ole, luodaan oletuslista
-                self.programs = [f"Ohjelma {i}" for i in range(1, 31)]
+                self.programs = [f"Ohjelma {i}" for i in range(1, 51)]
                 self._create_default_config()
             
             self.program_list_updated.emit(self.programs)
         except Exception as e:
             print(f"Virhe ohjelmien latauksessa: {e}")
-            self.programs = [f"Ohjelma {i}" for i in range(1, 31)]
+            self.programs = [f"Ohjelma {i}" for i in range(1, 51)]
             self.program_list_updated.emit(self.programs)
     
     def _create_default_config(self):
@@ -46,7 +46,7 @@ class ProgramManager(QObject):
         default_programs = {
             "programs": [
                 {"id": i, "name": f"Ohjelma {i}", "description": ""} 
-                for i in range(1, 31)
+                for i in range(1, 51)
             ],
             "last_updated": "2025-05-13",
             "version": "1.0.0"
@@ -75,3 +75,9 @@ class ProgramManager(QObject):
         if 'programs' in self.program_data and index < len(self.program_data['programs']):
             return self.program_data['programs'][index].get('description', '')
         return ""
+        
+    def get_program_id(self, index):
+        """Palauta ohjelman ID indeksin perusteella"""
+        if 'programs' in self.program_data and index < len(self.program_data['programs']):
+            return self.program_data['programs'][index].get('id', index + 1)
+        return index + 1

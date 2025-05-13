@@ -1,6 +1,7 @@
-from PyQt5.QtWidgets import QPushButton, QLabel, QFrame, QGridLayout, QVBoxLayout, QHBoxLayout, QScrollArea, QWidget
+from PyQt5.QtWidgets import (QPushButton, QLabel, QFrame, QGridLayout, QVBoxLayout, 
+                           QHBoxLayout, QScrollArea, QWidget)
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QFontMetrics
 from ui.screens.base_screen import BaseScreen
 
 class ProgramSelectionScreen(BaseScreen):
@@ -8,12 +9,16 @@ class ProgramSelectionScreen(BaseScreen):
     
     def __init__(self, parent=None, program_manager=None):
         self.program_manager = program_manager
+        self.current_page = 0
+        self.items_per_page = 12  # 3 riviä, 4 saraketta
+        self.max_pages = 0
         super().__init__(parent)
         
     def init_ui(self):
         # Päälayout
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(20, 20, 20, 20)
+        self.main_layout.setSpacing(15)
         
         # Yläpalkki (takaisin-nappi ja otsikko)
         top_bar = QHBoxLayout()
@@ -47,131 +52,191 @@ class ProgramSelectionScreen(BaseScreen):
         spacer.setFixedSize(150, 60)
         top_bar.addWidget(spacer)
         
-        main_layout.addLayout(top_bar)
-        
-        # Vieritettävä ohjelmalista
-        scroll_area = QScrollArea(self)
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QFrame.NoFrame)
-        scroll_area.setStyleSheet("""
-            QScrollArea {
-                background-color: transparent;
-                border: none;
-            }
-            QScrollBar:vertical {
-                background: #f0f0f0;
-                width: 15px;
-            }
-            QScrollBar::handle:vertical {
-                background: #cecece;
-                min-height: 30px;
-                border-radius: 7px;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0px;
-            }
-        """)
+        self.main_layout.addLayout(top_bar)
         
         # Ohjelmapainikkeiden container
         self.grid_container = QWidget()
-        grid_layout = QGridLayout(self.grid_container)
-        grid_layout.setSpacing(15)
+        self.grid_layout = QGridLayout(self.grid_container)
+        self.grid_layout.setSpacing(15)
         
-        # Hae ohjelmalista
-        program_list = []
-        if self.program_manager:
+        # Lisää grid container päälayoutiin
+        self.main_layout.addWidget(self.grid_container, 1)  # 1 = stretch factor
+        
+        # Navigaatiopalkki alareunaan
+        nav_bar = QHBoxLayout()
+        nav_bar.setAlignment(Qt.AlignCenter)
+        
+        # Edellinen sivu -nappi
+        self.prev_button = QPushButton("◄ EDELLINEN", self)
+        self.prev_button.setFixedSize(180, 60)
+        self.prev_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f0f0f0;
+                color: #333333;
+                border-radius: 10px;
+                font-size: 16px;
+                font-weight: bold;
+                border: 1px solid #dddddd;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #888888;
+            }
+        """)
+        self.prev_button.clicked.connect(self.show_prev_page)
+        nav_bar.addWidget(self.prev_button)
+        
+        # Sivunumerolabel
+        self.page_label = QLabel("Sivu 1/1", self)
+        self.page_label.setFixedSize(100, 60)
+        self.page_label.setAlignment(Qt.AlignCenter)
+        self.page_label.setFont(QFont("Arial", 16))
+        nav_bar.addWidget(self.page_label)
+        
+        # Seuraava sivu -nappi
+        self.next_button = QPushButton("SEURAAVA ►", self)
+        self.next_button.setFixedSize(180, 60)
+        self.next_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f0f0f0;
+                color: #333333;
+                border-radius: 10px;
+                font-size: 16px;
+                font-weight: bold;
+                border: 1px solid #dddddd;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #888888;
+            }
+        """)
+        self.next_button.clicked.connect(self.show_next_page)
+        nav_bar.addWidget(self.next_button)
+        
+        self.main_layout.addLayout(nav_bar)
+        
+        # Päivitä näkymä
+        self.update_program_list()
+        
+    def update_program_list(self, program_list=None):
+        """Päivitä ohjelmalista dynaamisesti"""
+        # Käytä parametrina annettua listaa tai hae ohjelmamanagerilta
+        if program_list is None and self.program_manager:
             program_list = self.program_manager.get_program_list()
-        else:
-            program_list = [f"Ohjelma {i}" for i in range(1, 31)]
+        elif program_list is None:
+            program_list = [f"Ohjelma {i}" for i in range(1, 51)]
+        
+        # Tyhjennä vanhat napit
+        self.clear_grid()
+        self.program_buttons = []
+        
+        # Laske maksimisivumäärä
+        self.max_pages = (len(program_list) + self.items_per_page - 1) // self.items_per_page
+        
+        # Varmista että nykyinen sivu on sallituissa rajoissa
+        if self.current_page >= self.max_pages:
+            self.current_page = max(0, self.max_pages - 1)
+        
+        # Hae näytettävät ohjelmat nykyiselle sivulle
+        start_idx = self.current_page * self.items_per_page
+        end_idx = min(start_idx + self.items_per_page, len(program_list))
+        displayed_programs = program_list[start_idx:end_idx]
         
         # Luo ohjelmapainikkeet
-        self.program_buttons = []
-        for i, program_name in enumerate(program_list):
-            button = QPushButton(program_name, self.grid_container)
-            button.setFixedSize(230, 90)
+        for i, program_name in enumerate(displayed_programs):
+            # Hae ohjelman oikea ID
+            program_id = start_idx + i + 1
+            
+            # Luo painike, jossa on sekä ID että nimi
+            button = QPushButton(self.grid_container)
+            button.setFixedSize(300, 120)
+            
+            # Luo selkeä layout painikkeelle
+            button_layout = QVBoxLayout(button)
+            button_layout.setContentsMargins(15, 5, 15, 5)
+            button_layout.setSpacing(5)
+            
+            # ID-label (ylärivinä)
+            id_label = QLabel(f"{program_id}", button)
+            id_label.setAlignment(Qt.AlignCenter)
+            id_label.setStyleSheet("color: #1976D2; font-size: 22px; font-weight: bold;")
+            button_layout.addWidget(id_label)
+            
+            # Nimi-label (alarivinä)
+            name_label = QLabel(program_name, button)
+            name_label.setAlignment(Qt.AlignCenter)
+            name_label.setStyleSheet("color: #333333; font-size: 16px;")
+            name_label.setWordWrap(True)
+            button_layout.addWidget(name_label)
+            
+            # Tyylittele painike
             button.setStyleSheet("""
                 QPushButton {
                     background-color: #f0f0f0;
-                    color: #333333;
                     border-radius: 10px;
-                    font-size: 20px;
-                    font-weight: bold;
                     border: 1px solid #dddddd;
-                    text-align: left;
-                    padding-left: 15px;
+                    text-align: center;
+                    padding: 5px;
                 }
                 QPushButton:hover {
                     background-color: #e0e0e0;
+                    border: 1px solid #bbbbbb;
                 }
                 QPushButton:pressed {
                     background-color: #2196F3;
                     color: white;
+                    border: 1px solid #1976D2;
                 }
             """)
             
-            # Paikkaindeksi: 5 riviä, 5 nappia per rivi (muutettu 6->5 jotta napit olisivat isompia)
-            row = i // 5
-            col = i % 5
+            # Paikkaindeksi: 3 riviä, 4 nappia per rivi
+            row = i // 4
+            col = i % 4
             
-            # Yhdistä painallus signaaliin (i+1 on ohjelmanumero)
-            button.clicked.connect(lambda checked, prog_name=program_name: self.select_program(prog_name))
+            # Yhdistä painallus signaaliin (käytä ID:tä ja nimeä)
+            button.clicked.connect(lambda checked, prog_id=program_id, prog_name=program_name: 
+                                 self.select_program(prog_id, prog_name))
             
-            grid_layout.addWidget(button, row, col)
+            self.grid_layout.addWidget(button, row, col)
             self.program_buttons.append(button)
         
-        scroll_area.setWidget(self.grid_container)
-        main_layout.addWidget(scroll_area)
+        # Päivitä sivunumero ja navigointinapit
+        self.page_label.setText(f"Sivu {self.current_page + 1}/{self.max_pages}")
+        self.prev_button.setEnabled(self.current_page > 0)
+        self.next_button.setEnabled(self.current_page < self.max_pages - 1)
     
-    def select_program(self, program_name):
+    def clear_grid(self):
+        """Tyhjennä grid-layout kaikista widgeteistä"""
+        for i in reversed(range(self.grid_layout.count())):
+            widget = self.grid_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+    
+    def show_prev_page(self):
+        """Näytä edellinen sivu"""
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.update_program_list()
+    
+    def show_next_page(self):
+        """Näytä seuraava sivu"""
+        if self.current_page < self.max_pages - 1:
+            self.current_page += 1
+            self.update_program_list()
+    
+    def select_program(self, program_id, program_name):
         """Valitse ohjelma ja lähetä signaali"""
-        self.program_selected.emit(program_name)
+        # Käytetään ForTest-laitteen ohjelman valinnassa suoraan program_id:tä (1-50)
+        self.program_selected.emit(f"{program_id}. {program_name}")
         self.go_back()
     
     def go_back(self):
         """Palaa testaussivulle"""
         if hasattr(self.parent(), 'show_testing'):
             self.parent().show_testing()
-    
-    def update_program_list(self, program_list):
-        """Päivitä ohjelmalista dynaamisesti"""
-        # Tyhjennä vanhat napit
-        for button in self.program_buttons:
-            button.deleteLater()
-        self.program_buttons = []
-        
-        # Hae uusi layout
-        grid_layout = self.grid_container.layout()
-        
-        # Luo uudet ohjelmapainikkeet
-        for i, program_name in enumerate(program_list):
-            button = QPushButton(program_name, self.grid_container)
-            button.setFixedSize(230, 90)
-            button.setStyleSheet("""
-                QPushButton {
-                    background-color: #f0f0f0;
-                    color: #333333;
-                    border-radius: 10px;
-                    font-size: 20px;
-                    font-weight: bold;
-                    border: 1px solid #dddddd;
-                    text-align: left;
-                    padding-left: 15px;
-                }
-                QPushButton:hover {
-                    background-color: #e0e0e0;
-                }
-                QPushButton:pressed {
-                    background-color: #2196F3;
-                    color: white;
-                }
-            """)
-            
-            # Paikkaindeksi: riviä, 5 nappia per rivi
-            row = i // 5
-            col = i % 5
-            
-            # Yhdistä painallus signaaliin
-            button.clicked.connect(lambda checked, prog_name=program_name: self.select_program(prog_name))
-            
-            grid_layout.addWidget(button, row, col)
-            self.program_buttons.append(button)

@@ -2,155 +2,255 @@
     "programs": [
         {
             "id": 1,
-            "name": "Ohjelma 1",
+            "name": "Testi 5 bar",
             "description": "Testi 5 bar paineella"
         },
         {
             "id": 2,
-            "name": "Ohjelma 2",
+            "name": "Testi 10 bar",
             "description": "Testi 10 bar paineella"
         },
         {
             "id": 3,
-            "name": "Ohjelma 3",
+            "name": "Matalapaineinen",
             "description": "Matalapaineinen testi"
         },
         {
             "id": 4,
-            "name": "Ohjelma 4",
+            "name": "Korkeapaineinen",
             "description": "Korkeapaineinen testi"
         },
         {
             "id": 5,
-            "name": "Ohjelma 5",
-            "description": "Vuototesti 5 min"
+            "name": "Vuototesti 5min",
+            "description": "Vuototesti 5 min kestolla"
         },
         {
             "id": 6,
-            "name": "Ohjelma 6",
-            "description": "Vuototesti 10 min"
+            "name": "Vuototesti 10min",
+            "description": "Vuototesti 10 min kestolla"
         },
         {
             "id": 7,
-            "name": "Ohjelma 7",
+            "name": "Perustestaus",
             "description": "Perustestausprosessi"
         },
         {
             "id": 8, 
-            "name": "Ohjelma 8",
-            "description": "Nopea testaus"
+            "name": "Nopea testaus",
+            "description": "Nopea testaussykli"
         },
         {
             "id": 9,
-            "name": "Ohjelma 9",
-            "description": "Tarkkuustesti"
+            "name": "Tarkkuustesti",
+            "description": "Tarkkuuskomponenttien testaus"
         },
         {
             "id": 10,
-            "name": "Ohjelma 10",
-            "description": "Painetesti 20 bar"
+            "name": "Painetesti 20bar",
+            "description": "Korkea painetesti 20 bar"
         },
         {
             "id": 11,
-            "name": "Ohjelma 11",
-            "description": "Erikoistestaus A"
+            "name": "Erikoistestaus A",
+            "description": "Erikoistestaus A-sarjan tuotteille"
         },
         {
             "id": 12,
-            "name": "Ohjelma 12",
-            "description": "Erikoistestaus B"
+            "name": "Erikoistestaus B",
+            "description": "Erikoistestaus B-sarjan tuotteille"
         },
         {
             "id": 13,
-            "name": "Ohjelma 13",
-            "description": "Vuototesti pitkä kesto"
+            "name": "Vuototesti pitkä",
+            "description": "Vuototesti pitkä kesto (30min)"
         },
         {
             "id": 14,
-            "name": "Ohjelma 14",
-            "description": "Paineistusohjelma"
+            "name": "Paineistusohjelma",
+            "description": "Paineistusohjelma säätöventtiileille"
         },
         {
             "id": 15,
-            "name": "Ohjelma 15",
-            "description": "Kalibrointiohjelma"
+            "name": "Kalibrointi",
+            "description": "Kalibrointiohjelma mittareille"
         },
         {
             "id": 16,
-            "name": "Ohjelma 16",
-            "description": "Matalapainesykli"
+            "name": "Matalapainesykli",
+            "description": "Matalapaineinen testisykli"
         },
         {
             "id": 17,
-            "name": "Ohjelma 17",
-            "description": "Korkeapainesykli"
+            "name": "Korkeapainesykli",
+            "description": "Korkeapaineinen testisykli"
         },
         {
             "id": 18,
-            "name": "Ohjelma 18",
+            "name": "Useat paineet",
             "description": "Testisykli useilla paineilla"
         },
         {
             "id": 19,
-            "name": "Ohjelma 19",
+            "name": "Venttiilitesti",
             "description": "Erikoisventtiilitesti"
         },
         {
             "id": 20,
-            "name": "Ohjelma 20",
+            "name": "Paine/aika-piirturi",
             "description": "Paine/aika-piirturitesti"
         },
         {
             "id": 21,
-            "name": "Ohjelma 21",
-            "description": "Tiiveystesti"
+            "name": "Tiiveystesti",
+            "description": "Tiiveystesti liitoksille"
         },
         {
             "id": 22,
-            "name": "Ohjelma 22",
+            "name": "Liitintesti",
             "description": "Liitinohjelman testi"
         },
         {
             "id": 23,
-            "name": "Ohjelma 23",
-            "description": "Putkilinjatesti"
+            "name": "Putkilinjatesti",
+            "description": "Putkilinjojen testaus"
         },
         {
             "id": 24,
-            "name": "Ohjelma 24",
-            "description": "Kestävyystesti"
+            "name": "Kestävyystesti",
+            "description": "Pitkäaikaiskestävyystesti"
         },
         {
             "id": 25,
-            "name": "Ohjelma 25",
-            "description": "Venttiilikestävyys"
+            "name": "Venttiilikestävyys",
+            "description": "Venttiilien kestävyystesti"
         },
         {
             "id": 26,
-            "name": "Ohjelma 26",
-            "description": "Komponenttitarkastus"
+            "name": "Komponenttitesti",
+            "description": "Komponenttien tarkastus"
         },
         {
             "id": 27,
-            "name": "Ohjelma 27",
-            "description": "Kuormitustesti"
+            "name": "Kuormitustesti",
+            "description": "Painetesti kuormituksella"
         },
         {
             "id": 28,
-            "name": "Ohjelma 28",
-            "description": "Pikatesti"
+            "name": "Pikatesti",
+            "description": "Nopea testausohjelma"
         },
         {
             "id": 29,
-            "name": "Ohjelma 29",
-            "description": "Turvallisuustesti"
+            "name": "Turvallisuustesti",
+            "description": "Turvallisuuskomponenttien testaus"
         },
         {
             "id": 30,
-            "name": "Ohjelma 30",
-            "description": "Vakiotesti"
+            "name": "Vakiotesti",
+            "description": "Standardimukainen testaus"
+        },
+        {
+            "id": 31,
+            "name": "Syklitesti 1",
+            "description": "Paineistussyklitesti 1"
+        },
+        {
+            "id": 32,
+            "name": "Syklitesti 2",
+            "description": "Paineistussyklitesti 2"
+        },
+        {
+            "id": 33,
+            "name": "Syklitesti 3",
+            "description": "Pitkä paineistussyklitesti"
+        },
+        {
+            "id": 34,
+            "name": "Lämpötesti 20°C",
+            "description": "Painetesti 20°C lämpötilassa"
+        },
+        {
+            "id": 35,
+            "name": "Lämpötesti 80°C",
+            "description": "Painetesti 80°C lämpötilassa"
+        },
+        {
+            "id": 36,
+            "name": "Valmistustarkastus",
+            "description": "Valmistustarkastustesti"
+        },
+        {
+            "id": 37,
+            "name": "Hydrauliikkatesti",
+            "description": "Hydrauliikkakomponenttien testi"
+        },
+        {
+            "id": 38,
+            "name": "Pneumatiikkatesti",
+            "description": "Pneumatiikkakomponenttien testi"
+        },
+        {
+            "id": 39,
+            "name": "Matalapaine 0.1bar",
+            "description": "Erittäin matalan paineen testi 0.1bar"
+        },
+        {
+            "id": 40,
+            "name": "Korkeapaine 50bar",
+            "description": "Erittäin korkean paineen testi 50bar"
+        },
+        {
+            "id": 41,
+            "name": "ISO 9001 testi",
+            "description": "ISO 9001 standardin mukainen testaus"
+        },
+        {
+            "id": 42,
+            "name": "Tilaustesti 1",
+            "description": "Asiakastilauskohtainen testi 1"
+        },
+        {
+            "id": 43,
+            "name": "Tilaustesti 2",
+            "description": "Asiakastilauskohtainen testi 2"
+        },
+        {
+            "id": 44,
+            "name": "Tilaustesti 3",
+            "description": "Asiakastilauskohtainen testi 3"
+        },
+        {
+            "id": 45,
+            "name": "Täyslaitetesti",
+            "description": "Täyden laitteen kokonaistesti"
+        },
+        {
+            "id": 46,
+            "name": "Osatesti",
+            "description": "Yksittäisten osien testaus"
+        },
+        {
+            "id": 47,
+            "name": "Tehdasvastaanotto",
+            "description": "Tehdastarkastustesti"
+        },
+        {
+            "id": 48,
+            "name": "Paineanturitesti",
+            "description": "Paineantureiden testaus"
+        },
+        {
+            "id": 49,
+            "name": "Virtausanturitesti",
+            "description": "Virtausantureiden testaus"
+        },
+        {
+            "id": 50,
+            "name": "Erikoisnopea",
+            "description": "Erikoisnopea tarkastustesti"
         }
     ],
     "last_updated": "2025-05-13",
-    "version": "1.0.0"
+    "version": "1.1.0"
 }
