@@ -33,6 +33,8 @@ class ModbusWorker(QObject):
             
         try:
             result = self.modbus.write_register(address, value)
+            # Lisää osoite tulokseen, jotta voidaan tunnistaa hätäseis-kuittaus
+            result.address = address
             self.resultReady.emit(result, 2, "")
         except Exception as e:
             self.resultReady.emit(False, 2, f"Virhe rekisterin kirjoittamisessa: {str(e)}")

@@ -125,22 +125,42 @@ class MainWindow(QWidget):
 
             # Jos hätäseis on päällä, mutta dialog ei ole auki, avaa se
             elif status == 0 and not self.emergency_dialog_open:
+                # Lähetä heti pysäytyskäsky kun hätäseis aktivoituu
+                if hasattr(self, 'fortest_manager') and self.fortest_manager:
+                    try:
+                        self.fortest_manager.abort_test()
+                        self.testing_screen.update_status("HÄTÄSEIS AKTIVOITU, TESTI PYSÄYTETTY", "ERROR")
+                    except Exception as e:
+                        print(f"Virhe testin pysäytyksessä: {e}")
+                
+                # Avaa dialogi normaalisti
                 self.emergency_dialog_open = True
                 self._emergency_dialog = EmergencyStopDialog(self, self.modbus_manager)
+                self._emergency_dialog._is_emergency_stop_dialog = True
                 self._emergency_dialog.finished.connect(self.on_emergency_dialog_closed)
                 self._emergency_dialog.exec_()
         except Exception as e:
             print(f"Virhe hätäseistilan tarkistuksessa: {e}")
-            # Suljetaan timer jos yhteys katkeaa
             self.emergency_stop_timer.stop()
 
-    def on_emergency_dialog_closed(self):
+    def on_emergency_dialog_closed(self, result):
         """Hätäseisdialogin sulkemisen käsittely"""
         self.emergency_dialog_open = False
+        if result == 1:  # QDialog.Accepted
+            self.testing_screen.update_status("Hätäseis kuitattu", "INFO")
         self._emergency_dialog = None
 
     def handle_modbus_result(self, result, op_code, error_msg):
         """Käsittelee modbus-kyselyn tuloksen"""
+        # Estä täysin rekisterin 19099 (hätäseis) kirjoitusten käsittely
+        if op_code == 2 and hasattr(result, 'address') and result.address == 19099:
+            return
+            
+        # Ohita myös jos kyseessä on hätäseisdialogi
+        if hasattr(self, '_emergency_dialog') and getattr(self._emergency_dialog, '_is_emergency_stop_dialog', False):
+            if op_code == 2:  # Rekisterin kirjoitus
+                return
+        
         if error_msg:
             # Päivitä tilaviesti päänäkymään
             self.testing_screen.update_status(error_msg, "ERROR")
