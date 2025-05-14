@@ -86,14 +86,14 @@ class TestingScreen(BaseScreen):
         self.manual_button.move(5, 5)
         self.manual_button.clicked.connect(self.show_manual)
         
-        # Sammutus-painike
+        # Sammutus-painike (TESTIEN JÄLKEEN TÄMÄN SAA POISTAA!)
         self.shutdown_button = IconButton(QStyle.SP_DialogCancelButton, "Sammuta", self)
-        self.shutdown_button.move(1180, 20)
+        self.shutdown_button.move(100, -20)
         self.shutdown_button.clicked.connect(self.show_shutdown_dialog)
 
         # New confirmation shutdown button
         self.confirm_shutdown_button = IconButton(QStyle.SP_DialogCancelButton, "Sammuta järjestelmä", self)
-        self.confirm_shutdown_button.move(1080, 20)  # Position to the left of the original button
+        self.confirm_shutdown_button.move(1180, 20)
         self.confirm_shutdown_button.clicked.connect(self.show_confirm_shutdown_dialog)        
         
         # Testipaneelit
@@ -282,36 +282,41 @@ class TestingScreen(BaseScreen):
         if not active_panels:
             self.update_status("Valitse vähintään yksi testi aktiiviseksi ennen käynnistystä", "WARNING")
             return
+        
+        # Tarkista että modbus-yhteys on kunnossa
+        if not hasattr(self.parent(), 'fortest_manager') or \
+        not hasattr(self.parent().fortest_manager.worker, 'fortest') or \
+        not hasattr(self.parent().fortest_manager.worker.fortest, 'modbus') or \
+        not self.parent().fortest_manager.worker.fortest.modbus.connected:
+            self.update_status("ForTest-yhteyttä ei saatavilla, testiä ei voi käynnistää", "ERROR")
+            return
 
         if active_panels:
+            # Tarkista että aktiivisissa paneeleissa on ohjelma valittuna
+            for panel in active_panels:
+                if not hasattr(panel, 'program_number') or panel.program_number <= 0:
+                    self.update_status("Valitse ohjelma kaikille aktiivisille testeille", "WARNING")
+                    return
+            
             # Vaihda ohjelma ensimmäisen aktiivisen testin mukaan
             first_panel = active_panels[0]
-            if hasattr(first_panel, 'program_number') and first_panel.program_number > 0:
-                print(f"Vaihdetaan ohjelma: {first_panel.program_number}")
+            print(f"Vaihdetaan ohjelma: {first_panel.program_number}")
+            
+            # Ohjelman vaihto ForTestHandler-luokan kautta
+            try:
+                modbus = self.parent().fortest_manager.worker.fortest.modbus
+                result = modbus.write_register(0x0060, first_panel.program_number)
+                self.update_status(f"Vaihdetaan ohjelmaan {first_panel.program_number}...", "INFO")
                 
-                # Ohjelman vaihto ForTestHandler-luokan kautta
-                # ForTest käyttää ttyUSB1 porttia
-                if hasattr(self.parent(), 'fortest_manager'):
-                    try:
-                        # Käytä suoraan modbus_handler-objektia fortest_managerista
-                        if hasattr(self.parent().fortest_manager.worker, 'fortest') and \
-                        hasattr(self.parent().fortest_manager.worker.fortest, 'modbus'):
-                            modbus = self.parent().fortest_manager.worker.fortest.modbus
-                            result = modbus.write_register(0x0060, first_panel.program_number)
-                            self.update_status(f"Vaihdetaan ohjelmaan {first_panel.program_number}...", "INFO")
-                            
-                            # Jos vaihto onnistui, jatka testiä viiveellä
-                            if result:
-                                QTimer.singleShot(1000, self._continue_start_test)
-                                return
-                            else:
-                                self.update_status("Ohjelman vaihto epäonnistui", "ERROR")
-                        else:
-                            self.update_status("ForTest-yhteyttä ei saatavilla", "ERROR")
-                    except Exception as e:
-                        self.update_status(f"Virhe ohjelman vaihdossa: {str(e)}", "ERROR")
+                # Jos vaihto onnistui, jatka testiä viiveellä
+                if result:
+                    QTimer.singleShot(1000, self._continue_start_test)
+                    return
                 else:
-                    self.update_status("ForTest-manageria ei saatavilla", "ERROR")
+                    self.update_status("Ohjelman vaihto epäonnistui", "ERROR")
+            except Exception as e:
+                self.update_status(f"Virhe ohjelman vaihdossa: {str(e)}", "ERROR")
+                return
 
         # Merkitse aktiiviset paneelit keräämään tuloksia
         for panel in self.test_panels:
@@ -329,7 +334,7 @@ class TestingScreen(BaseScreen):
                 panel.results_started = True
                 
         self.is_running = True
-        self.control_panel.update_button_states(True)
+        self.control_panel.update_button_states(True, False)  # running=True, ready=False
         
         # Käynnistä testi ForTestManager-luokan avulla
         if hasattr(self.parent(), 'fortest_manager'):
@@ -343,16 +348,47 @@ class TestingScreen(BaseScreen):
     def stop_test(self):
         """Pysäytä testi ForTestManager-luokan avulla"""
         self.is_running = False
-        self.control_panel.update_button_states(False)
+        
+        # Tarkista, onko laite valmis käynnistettäväksi ohjauksen päivitystä varten
+        ready_to_start = self.check_ready_to_start()
+        self.control_panel.update_button_states(False, ready_to_start)
         
         # Pysäytä testi ForTestManager-luokan avulla
         if hasattr(self.parent(), 'fortest_manager'):
             self.parent().fortest_manager.abort_test()
             
-        # Aseta GPIO-pinnitdef start_test(self
+        # Aseta GPIO-pinnit testerin todellisen tilan mukaan
         if hasattr(self.parent(), 'gpio_handler') and self.parent().gpio_handler:
-            self.parent().gpio_handler.set_output(4, True)   # GPIO 23 (vihreä) päälle
-            self.parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
+            if ready_to_start:
+                self.parent().gpio_handler.set_output(4, True)   # GPIO 23 (vihreä) päälle
+                self.parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
+            else:
+                self.parent().gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
+                self.parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
+
+    # Lisää uusi metodi tarkistamaan onko testeri valmis käynnistykseen
+    def check_ready_to_start(self):
+        """Tarkista onko testeri valmis käynnistykseen"""
+        # Tarkista onko aktiivisia paneeleja
+        active_panels = [panel for panel in self.test_panels if panel.is_active]
+        if not active_panels:
+            return False
+        
+        # Tarkista että aktiivisissa paneeleissa on ohjelma valittuna
+        for panel in active_panels:
+            if not hasattr(panel, 'program_number') or panel.program_number <= 0:
+                return False
+        
+        # Tarkista modbus-yhteys
+        if not hasattr(self.parent(), 'fortest_manager') or \
+        not hasattr(self.parent().fortest_manager.worker, 'fortest') or \
+        not hasattr(self.parent().fortest_manager.worker.fortest, 'modbus') or \
+        not self.parent().fortest_manager.worker.fortest.modbus.connected:
+            return False
+        
+        # Kaikki ok, testeri on valmis käynnistykseen
+        return True
+
 
     def toggle_active(self):
         """Vaihda aktiivisuustila ja päivitä vain UI ja GPIO"""
@@ -472,6 +508,26 @@ class TestingScreen(BaseScreen):
                     self.results_read_counter = 0
             else:
                 self.results_read_counter = 0
+            
+            # Päivitä nappien tila todellisen tilanteen mukaan
+            ready_to_start = False
+            if not self.is_running:
+                ready_to_start = self.check_ready_to_start()
+            
+            # Päivitä nappien ja GPIO-pinnien tila
+            self.control_panel.update_button_states(self.is_running, ready_to_start)
+            
+            # Päivitä GPIO-pinnit testerin todellisen tilan mukaan
+            if hasattr(self.parent(), 'gpio_handler') and self.parent().gpio_handler:
+                if self.is_running:
+                    self.parent().gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
+                    self.parent().gpio_handler.set_output(5, True)   # GPIO 24 (punainen) päälle
+                elif ready_to_start:
+                    self.parent().gpio_handler.set_output(4, True)   # GPIO 23 (vihreä) päälle
+                    self.parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
+                else:
+                    self.parent().gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
+                    self.parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
 
     def cleanup(self):
         """Siivoa resurssit"""

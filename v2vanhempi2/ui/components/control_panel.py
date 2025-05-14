@@ -21,7 +21,7 @@ class ControlPanel(QWidget):
         self.start_button.setFixedSize(80, 80)
         self.start_button.setStyleSheet("""
             QPushButton {
-                background-color: #4CAF50;
+                background-color: #888888;
                 color: white;
                 border-radius: 5px;
                 font-size: 24px;
@@ -35,7 +35,7 @@ class ControlPanel(QWidget):
         self.stop_button.setFixedSize(80, 80)
         self.stop_button.setStyleSheet("""
             QPushButton {
-                background-color: #F44336;
+                background-color: #888888;
                 color: white;
                 border-radius: 5px;
                 font-size: 24px;
@@ -47,12 +47,13 @@ class ControlPanel(QWidget):
         layout.addWidget(self.start_button)
         layout.addWidget(self.stop_button)
     
-    def update_button_states(self, running=False):
+    def update_button_states(self, running=False, ready_to_start=False):
         """Päivitä nappien tyylit tilan mukaan"""
         if running:
+            # Testeri käynnissä - punainen O-nappi, harmaa I-nappi
             self.start_button.setStyleSheet("""
                 QPushButton {
-                    background-color: #388E3C;
+                    background-color: #888888;
                     color: white;
                     border-radius: 5px;
                     font-size: 24px;
@@ -68,7 +69,8 @@ class ControlPanel(QWidget):
                     font-weight: bold;
                 }
             """)
-        else:
+        elif ready_to_start:
+            # Valmis käynnistykseen - vihreä I-nappi, harmaa O-nappi
             self.start_button.setStyleSheet("""
                 QPushButton {
                     background-color: #4CAF50;
@@ -80,7 +82,27 @@ class ControlPanel(QWidget):
             """)
             self.stop_button.setStyleSheet("""
                 QPushButton {
-                    background-color: #D32F2F;
+                    background-color: #888888;
+                    color: white;
+                    border-radius: 5px;
+                    font-size: 24px;
+                    font-weight: bold;
+                }
+            """)
+        else:
+            # Ei valmis käynnistykseen, molemmat napit harmaita
+            self.start_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #888888;
+                    color: white;
+                    border-radius: 5px;
+                    font-size: 24px;
+                    font-weight: bold;
+                }
+            """)
+            self.stop_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #888888;
                     color: white;
                     border-radius: 5px;
                     font-size: 24px;
