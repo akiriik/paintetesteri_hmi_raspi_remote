@@ -90,6 +90,11 @@ class TestingScreen(BaseScreen):
         self.shutdown_button = IconButton(QStyle.SP_DialogCancelButton, "Sammuta", self)
         self.shutdown_button.move(1180, 20)
         self.shutdown_button.clicked.connect(self.show_shutdown_dialog)
+
+        # New confirmation shutdown button
+        self.confirm_shutdown_button = IconButton(QStyle.SP_DialogCancelButton, "Sammuta järjestelmä", self)
+        self.confirm_shutdown_button.move(1080, 20)  # Position to the left of the original button
+        self.confirm_shutdown_button.clicked.connect(self.show_confirm_shutdown_dialog)        
         
         # Testipaneelit
         self.test_panels = []
@@ -140,6 +145,76 @@ class TestingScreen(BaseScreen):
         """Siirry käsikäyttösivulle"""
         if hasattr(self.parent(), 'show_manual'):
             self.parent().show_manual()
+
+    def show_confirm_shutdown_dialog(self):
+        """Show system shutdown confirmation dialog with large touch buttons"""
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Sammutuksen vahvistus")
+        dialog.setText("Haluatko sammuttaa järjestelmän?")
+        
+        # Create custom large buttons
+        peruuta_btn = QPushButton("PERUUTA")
+        peruuta_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f0f0f0;
+                color: #333333;
+                border-radius: 10px;
+                padding: 15px;
+                min-width: 200px;
+                min-height: 80px;
+                font-size: 24px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+            }
+        """)
+        
+        sammuta_btn = QPushButton("SAMMUTA")
+        sammuta_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #F44336;
+                color: white;
+                border-radius: 10px;
+                padding: 15px;
+                min-width: 200px;
+                min-height: 80px;
+                font-size: 24px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #D32F2F;
+            }
+        """)
+        
+        dialog.addButton(peruuta_btn, QMessageBox.RejectRole)
+        dialog.addButton(sammuta_btn, QMessageBox.AcceptRole)
+        
+        dialog.setStyleSheet("""
+            QMessageBox {
+                background-color: white;
+                font-size: 24px;
+            }
+        """)
+        
+        # Execute dialog and handle result
+        result = dialog.exec_()
+        clicked_button = dialog.clickedButton()
+
+        # Only proceed with shutdown if the Sammuta button was explicitly clicked
+        if clicked_button == sammuta_btn:
+            # Set register 17999 high using modbus (USB0)
+            if hasattr(self.parent(), 'modbus_manager'):
+                self.parent().modbus_manager.write_register(17999, 1)
+                self.update_status("Sammutetaan järjestelmä...", "INFO")
+                
+                # Add delay to allow register change to take effect
+                QTimer.singleShot(2000, self.shutdown_system)
+        
+    def shutdown_system(self):
+        """Shutdown Raspberry Pi system"""
+        import os
+        os.system("sudo shutdown -h now")
     
     def show_shutdown_dialog(self):
         """Näytä sammutusvalikko"""
