@@ -80,8 +80,8 @@ class MainWindow(QWidget):
 
         # Alusta lämpötila-anturi (kokeile oikeaa ensin, sitten dummy)
         try:
-            self.temperature_handler = TemperatureHandler()
-            print("DS18B20 lämpötila-anturi käytössä")
+            from utils.ds18b20_bitbang import DS18B20Handler
+            self.temperature_handler = DS18B20Handler(gpio_pin=4)
         except Exception as e:
             print(f"DS18B20 ei saatavilla, käytetään dummy-dataa: {e}")
             self.temperature_handler = DummyTemperatureHandler()
