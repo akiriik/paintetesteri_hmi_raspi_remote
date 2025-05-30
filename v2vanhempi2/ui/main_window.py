@@ -16,6 +16,9 @@ from utils.fortest_manager import ForTestManager
 from utils.gpio_handler import GPIOHandler
 from utils.gpio_input_handler import GPIOInputHandler
 from utils.program_manager import ProgramManager
+from utils.temperature_handler import TemperatureHandler, DummyTemperatureHandler
+from ui.components.temperature_widget import TemperatureWidget
+
 
 class MainWindow(QWidget):
     def __init__(self, parent=None):
@@ -74,6 +77,18 @@ class MainWindow(QWidget):
         except Exception as e:
             print(f"Varoitus: GPIO-nappuloiden alustus epäonnistui: {e}")
             self.gpio_input_handler = None
+
+        # Alusta lämpötila-anturi (kokeile oikeaa ensin, sitten dummy)
+        try:
+            self.temperature_handler = TemperatureHandler()
+            print("DS18B20 lämpötila-anturi käytössä")
+        except Exception as e:
+            print(f"DS18B20 ei saatavilla, käytetään dummy-dataa: {e}")
+            self.temperature_handler = DummyTemperatureHandler()
+        
+        # Yhdistä lämpötilasignaali
+        self.temperature_handler.temperature_updated.connect(self.update_temperature_display)
+
 
         # Ajastimet
         self.emergency_stop_timer = QTimer(self)
@@ -271,6 +286,13 @@ class MainWindow(QWidget):
                 self.close()
         super().keyPressEvent(event)
 
+    # Lisää metodi lämpötilan päivitykseen:
+    def update_temperature_display(self, temperatures):
+        """Päivitä lämpötilanäyttö"""
+        if hasattr(self.testing_screen, 'temperature_widget'):
+            self.testing_screen.temperature_widget.update_temperatures(temperatures)
+
+
     def show(self):
         """Näyttää ikkunan koko ruudussa"""
         self.showFullScreen()
@@ -291,6 +313,11 @@ class MainWindow(QWidget):
             # Lopuksi GPIO-outputit
             if hasattr(self, 'gpio_handler') and self.gpio_handler:
                 self.gpio_handler.cleanup()
+
+            # Siivoa lämpötila-anturi
+            if hasattr(self, 'temperature_handler'):
+                self.temperature_handler.cleanup()
+                                
         except Exception as e:
             # Virhetilanteessa älä tulosta täyttä virhettä
             print("Virhe sovelluksen sulkemisessa")
