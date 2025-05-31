@@ -1,8 +1,8 @@
-# ui/main_window.py
+# ui/main_window.py - Päivitetty versio SHT20-anturilla
 import sys
 import os
 import time
-from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QWidget, QVBoxLayout
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QKeyEvent
 
@@ -10,12 +10,14 @@ from ui.screens.testing_screen import TestingScreen
 from ui.screens.manual_screen import ManualScreen
 from ui.screens.program_selection_screen import ProgramSelectionScreen
 from ui.components.emergency_stop_dialog import EmergencyStopDialog
+from ui.components.environment_status_bar import EnvironmentStatusBar
 from utils.fortest_handler import DummyForTestHandler
 from utils.modbus_manager import ModbusManager
 from utils.fortest_manager import ForTestManager
 from utils.gpio_handler import GPIOHandler
 from utils.gpio_input_handler import GPIOInputHandler
 from utils.program_manager import ProgramManager
+from utils.sht20_handler import SHT20Manager
 
 
 class MainWindow(QWidget):
@@ -31,21 +33,35 @@ class MainWindow(QWidget):
             }
         """)
 
+        # Pää-layout
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # Sisältöalue (korkeus 720 - 40 = 680)
+        self.content_widget = QWidget()
+        self.content_widget.setFixedHeight(680)
+        main_layout.addWidget(self.content_widget)
+
+        # Ympäristötietojen statusrivi alareunaan
+        self.environment_status_bar = EnvironmentStatusBar(self)
+        main_layout.addWidget(self.environment_status_bar)
+
         # Alusta ohjelmamanageri ensin
         self.program_manager = ProgramManager()
 
-        # Näytöt
-        self.testing_screen = TestingScreen(self)
-        self.testing_screen.setGeometry(0, 0, 1280, 720)
+        # Näytöt - aseta ne content_widgetiin
+        self.testing_screen = TestingScreen(self.content_widget)
+        self.testing_screen.setGeometry(0, 0, 1280, 680)
         self.testing_screen.program_selection_requested.connect(self.show_program_selection)
 
-        self.manual_screen = ManualScreen(self)
-        self.manual_screen.setGeometry(0, 0, 1280, 720)
+        self.manual_screen = ManualScreen(self.content_widget)
+        self.manual_screen.setGeometry(0, 0, 1280, 680)
         self.manual_screen.hide()
 
         # Välitä ohjelmamanageri ohjelmanvalintanäkymälle
-        self.program_selection_screen = ProgramSelectionScreen(self, self.program_manager)
-        self.program_selection_screen.setGeometry(0, 0, 1280, 720)
+        self.program_selection_screen = ProgramSelectionScreen(self.content_widget, self.program_manager)
+        self.program_selection_screen.setGeometry(0, 0, 1280, 680)
         self.program_selection_screen.hide()
         self.program_selection_screen.program_selected.connect(self.on_program_selected)
 
@@ -59,6 +75,15 @@ class MainWindow(QWidget):
         
         # Yhdistä ohjelmamanagerin signaali ohjelmiston päivitykseen
         self.program_manager.program_list_updated.connect(self.program_selection_screen.update_program_list)
+
+        # Alusta SHT20-anturi
+        try:
+            self.sht20_manager = SHT20Manager()
+            self.sht20_manager.data_updated.connect(self.environment_status_bar.update_sensor_data)
+            self.sht20_manager.error_occurred.connect(self.environment_status_bar.show_sensor_error)
+        except Exception as e:
+            print(f"Varoitus: SHT20-anturin alustus epäonnistui: {e}")
+            self.sht20_manager = None
 
         # Alusta GPIO jos mahdollista
         try:
@@ -83,6 +108,11 @@ class MainWindow(QWidget):
 
         self.emergency_dialog_open = False
         self._dialog_opened_time = 0
+        
+    def update_environment_sensors(self):
+        """Päivitä ympäristöanturit - kutsutaan statusrivin ajastimesta"""
+        if hasattr(self, 'sht20_manager') and self.sht20_manager:
+            self.sht20_manager.read_once()
         
     def handle_button_press(self, button_name, is_pressed):
         """Käsittelee GPIO-nappulan painalluksen - reagoidaan vain painallukseen"""
@@ -279,6 +309,14 @@ class MainWindow(QWidget):
     def closeEvent(self, event):
         """Käsittelee sovelluksen sulkemisen"""
         try:
+            # Siivoa SHT20-anturi
+            if hasattr(self, 'sht20_manager') and self.sht20_manager:
+                self.sht20_manager.cleanup()
+                
+            # Siivoa environment status bar
+            if hasattr(self, 'environment_status_bar') and self.environment_status_bar:
+                self.environment_status_bar.cleanup()
+                
             # Siivoa ensin GPIO-nappuloiden tapahtumakuuntelijat
             if hasattr(self, 'gpio_input_handler') and self.gpio_input_handler:
                 self.gpio_input_handler.cleanup()
