@@ -6,8 +6,6 @@ from ui.screens.base_screen import BaseScreen
 from ui.components.test_panel import TestPanel
 from ui.components.control_panel import ControlPanel
 
-from ui.components.temperature_widget import TemperatureWidget
-
 class ShutdownDialog(QMessageBox):
     """Sammutusvalikko"""
     def __init__(self, parent=None):
@@ -98,10 +96,6 @@ class TestingScreen(BaseScreen):
         self.confirm_shutdown_button.move(1180, 20)
         self.confirm_shutdown_button.clicked.connect(self.show_confirm_shutdown_dialog)        
         
-        # Lämpötila-widget (oikeaan yläkulmaan)
-        self.temperature_widget = TemperatureWidget(self)
-        self.temperature_widget.move(950, 5)  # Sijoita sopivaan paikkaan
-
         # Testipaneelit
         self.test_panels = []
         for i in range(1, 4):
