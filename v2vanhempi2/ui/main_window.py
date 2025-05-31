@@ -16,7 +16,7 @@ from utils.fortest_manager import ForTestManager
 from utils.gpio_handler import GPIOHandler
 from utils.gpio_input_handler import GPIOInputHandler
 from utils.program_manager import ProgramManager
-from utils.temperature_handler import TemperatureHandler, DummyTemperatureHandler
+from utils.ds18b20_bitbang import DS18B20Handler as TemperatureHandler
 from ui.components.temperature_widget import TemperatureWidget
 
 
