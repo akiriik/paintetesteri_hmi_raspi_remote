@@ -50,10 +50,6 @@ class MainWindow(QWidget):
         self.program_selection_screen.hide()
         self.program_selection_screen.program_selected.connect(self.on_program_selected)
 
-        # Ympäristötietojen statusrivi alareunaan kiinteillä koordinaateilla
-        self.environment_status_bar = EnvironmentStatusBar(self)
-        self.environment_status_bar.setGeometry(0, 680, 1280, 40)
-
         # Alusta modbus-hallinta
         self.modbus_manager = ModbusManager(port='/dev/ttyUSB0', baudrate=19200)
         self.fortest_manager = ForTestManager(port='/dev/ttyUSB1', baudrate=19200)
@@ -68,8 +64,6 @@ class MainWindow(QWidget):
         # Alusta SHT20-anturi
         try:
             self.sht20_manager = SHT20Manager()
-            self.sht20_manager.data_updated.connect(self.environment_status_bar.update_sensor_data)
-            self.sht20_manager.error_occurred.connect(self.environment_status_bar.show_sensor_error)
         except Exception as e:
             print(f"Varoitus: SHT20-anturin alustus epäonnistui: {e}")
             self.sht20_manager = None
@@ -320,10 +314,6 @@ class MainWindow(QWidget):
             # Siivoa SHT20-anturi
             if hasattr(self, 'sht20_manager') and self.sht20_manager:
                 self.sht20_manager.cleanup()
-                
-            # Siivoa environment status bar
-            if hasattr(self, 'environment_status_bar') and self.environment_status_bar:
-                self.environment_status_bar.cleanup()
                 
             # Siivoa ensin GPIO-nappuloiden tapahtumakuuntelijat
             if hasattr(self, 'gpio_input_handler') and self.gpio_input_handler:
