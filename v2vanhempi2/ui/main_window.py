@@ -19,7 +19,6 @@ from utils.gpio_input_handler import GPIOInputHandler
 from utils.program_manager import ProgramManager
 from utils.sht20_handler import SHT20Manager
 
-
 class MainWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -33,37 +32,27 @@ class MainWindow(QWidget):
             }
         """)
 
-        # Pää-layout
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-
-        # Sisältöalue (korkeus 720 - 40 = 680)
-        self.content_widget = QWidget()
-        self.content_widget.setFixedHeight(680)
-        main_layout.addWidget(self.content_widget)
-
-        # Ympäristötietojen statusrivi alareunaan
-        self.environment_status_bar = EnvironmentStatusBar(self)
-        main_layout.addWidget(self.environment_status_bar)
-
         # Alusta ohjelmamanageri ensin
         self.program_manager = ProgramManager()
 
-        # Näytöt - aseta ne content_widgetiin
-        self.testing_screen = TestingScreen(self.content_widget)
-        self.testing_screen.setGeometry(0, 0, 1280, 680)
+        # Näytöt - luodaan suoraan MainWindowiin
+        self.testing_screen = TestingScreen(self)
+        self.testing_screen.setGeometry(0, 0, 1280, 720)
         self.testing_screen.program_selection_requested.connect(self.show_program_selection)
 
-        self.manual_screen = ManualScreen(self.content_widget)
-        self.manual_screen.setGeometry(0, 0, 1280, 680)
+        self.manual_screen = ManualScreen(self)
+        self.manual_screen.setGeometry(0, 0, 1280, 720)
         self.manual_screen.hide()
 
         # Välitä ohjelmamanageri ohjelmanvalintanäkymälle
-        self.program_selection_screen = ProgramSelectionScreen(self.content_widget, self.program_manager)
-        self.program_selection_screen.setGeometry(0, 0, 1280, 680)
+        self.program_selection_screen = ProgramSelectionScreen(self, self.program_manager)
+        self.program_selection_screen.setGeometry(0, 0, 1280, 720)
         self.program_selection_screen.hide()
         self.program_selection_screen.program_selected.connect(self.on_program_selected)
+
+        # Ympäristötietojen statusrivi alareunaan kiinteillä koordinaateilla
+        self.environment_status_bar = EnvironmentStatusBar(self)
+        self.environment_status_bar.setGeometry(0, 680, 1280, 40)
 
         # Alusta modbus-hallinta
         self.modbus_manager = ModbusManager(port='/dev/ttyUSB0', baudrate=19200)
@@ -113,7 +102,7 @@ class MainWindow(QWidget):
 
         self.emergency_dialog_open = False
         self._dialog_opened_time = 0
-        
+
     def update_environment_sensors(self):
         """Päivitä ympäristöanturit - kutsutaan statusrivin ajastimesta"""
         if hasattr(self, 'sht20_manager') and self.sht20_manager:

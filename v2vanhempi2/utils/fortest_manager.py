@@ -1,5 +1,5 @@
 # utils/fortest_manager.py
-from PyQt5.QtCore import QObject, QThread, pyqtSignal, pyqtSlot, QMetaObject, Qt, Q_ARG
+from PyQt5.QtCore import QObject, QThread, pyqtSignal, pyqtSlot, QMetaObject, Qt, Q_ARG, QTimerRetryAR
 from utils.fortest_handler import ForTestHandler
 
 class ForTestWorker(QObject):

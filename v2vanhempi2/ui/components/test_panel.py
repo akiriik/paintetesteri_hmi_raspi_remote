@@ -120,8 +120,8 @@ class TestPanel(QWidget):
             # Älä tyhjennä näyttöä: self.pressure_result.setText("")
         
         # Käytä GPIO-ohjausta
-        if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
-            self.parent().parent().gpio_handler.set_output(self.test_number, self.is_active)
+        if hasattr(self.parent(), 'gpio_handler') and self.parent().gpio_handler:
+            self.parent().gpio_handler.set_output(self.test_number, self.is_active)
 
 
     @pyqtSlot(bool, str)

@@ -199,8 +199,8 @@ class TestingScreen(BaseScreen):
         # Only proceed with shutdown if the Sammuta button was explicitly clicked
         if clicked_button == sammuta_btn:
             # Set register 17999 high using modbus (USB0)
-            if hasattr(self.parent().parent(), 'modbus_manager'):
-                self.parent().parent().modbus_manager.write_register(17999, 1)
+            if hasattr(self.parent(), 'modbus_manager'):
+                self.parent().modbus_manager.write_register(17999, 1)
                 self.update_status("Sammutetaan järjestelmä...", "INFO")
                 
                 # Add delay to allow register change to take effect
@@ -246,8 +246,8 @@ class TestingScreen(BaseScreen):
 
     def show_manual(self):
         """Siirry käsikäyttösivulle"""
-        if hasattr(self.parent().parent(), 'show_manual'):
-            self.parent().parent().show_manual()
+        if hasattr(self.parent(), 'show_manual'):
+            self.parent().show_manual()
     
     def close_application(self):
         """Sulje sovellus"""
@@ -320,7 +320,7 @@ class TestingScreen(BaseScreen):
 
         # Jos ei onnistunut tai ei ole aktiivisia testejä, käynnistetään ilman ohjelman vaihtoa
         self._continue_start_test()
-        
+
     def _continue_start_test(self):
         """Jatka testin käynnistystä ohjelmavaihdon jälkeen"""
         # Merkitse aktiiviset paneelit keräämään tuloksia
@@ -442,8 +442,8 @@ class TestingScreen(BaseScreen):
 
     def update_test_statuses(self):
         """Read and update test statuses from ForTest"""
-        if hasattr(self.parent().parent(), 'fortest_manager'):
-            self.parent().parent().fortest_manager.read_status()
+        if hasattr(self.parent(), 'fortest_manager'):
+            self.parent().fortest_manager.read_status()
 
     def handle_fortest_status(self, result):
         """Käsittele ForTest-laitteen tilatiedot"""
@@ -490,16 +490,16 @@ class TestingScreen(BaseScreen):
 
     def update_fortest_data(self):
         """Lue ForTest statustiedot ja tulokset"""
-        if hasattr(self.parent().parent(), 'fortest_manager'):
+        if hasattr(self.parent(), 'fortest_manager'):
             # Lue ForTest tila
-            self.parent().parent().fortest_manager.read_status()
+            self.parent().fortest_manager.read_status()
             
             # Lue myös tulokset säännöllisesti
             if hasattr(self, 'results_read_counter'):
                 self.results_read_counter += 1
                 # Lue tulokset harvemmin (esim. joka 5. kerta)
                 if self.results_read_counter >= 5:
-                    self.parent().parent().fortest_manager.read_results()
+                    self.parent().fortest_manager.read_results()
                     self.results_read_counter = 0
             else:
                 self.results_read_counter = 0
@@ -513,16 +513,16 @@ class TestingScreen(BaseScreen):
             self.control_panel.update_button_states(self.is_running, ready_to_start)
             
             # Päivitä GPIO-pinnit testerin todellisen tilan mukaan
-            if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
+            if hasattr(self.parent(), 'gpio_handler') and self.parent().gpio_handler:
                 if self.is_running:
-                    self.parent().parent().gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
-                    self.parent().parent().gpio_handler.set_output(5, True)   # GPIO 24 (punainen) päälle
+                    self.parent().gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
+                    self.parent().gpio_handler.set_output(5, True)   # GPIO 24 (punainen) päälle
                 elif ready_to_start:
-                    self.parent().parent().gpio_handler.set_output(4, True)   # GPIO 23 (vihreä) päälle
-                    self.parent().parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
+                    self.parent().gpio_handler.set_output(4, True)   # GPIO 23 (vihreä) päälle
+                    self.parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
                 else:
-                    self.parent().parent().gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
-                    self.parent().parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
+                    self.parent().gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
+                    self.parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
 
     def cleanup(self):
         """Siivoa resurssit"""
