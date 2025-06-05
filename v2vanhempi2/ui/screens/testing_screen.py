@@ -107,7 +107,7 @@ class TestingScreen(BaseScreen):
             
             # Testipaneeli
             panel = TestPanel(i, self)
-            panel.move(10 + (i-1)*400, 130)
+            panel.move(30 + (i-1)*420, 100)
             panel.program_selection_requested.connect(self.start_program_selection)
             panel.status_message.connect(self.handle_status_message)
             self.test_panels.append(panel)

@@ -8,15 +8,14 @@ class TestPanel(QWidget):
     """Yksittäisen testin paneeli"""
     program_selection_requested = pyqtSignal(int)  # Signaali ohjelman valintapyynnölle
     status_message = pyqtSignal(str, int)  # Viesti, tyyppi
-    
     def __init__(self, test_number, parent=None):
         super().__init__(parent)
         self.test_number = test_number
         self.selected_program = None
         self.is_active = False
-        self.modbus_register = 17000 + self.test_number  # PAINE 1-3 AKTIIVINEN rekisterit: 17001-17003
-        
-        self.setFixedSize(400,600)
+        self.modbus_register = 17000 + self.test_number
+
+        self.setFixedSize(400, 600)
         self.setStyleSheet("""
             QWidget {
                 background-color: #f5f5f5;
@@ -25,17 +24,12 @@ class TestPanel(QWidget):
             }
         """)
 
-        # Layout
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignTop)
-        layout.setSpacing(10)
+        # Tuloslista
+        self.results_history = []
 
-        # Tuloslista, max 3 riviä
-        self.results_history = []  # Tallentaa max 3 viimeisintä tulosta        
-
-        # Painetulos laatikko
+        # Tulosnäyttö
         self.pressure_result = QLabel("", self)
-        self.pressure_result.setFixedSize(380, 250)
+        self.pressure_result.setGeometry(0, 0, 380, 350)
         self.pressure_result.setAlignment(Qt.AlignCenter)
         self.pressure_result.setStyleSheet("""
             background-color: black;
@@ -46,18 +40,16 @@ class TestPanel(QWidget):
             border: 2px solid #444444;
             border-radius: 10px;
         """)
-        layout.addWidget(self.pressure_result)
-        
+
         # Ohjelmatiedot
         self.program_label = QLabel("Ohjelma: --", self)
-        self.program_label.setFixedSize(280, 60)
+        self.program_label.setGeometry(0, 370, 380, 60)
         self.program_label.setAlignment(Qt.AlignCenter)
         self.program_label.setFont(QFont("Arial", 14, QFont.Bold))
-        layout.addWidget(self.program_label)
-        
-        # Valitse ohjelma nappi
+
+        # Valitse ohjelma -nappi
         self.select_program_btn = QPushButton("VALITSE OHJELMA", self)
-        self.select_program_btn.setFixedSize(280, 80)
+        self.select_program_btn.setGeometry(0, 450, 180, 60)
         self.select_program_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
@@ -69,11 +61,10 @@ class TestPanel(QWidget):
             }
         """)
         self.select_program_btn.clicked.connect(self.request_program_selection)
-        layout.addWidget(self.select_program_btn)
-        
-        # Aktiivinen nappi
+
+        # Aktiivinen-nappi
         self.active_btn = QPushButton("AKTIIVINEN", self)
-        self.active_btn.setFixedSize(280, 80)
+        self.active_btn.setGeometry(210, 450, 180, 60)
         self.active_btn.setStyleSheet("""
             QPushButton {
                 background-color: #888888;
@@ -85,7 +76,7 @@ class TestPanel(QWidget):
             }
         """)
         self.active_btn.clicked.connect(self.toggle_active)
-        layout.addWidget(self.active_btn)
+
     
     def request_program_selection(self):
         """Pyydä ohjelman valintaa"""
