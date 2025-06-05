@@ -48,8 +48,8 @@ class TestPanel(QWidget):
         self.program_label.setFont(QFont("Arial", 14, QFont.Bold))
 
         # Valitse ohjelma -nappi
-        self.select_program_btn = QPushButton("VALITSE OHJELMA", self)
-        self.select_program_btn.setGeometry(0, 450, 180, 60)
+        self.select_program_btn = QPushButton("VALITSE", self)
+        self.select_program_btn.setGeometry(0, 450, 180, 80)
         self.select_program_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
@@ -64,7 +64,7 @@ class TestPanel(QWidget):
 
         # Aktiivinen-nappi
         self.active_btn = QPushButton("AKTIIVINEN", self)
-        self.active_btn.setGeometry(210, 450, 180, 60)
+        self.active_btn.setGeometry(210, 450, 160, 60)
         self.active_btn.setStyleSheet("""
             QPushButton {
                 background-color: #888888;
