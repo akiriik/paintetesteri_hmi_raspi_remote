@@ -238,5 +238,5 @@ class ProgramSelectionScreen(BaseScreen):
     
     def go_back(self):
         """Palaa testaussivulle"""
-        if hasattr(self.parent(), 'show_testing'):
-            self.parent().show_testing()
+        if hasattr(self.parent().parent(), 'show_testing'):
+            self.parent().parent().show_testing()

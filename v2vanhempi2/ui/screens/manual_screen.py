@@ -85,9 +85,9 @@ class ManualScreen(BaseScreen):
         """)
         
         # Käytä ModbusManager-luokkaa releen ohjaamiseen
-        if hasattr(self.parent(), 'modbus_manager'):
+        if hasattr(self.parent().parent(), 'modbus_manager'):
             relay_num = index + 1
-            self.parent().modbus_manager.toggle_relay(relay_num, new_state)
+            self.parent().parent().modbus_manager.toggle_relay(relay_num, new_state)
             # Virheviestit käsitellään automaattisesti MainWindow.handle_modbus_result-metodissa
         else:
             self.relay_states[index] = not self.relay_states[index]  # Vaihda tila takaisin
@@ -102,10 +102,10 @@ class ManualScreen(BaseScreen):
             """)
     def go_back(self):
         """Palaa testaussivulle"""
-        if hasattr(self.parent(), 'show_testing'):
-            self.parent().show_testing()
+        if hasattr(self.parent().parent(), 'show_testing'):
+            self.parent().parent().show_testing()
     
-def cleanup(self):
-    # Sulje Modbus-yhteys vain jos se on olemassa
-    if hasattr(self, 'modbus') and self.modbus is not None:
-        self.modbus.close()
+    def cleanup(self):
+        # Sulje Modbus-yhteys vain jos se on olemassa
+        if hasattr(self, 'modbus') and self.modbus is not None:
+            self.modbus.close()

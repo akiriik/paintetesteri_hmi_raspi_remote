@@ -141,11 +141,6 @@ class TestingScreen(BaseScreen):
         self.fortest_timer.timeout.connect(self.update_fortest_data)
         self.fortest_timer.start(1000)  # Päivitys sekunnin välein
 
-    def show_manual(self):
-        """Siirry käsikäyttösivulle"""
-        if hasattr(self.parent(), 'show_manual'):
-            self.parent().show_manual()
-
     def show_confirm_shutdown_dialog(self):
         """Show system shutdown confirmation dialog with large touch buttons"""
         dialog = QMessageBox(self)
@@ -204,8 +199,8 @@ class TestingScreen(BaseScreen):
         # Only proceed with shutdown if the Sammuta button was explicitly clicked
         if clicked_button == sammuta_btn:
             # Set register 17999 high using modbus (USB0)
-            if hasattr(self.parent(), 'modbus_manager'):
-                self.parent().modbus_manager.write_register(17999, 1)
+            if hasattr(self.parent().parent(), 'modbus_manager'):
+                self.parent().parent().modbus_manager.write_register(17999, 1)
                 self.update_status("Sammutetaan järjestelmä...", "INFO")
                 
                 # Add delay to allow register change to take effect
@@ -248,11 +243,11 @@ class TestingScreen(BaseScreen):
         """Siirry ohjelmasivulle"""
         if hasattr(self.parent(), 'show_testing'):
             self.parent().show_testing()
-    
+
     def show_manual(self):
         """Siirry käsikäyttösivulle"""
-        if hasattr(self.parent(), 'show_manual'):
-            self.parent().show_manual()
+        if hasattr(self.parent().parent(), 'show_manual'):
+            self.parent().parent().show_manual()
     
     def close_application(self):
         """Sulje sovellus"""
