@@ -489,40 +489,40 @@ class TestingScreen(BaseScreen):
                 self.last_shown_status = 3
 
     def update_fortest_data(self):
-    """Lue ForTest statustiedot ja tulokset"""
-    if hasattr(self.parent().parent(), 'fortest_manager'):
-        # Lue ForTest tila
-        self.parent().parent().fortest_manager.read_status()
-        
-        # Lue myös tulokset säännöllisesti
-        if hasattr(self, 'results_read_counter'):
-            self.results_read_counter += 1
-            # Lue tulokset harvemmin (esim. joka 5. kerta)
-            if self.results_read_counter >= 5:
-                self.parent().parent().fortest_manager.read_results()
-                self.results_read_counter = 0
-        else:
-            self.results_read_counter = 0
-        
-        # Päivitä nappien tila todellisen tilanteen mukaan
-        ready_to_start = False
-        if not self.is_running:
-            ready_to_start = self.check_ready_to_start()
-        
-        # Päivitä nappien ja GPIO-pinnien tila
-        self.control_panel.update_button_states(self.is_running, ready_to_start)
-        
-        # Päivitä GPIO-pinnit testerin todellisen tilan mukaan
-        if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
-            if self.is_running:
-                self.parent().parent().gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
-                self.parent().parent().gpio_handler.set_output(5, True)   # GPIO 24 (punainen) päälle
-            elif ready_to_start:
-                self.parent().parent().gpio_handler.set_output(4, True)   # GPIO 23 (vihreä) päälle
-                self.parent().parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
+        """Lue ForTest statustiedot ja tulokset"""
+        if hasattr(self.parent().parent(), 'fortest_manager'):
+            # Lue ForTest tila
+            self.parent().parent().fortest_manager.read_status()
+            
+            # Lue myös tulokset säännöllisesti
+            if hasattr(self, 'results_read_counter'):
+                self.results_read_counter += 1
+                # Lue tulokset harvemmin (esim. joka 5. kerta)
+                if self.results_read_counter >= 5:
+                    self.parent().parent().fortest_manager.read_results()
+                    self.results_read_counter = 0
             else:
-                self.parent().parent().gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
-                self.parent().parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
+                self.results_read_counter = 0
+            
+            # Päivitä nappien tila todellisen tilanteen mukaan
+            ready_to_start = False
+            if not self.is_running:
+                ready_to_start = self.check_ready_to_start()
+            
+            # Päivitä nappien ja GPIO-pinnien tila
+            self.control_panel.update_button_states(self.is_running, ready_to_start)
+            
+            # Päivitä GPIO-pinnit testerin todellisen tilan mukaan
+            if hasattr(self.parent().parent(), 'gpio_handler') and self.parent().parent().gpio_handler:
+                if self.is_running:
+                    self.parent().parent().gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
+                    self.parent().parent().gpio_handler.set_output(5, True)   # GPIO 24 (punainen) päälle
+                elif ready_to_start:
+                    self.parent().parent().gpio_handler.set_output(4, True)   # GPIO 23 (vihreä) päälle
+                    self.parent().parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
+                else:
+                    self.parent().parent().gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
+                    self.parent().parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
 
     def cleanup(self):
         """Siivoa resurssit"""
