@@ -3,7 +3,7 @@ import sys
 import os
 import time
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QKeyEvent
 
 from ui.screens.testing_screen import TestingScreen
@@ -20,6 +20,7 @@ from utils.program_manager import ProgramManager
 from utils.sht20_handler import SHT20Manager
 
 class MainWindow(QWidget):
+    pressure_data_ready = pyqtSignal(int)  # Painedatan signaali
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -61,6 +62,9 @@ class MainWindow(QWidget):
         # Yhdistä ohjelmamanagerin signaali ohjelmiston päivitykseen
         self.program_manager.program_list_updated.connect(self.program_selection_screen.update_program_list)
 
+        # Yhdistä painedatan signaali testing_screeniin
+        self.pressure_data_ready.connect(self.testing_screen.handle_pressure_data)
+
         # Alusta GPIO jos mahdollista
         try:
             self.gpio_handler = GPIOHandler()
@@ -81,6 +85,11 @@ class MainWindow(QWidget):
         self.emergency_stop_timer = QTimer(self)
         self.emergency_stop_timer.timeout.connect(self.check_emergency_stop)
         self.emergency_stop_timer.start(1000)  # Tarkista hätäseis kerran sekunnissa
+
+        # Paineen lukemisen ajastin
+        self.pressure_timer = QTimer(self)
+        self.pressure_timer.timeout.connect(self.read_pressure)
+        self.pressure_timer.start(1000)
 
         self.emergency_dialog_open = False
         self._dialog_opened_time = 0
@@ -109,6 +118,13 @@ class MainWindow(QWidget):
         # Aseta GPIO-lähtö uudessa tilassa
         if self.gpio_handler:
             self.gpio_handler.set_output(panel_index + 1, panel.is_active)
+
+        # Käsittele paineen lukutulos
+        if op_code == 1 and hasattr(result, 'address') and result.address == 19500:
+            if result and hasattr(result, 'registers') and len(result.registers) > 0:
+                pressure_value = result.registers[0]
+                self.pressure_data_ready.emit(pressure_value)
+            return
 
     def check_emergency_stop(self):
         """Tarkista hätäseistila"""
