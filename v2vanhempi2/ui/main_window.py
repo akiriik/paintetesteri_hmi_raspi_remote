@@ -1,4 +1,4 @@
-# ui/main_window.py - Päivitetty versio SHT20-anturilla
+# ui/main_window.py - Päivitetty versio SHT20-anturilla ja paineella
 import sys
 import os
 import time
@@ -106,6 +106,11 @@ class MainWindow(QWidget):
         self.emergency_stop_timer.timeout.connect(self.check_emergency_stop)
         self.emergency_stop_timer.start(1000)  # Tarkista hätäseis kerran sekunnissa
 
+        # Paineen lukemisen ajastin
+        self.pressure_timer = QTimer(self)
+        self.pressure_timer.timeout.connect(self.read_pressure)
+        self.pressure_timer.start(1000)  # Lue paine kerran sekunnissa
+
         self.emergency_dialog_open = False
         self._dialog_opened_time = 0
         
@@ -113,6 +118,11 @@ class MainWindow(QWidget):
         """Päivitä ympäristöanturit - kutsutaan statusrivin ajastimesta"""
         if hasattr(self, 'sht20_manager') and self.sht20_manager:
             self.sht20_manager.read_once()
+        
+    def read_pressure(self):
+        """Lue painearvo rekisteristä 19500"""
+        if hasattr(self, 'modbus_manager') and self.modbus_manager and self.modbus_manager.is_connected():
+            self.modbus_manager.read_register(19500, 1)
         
     def handle_button_press(self, button_name, is_pressed):
         """Käsittelee GPIO-nappulan painalluksen - reagoidaan vain painallukseen"""
@@ -191,6 +201,15 @@ class MainWindow(QWidget):
         if hasattr(self, '_emergency_dialog') and getattr(self._emergency_dialog, '_is_emergency_stop_dialog', False):
             if op_code == 2:  # Rekisterin kirjoitus
                 return
+        
+        # Käsittele paineen lukutulos
+        if op_code == 1 and hasattr(result, 'address') and result.address == 19500:
+            if result and hasattr(result, 'registers') and len(result.registers) > 0:
+                pressure_value = result.registers[0]  # UINT arvo
+                self.environment_status_bar.update_pressure_data(pressure_value)
+            else:
+                self.environment_status_bar.show_pressure_error()
+            return
         
         if error_msg:
             # Päivitä tilaviesti päänäkymään
