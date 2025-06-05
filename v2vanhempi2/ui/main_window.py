@@ -119,13 +119,6 @@ class MainWindow(QWidget):
         if self.gpio_handler:
             self.gpio_handler.set_output(panel_index + 1, panel.is_active)
 
-        # Käsittele paineen lukutulos
-        if op_code == 1 and hasattr(result, 'address') and result.address == 19500:
-            if result and hasattr(result, 'registers') and len(result.registers) > 0:
-                pressure_value = result.registers[0]
-                self.pressure_data_ready.emit(pressure_value)
-            return
-
     def check_emergency_stop(self):
         """Tarkista hätäseistila"""
         if not hasattr(self, 'modbus_manager') or not self.modbus_manager or not self.modbus_manager.is_connected():
