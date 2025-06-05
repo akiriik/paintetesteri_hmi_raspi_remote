@@ -442,7 +442,7 @@ class TestingScreen(BaseScreen):
 
     def update_test_statuses(self):
         """Read and update test statuses from ForTest"""
-        if hasattr(self.parent(), 'fortest_manager'):
+        if hasattr(self.parent().parent(), 'fortest_manager'):
             self.parent().parent().fortest_manager.read_status()
 
     def handle_fortest_status(self, result):
