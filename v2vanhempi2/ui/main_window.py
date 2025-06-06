@@ -282,6 +282,7 @@ class MainWindow(QWidget):
 
     def show_testing(self):
         """Näyttää testaussivun"""
+        self.environment_status_bar.show()
         self.manual_screen.hide()
         self.program_selection_screen.hide()
         self.testing_screen.show()
