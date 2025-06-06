@@ -471,9 +471,22 @@ class TestingScreen(BaseScreen):
             status_value = result.registers[1]
             
             # Tarkista tilamuutos testin päättymiselle
-            if status_value == 0 and hasattr(self, 'last_status') and self.last_status == 1:
+            if status_value == 0 and hasattr(self, 'last_status') and self.last_status in [1, 2, 3]:
+                # Testin tila muuttui "WAITING" tilaan - testi on päättynyt
+                self.is_running = False
+                
+                # Lue tulokset
                 if hasattr(self.parent(), 'fortest_manager'):
-                    self.parent().parent().fortest_manager.read_results()
+                    self.parent().fortest_manager.read_results()
+                
+                # Päivitä GPIO-valot (vihreä päälle, punainen pois)
+                if hasattr(self.parent(), 'gpio_handler') and self.parent().gpio_handler:
+                    self.parent().gpio_handler.set_output(4, True)   # GPIO 23 (vihreä) päälle
+                    self.parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
+                
+                # Päivitä nappien tila
+                ready_to_start = self.check_ready_to_start()
+                self.control_panel.update_button_states(False, ready_to_start)
             
             self.last_status = status_value
             
@@ -487,6 +500,9 @@ class TestingScreen(BaseScreen):
             elif status_value == 3 and (not hasattr(self, 'last_shown_status') or self.last_shown_status != 3):
                 self.update_status("PURKU", "INFO")
                 self.last_shown_status = 3
+            elif status_value == 0 and (not hasattr(self, 'last_shown_status') or self.last_shown_status != 0):
+                self.update_status("VALMIS", "SUCCESS")
+                self.last_shown_status = 0
 
     def update_fortest_data(self):
         """Lue ForTest statustiedot ja tulokset"""
