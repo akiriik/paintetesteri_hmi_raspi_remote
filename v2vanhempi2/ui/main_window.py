@@ -3,7 +3,7 @@ import sys
 import os
 import time
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QKeyEvent
 
 from ui.screens.testing_screen import TestingScreen
@@ -20,7 +20,6 @@ from utils.program_manager import ProgramManager
 from utils.sht20_handler import SHT20Manager
 
 class MainWindow(QWidget):
-    pressure_data_ready = pyqtSignal(int)  # Painedatan signaali
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -51,6 +50,10 @@ class MainWindow(QWidget):
         self.program_selection_screen.hide()
         self.program_selection_screen.program_selected.connect(self.on_program_selected)
 
+        # Ympäristötietojen statusrivi alareunaan kiinteillä koordinaateilla
+        self.environment_status_bar = EnvironmentStatusBar(self)
+        self.environment_status_bar.setGeometry(0, 660, 1280, 40)
+
         # Alusta modbus-hallinta
         self.modbus_manager = ModbusManager(port='/dev/ttyUSB0', baudrate=19200)
         self.fortest_manager = ForTestManager(port='/dev/ttyUSB1', baudrate=19200)
@@ -62,8 +65,14 @@ class MainWindow(QWidget):
         # Yhdistä ohjelmamanagerin signaali ohjelmiston päivitykseen
         self.program_manager.program_list_updated.connect(self.program_selection_screen.update_program_list)
 
-        # Yhdistä painedatan signaali testing_screeniin
-        self.pressure_data_ready.connect(self.testing_screen.handle_pressure_data)
+        # Alusta SHT20-anturi
+        try:
+            self.sht20_manager = SHT20Manager()
+            self.sht20_manager.data_updated.connect(self.environment_status_bar.update_sensor_data)
+            self.sht20_manager.error_occurred.connect(self.environment_status_bar.show_sensor_error)
+        except Exception as e:
+            print(f"Varoitus: SHT20-anturin alustus epäonnistui: {e}")
+            self.sht20_manager = None
 
         # Alusta GPIO jos mahdollista
         try:
@@ -89,10 +98,20 @@ class MainWindow(QWidget):
         # Paineen lukemisen ajastin
         self.pressure_timer = QTimer(self)
         self.pressure_timer.timeout.connect(self.read_pressure)
-        self.pressure_timer.start(1000)
+        self.pressure_timer.start(1000)  # Lue paine kerran sekunnissa
 
         self.emergency_dialog_open = False
         self._dialog_opened_time = 0
+
+    def update_environment_sensors(self):
+        """Päivitä ympäristöanturit - kutsutaan statusrivin ajastimesta"""
+        if hasattr(self, 'sht20_manager') and self.sht20_manager:
+            self.sht20_manager.read_once()
+        
+    def read_pressure(self):
+        """Lue painearvo rekisteristä 19500"""
+        if hasattr(self, 'modbus_manager') and self.modbus_manager and self.modbus_manager.is_connected():
+            self.modbus_manager.read_register(19500, 1)
         
     def handle_button_press(self, button_name, is_pressed):
         """Käsittelee GPIO-nappulan painalluksen - reagoidaan vain painallukseen"""
@@ -171,6 +190,15 @@ class MainWindow(QWidget):
         if hasattr(self, '_emergency_dialog') and getattr(self._emergency_dialog, '_is_emergency_stop_dialog', False):
             if op_code == 2:  # Rekisterin kirjoitus
                 return
+        
+        # Käsittele paineen lukutulos
+        if op_code == 1 and hasattr(result, 'address') and result.address == 19500:
+            if result and hasattr(result, 'registers') and len(result.registers) > 0:
+                pressure_value = result.registers[0]  # UINT arvo
+                self.environment_status_bar.update_pressure_data(pressure_value)
+            else:
+                self.environment_status_bar.show_pressure_error()
+            return
         
         if error_msg:
             # Päivitä tilaviesti päänäkymään
@@ -261,6 +289,7 @@ class MainWindow(QWidget):
     def show_manual(self):
         """Näyttää käsikäyttösivun"""
         self.testing_screen.hide()
+        self.environment_status_bar.hide()
         self.program_selection_screen.hide()
         self.manual_screen.show()
 
@@ -268,7 +297,7 @@ class MainWindow(QWidget):
         """Näyttää ohjelman valintasivun"""
         if test_number is not None:
             self.testing_screen.current_test_panel = test_number
-
+        self.environment_status_bar.hide()
         self.testing_screen.hide()
         self.manual_screen.hide()
         self.program_selection_screen.show()
@@ -288,7 +317,15 @@ class MainWindow(QWidget):
 
     def closeEvent(self, event):
         """Käsittelee sovelluksen sulkemisen"""
-        try:     
+        try:
+            # Siivoa SHT20-anturi
+            if hasattr(self, 'sht20_manager') and self.sht20_manager:
+                self.sht20_manager.cleanup()
+                
+            # Siivoa environment status bar
+            if hasattr(self, 'environment_status_bar') and self.environment_status_bar:
+                self.environment_status_bar.cleanup()
+                
             # Siivoa ensin GPIO-nappuloiden tapahtumakuuntelijat
             if hasattr(self, 'gpio_input_handler') and self.gpio_input_handler:
                 self.gpio_input_handler.cleanup()

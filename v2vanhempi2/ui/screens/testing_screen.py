@@ -1,8 +1,7 @@
 from PyQt5.QtWidgets import QLabel, QPushButton, QFrame, QWidget, QMenu, QMessageBox, QScrollArea, QVBoxLayout, QHBoxLayout, QStyle
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize
 from PyQt5.QtGui import QFont, QIcon
-from ui.components.environment_status_bar import EnvironmentStatusBar
-from utils.sht20_handler import SHT20Manager
+
 from ui.screens.base_screen import BaseScreen
 from ui.components.test_panel import TestPanel
 from ui.components.control_panel import ControlPanel
@@ -73,6 +72,7 @@ class IconButton(QPushButton):
 
 class TestingScreen(BaseScreen):
     program_selection_requested = pyqtSignal(int)
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.current_test_panel = None
@@ -140,19 +140,6 @@ class TestingScreen(BaseScreen):
         self.fortest_timer = QTimer(self)
         self.fortest_timer.timeout.connect(self.update_fortest_data)
         self.fortest_timer.start(1000)  # Päivitys sekunnin välein
-
-        # Ympäristötietojen statusrivi alareunaan
-        self.environment_status_bar = EnvironmentStatusBar(self)
-        self.environment_status_bar.setGeometry(0, 660, 1280, 40)
-
-        # Alusta SHT20-anturi
-        try:
-            self.sht20_manager = SHT20Manager()
-            self.sht20_manager.data_updated.connect(self.environment_status_bar.update_sensor_data)
-            self.sht20_manager.error_occurred.connect(self.environment_status_bar.show_sensor_error)
-        except Exception as e:
-            print(f"Varoitus: SHT20-anturin alustus epäonnistui: {e}")
-            self.sht20_manager = None
 
     def show_confirm_shutdown_dialog(self):
         """Show system shutdown confirmation dialog with large touch buttons"""
@@ -537,23 +524,6 @@ class TestingScreen(BaseScreen):
                     self.parent().gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
                     self.parent().gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
 
-    def handle_pressure_data(self, pressure_value):
-        """Käsittele painedatan signaali main_windowista"""
-        if hasattr(self, 'environment_status_bar'):
-            self.environment_status_bar.update_pressure_data(pressure_value)
-
-    def update_environment_sensors(self):
-            """Päivitä ympäristöanturit - kutsutaan statusrivin ajastimesta"""
-            if hasattr(self, 'sht20_manager') and self.sht20_manager:
-                self.sht20_manager.read_once()
-
     def cleanup(self):
         """Siivoa resurssit"""
-        # Siivoa SHT20-anturi
-        if hasattr(self, 'sht20_manager') and self.sht20_manager:
-            self.sht20_manager.cleanup()
-            
-        # Siivoa environment status bar
-        if hasattr(self, 'environment_status_bar') and self.environment_status_bar:
-            self.environment_status_bar.cleanup()        
         pass
