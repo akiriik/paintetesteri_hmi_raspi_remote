@@ -73,7 +73,6 @@ class IconButton(QPushButton):
 
 class TestingScreen(BaseScreen):
     program_selection_requested = pyqtSignal(int)
-    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.current_test_panel = None
@@ -142,6 +141,10 @@ class TestingScreen(BaseScreen):
         self.fortest_timer.timeout.connect(self.update_fortest_data)
         self.fortest_timer.start(1000)  # Päivitys sekunnin välein
 
+        # Ympäristötietojen statusrivi alareunaan
+        self.environment_status_bar = EnvironmentStatusBar(self)
+        self.environment_status_bar.setGeometry(0, 660, 1280, 40)
+
         # Alusta SHT20-anturi
         try:
             self.sht20_manager = SHT20Manager()
@@ -150,10 +153,6 @@ class TestingScreen(BaseScreen):
         except Exception as e:
             print(f"Varoitus: SHT20-anturin alustus epäonnistui: {e}")
             self.sht20_manager = None
-
-        # Ympäristötietojen statusrivi alareunaan
-        self.environment_status_bar = EnvironmentStatusBar(self)
-        self.environment_status_bar.setGeometry(0, 660, 1280, 40)
 
     def show_confirm_shutdown_dialog(self):
         """Show system shutdown confirmation dialog with large touch buttons"""
