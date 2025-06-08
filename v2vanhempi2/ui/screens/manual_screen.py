@@ -12,9 +12,12 @@ class ManualScreen(BaseScreen):
         super().__init__(parent)
         
     def init_ui(self):
+        # Aseta musta tausta
+        self.setStyleSheet("background-color: black;")
         # Page title
         self.title = self.create_title("KÄSIKÄYTTÖ")
-        
+        self.title.setStyleSheet("color: white;")
+
         # Takaisin-nappi
         self.back_button = QPushButton("← TAKAISIN", self)
         self.back_button.setGeometry(20, 20, 150, 60)
@@ -40,6 +43,7 @@ class ManualScreen(BaseScreen):
         # Status label for user feedback
         self.relay_status_label = QLabel("Rele-ohjaukset", self)
         self.relay_status_label.setFont(QFont("Arial", 14))
+        self.relay_status_label.setStyleSheet("color: white;")
         self.relay_status_label.setAlignment(Qt.AlignCenter)
         self.relay_status_label.setGeometry(0, 560, 1280, 30)
         

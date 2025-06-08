@@ -5,7 +5,8 @@ from PyQt5.QtGui import QFont
 class BaseScreen(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setStyleSheet("background-color: black;")
+        # Poistettu musta tausta täältä
+        # self.setStyleSheet("background-color: black;")
         
         # Set up common fonts
         self.title_font = QFont()

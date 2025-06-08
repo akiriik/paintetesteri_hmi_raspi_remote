@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QLabel, QPushButton, QFrame, QWidget, QMenu, QMessageBox, QScrollArea, QVBoxLayout, QHBoxLayout, QStyle
+from PyQt5.QtWidgets import QLabel, QPushButton, QFrame, QWidget, QMenu, QMessageBox, QScrollArea, QVBoxLayout, QHBoxLayout, QStyle, QDialog
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize
 from PyQt5.QtGui import QFont, QIcon
 
@@ -6,32 +6,96 @@ from ui.screens.base_screen import BaseScreen
 from ui.components.test_panel import TestPanel
 from ui.components.control_panel import ControlPanel
 
-class ShutdownDialog(QMessageBox):
+class ShutdownDialog(QDialog):
     """Sammutusvalikko"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Sammutusvalikko")
-        self.setText("Valitse toiminto:")
+        self.setModal(True)
+        self.setFixedSize(800, 400)
+        self.result_value = None
         
-        self.addButton("Sammuta Raspberry Pi", QMessageBox.AcceptRole)
-        self.addButton("Käynnistä ohjelma uudelleen", QMessageBox.ActionRole)
-        self.addButton("Sammuta ohjelma", QMessageBox.DestructiveRole)
-        self.addButton("Peruuta", QMessageBox.RejectRole)
-        
+        # Dialogin tyyli
         self.setStyleSheet("""
-            QMessageBox {
+            QDialog {
                 background-color: white;
-                font-size: 18px;
             }
-            QPushButton {
-                background-color: #f0f0f0;
-                border-radius: 5px;
-                padding: 10px;
-                min-width: 200px;
-                min-height: 40px;
-                font-size: 16px;
+            QLabel {
+                color: black;
+                background-color: white;
             }
         """)
+
+        # Keskitä dialogi
+        if parent:
+            self.move(
+                parent.width() // 2 - self.width() // 2,
+                parent.height() // 2 - self.height() // 2
+            )
+        
+        layout = QVBoxLayout(self)
+        layout.setSpacing(30)
+        layout.setContentsMargins(40, 40, 40, 40)
+        
+        # Otsikko
+        title = QLabel("Valitse toiminto:", self)
+        title.setAlignment(Qt.AlignCenter)
+        title.setFont(QFont("Arial", 20))
+        layout.addWidget(title)
+        
+        # Nappuloiden layout
+        buttons_layout = QVBoxLayout()
+        buttons_layout.setSpacing(15)
+        
+        # Luo napit
+        self.raspberry_btn = QPushButton("Sammuta Raspberry Pi")
+        self.restart_btn = QPushButton("Käynnistä ohjelma uudelleen")
+        self.close_btn = QPushButton("Sammuta ohjelma")
+        self.cancel_btn = QPushButton("Peruuta")
+        
+        buttons = [self.raspberry_btn, self.restart_btn, self.close_btn, self.cancel_btn]
+        
+        for btn in buttons:
+            btn.setFixedHeight(60)
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #f0f0f0;
+                    color: black;
+                    border-radius: 5px;
+                    padding: 10px;
+                    font-size: 18px;
+                    border: 1px solid #ccc;
+                }
+                QPushButton:hover {
+                    background-color: #e0e0e0;
+                }
+            """)
+            buttons_layout.addWidget(btn)
+        
+        layout.addLayout(buttons_layout)
+        
+        # Yhdistä signaalit
+        self.raspberry_btn.clicked.connect(lambda: self.set_result("raspberry"))
+        self.restart_btn.clicked.connect(lambda: self.set_result("restart"))
+        self.close_btn.clicked.connect(lambda: self.set_result("close"))
+        self.cancel_btn.clicked.connect(lambda: self.set_result("cancel"))
+        
+        # Dialogin tyyli
+        self.setStyleSheet("""
+            QDialog {
+                background-color: white;
+            }
+            QLabel {
+                color: black;
+            }
+        """)
+    
+    def set_result(self, value):
+        self.result_value = value
+        self.accept()
+    
+    def get_result(self):
+        return self.result_value
 
 class IconButton(QPushButton):
     """Kuvakepainike järjestelmäikoneilla"""
@@ -80,6 +144,9 @@ class TestingScreen(BaseScreen):
         self.init_ui()
 
     def init_ui(self):
+        # Aseta musta tausta testaussivulle
+        self.setStyleSheet("background-color: black;")
+
         # Ikonipainikkeet
         # Käsikäyttö-painike
         self.manual_button = IconButton(QStyle.SP_DialogResetButton, "Käsikäyttö", self)
@@ -99,6 +166,7 @@ class TestingScreen(BaseScreen):
             title.setFont(QFont("Arial", 20, QFont.Bold))
             title.setAlignment(Qt.AlignCenter)
             title.setGeometry(120 + (i-1)*400, 150, 150, 30)
+            title.setStyleSheet("color: white;")
             
             # Testipaneeli
             panel = TestPanel(i, self)
@@ -155,6 +223,16 @@ class TestingScreen(BaseScreen):
         layout.setSpacing(20)
         layout.setContentsMargins(40, 40, 40, 40)
         
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: white;
+            }
+            QLabel {
+                background-color: white;
+                color: black;
+            }
+        """)
+
         # Question text
         question_label = QLabel("Haluatko sammuttaa järjestelmän?")
         question_label.setAlignment(Qt.AlignCenter)
@@ -284,22 +362,21 @@ class TestingScreen(BaseScreen):
     def show_shutdown_dialog(self):
         """Näytä sammutusvalikko"""
         dialog = ShutdownDialog(self)
-        result = dialog.exec_()
+        dialog.exec_()
         
-        selected_button = dialog.clickedButton()
-        button_role = dialog.buttonRole(selected_button)
+        result = dialog.get_result()
         
-        if button_role == QMessageBox.AcceptRole:  # Sammuta Raspberry Pi
+        if result == "raspberry":
             self.update_status("Sammutetaan Raspberry Pi...", "INFO")
             import os
             os.system("sudo shutdown -h now")
-        elif button_role == QMessageBox.ActionRole:  # Käynnistä ohjelma uudelleen
+        elif result == "restart":
             self.update_status("Käynnistetään ohjelma uudelleen...", "INFO")
             self.window().close()
             import os
             import sys
             os.execv(sys.executable, ['python'] + sys.argv)
-        elif button_role == QMessageBox.DestructiveRole:  # Sammuta ohjelma
+        elif result == "close":
             self.update_status("Sammutetaan ohjelma...", "INFO")
             self.window().close()
 

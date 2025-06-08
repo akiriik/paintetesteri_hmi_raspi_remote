@@ -37,7 +37,7 @@ class TestPanel(QWidget):
             font-family: 'Digital-7', 'Consolas', monospace;
             font-size: 40px;
             font-weight: bold;
-            border: 2px solid #444444;
+            border: 2px solid #ffffff;
             border-radius: 10px;
         """)
 
