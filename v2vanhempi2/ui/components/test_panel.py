@@ -15,7 +15,7 @@ class TestPanel(QWidget):
         self.is_active = False
         self.modbus_register = 17000 + self.test_number
 
-        self.setFixedSize(400, 650)
+        self.setFixedSize(400, 590)
         self.setStyleSheet("""
             QWidget {
                 background-color: #f5f5f5;
@@ -43,13 +43,13 @@ class TestPanel(QWidget):
 
         # Ohjelmatiedot
         self.program_label = QLabel("Ohjelma: --", self)
-        self.program_label.setGeometry(0, 410, 380, 60)
+        self.program_label.setGeometry(0, 420, 380, 60)
         self.program_label.setAlignment(Qt.AlignCenter)
-        self.program_label.setFont(QFont("Arial", 14, QFont.Bold))
+        self.program_label.setFont(QFont("Arial", 18, QFont.Bold))
 
         # Valitse ohjelma -nappi
         self.select_program_btn = QPushButton("VALITSE OHJELMA", self)
-        self.select_program_btn.setGeometry(65, 500, 250, 70)
+        self.select_program_btn.setGeometry(65, 510, 250, 70)
         self.select_program_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
