@@ -1,77 +1,76 @@
 # ui/components/environment_status_bar.py
-from PyQt5.QtWidgets import QWidget, QLabel, QHBoxLayout
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import QLabel, QWidget, QHBoxLayout
+from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QFont
 
 
 class EnvironmentStatusBar(QWidget):
-    """Ympäristötilojen statusrivi (lämpötila, kosteus ja paine)"""
+    """Ympäristötilojen statusrivit"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(40)
-
-        # Musta tausta ja rajaus kuten log_panelissa
-        self.setStyleSheet("""
+        
+        # Layout
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Säiliö-label
+        self.container_label = QLabel("SÄILIÖ: --.-°C / --.- % / -.-- BAR", self)
+        self.container_label.setFont(QFont("Consolas", 14))
+        self.container_label.setStyleSheet("""
+            color: #33FF33;
             background-color: black;
-            border-top: 1px solid #333333;
             border-radius: 5px;
+            border: 1px solid #333333;
+            padding: 5px 10px;
         """)
-
-        self.init_ui()
-
+        
+        # Tila-label
+        self.status_label = QLabel("TILA: 99.0°C / 99.0 %", self)
+        self.status_label.setFont(QFont("Consolas", 14))
+        self.status_label.setStyleSheet("""
+            color: #33FF33;
+            background-color: black;
+            border-radius: 5px;
+            border: 1px solid #333333;
+            padding: 5px 10px;
+        """)
+        
+        layout.addWidget(self.container_label)
+        layout.addStretch()
+        layout.addWidget(self.status_label)
+        
+        
+        # Tallennetut arvot
+        self.temperature = None
+        self.humidity = None
+        self.pressure = None
+        
         # Tietojen päivitysajastin
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self.request_sensor_update)
         self.update_timer.start(500)
 
-    def init_ui(self):
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)  # Pieni marginaali
-        layout.setSpacing(5)  # Ei väliä elementtien väliin
-
-        label_font = QFont("Consolas", 18)
-
-        # Lämpötila
-        self.temp_label = QLabel("Lämpötila: --.-°C", self)
-        self.temp_label.setFont(label_font)
-        self.temp_label.setStyleSheet("color: #33FF33; background-color: black;")
-        layout.addWidget(self.temp_label)
-
-        # Kosteus
-        self.humidity_label = QLabel("Kosteus: --.- %", self)
-        self.humidity_label.setFont(label_font)
-        self.humidity_label.setStyleSheet("color: #33FF33; background-color: black;")
-        layout.addWidget(self.humidity_label)
-
-        # Paine
-        self.pressure_label = QLabel("Paine: ---- BAR", self)
-        self.pressure_label.setFont(label_font)
-        self.pressure_label.setStyleSheet("color: #33FF33; background-color: black;")
-        layout.addWidget(self.pressure_label)
-
-        layout.addStretch()
-
     def update_sensor_data(self, data):
-        temperature = data.get('temperature')
-        humidity = data.get('humidity')
-
-        if temperature is not None:
-            self.temp_label.setText(f"Lämpötila: {temperature:.1f}°C")
-        else:
-            self.temp_label.setText("Lämpötila: ERR")
-
-        if humidity is not None:
-            self.humidity_label.setText(f"Kosteus: {humidity:.1f} %")
-        else:
-            self.humidity_label.setText("Kosteus: ERR")
+        self.temperature = data.get('temperature')
+        self.humidity = data.get('humidity')
+        self.update_display()
 
     def update_pressure_data(self, pressure_value):
         if pressure_value is not None:
-            pressure_bar = self.convert_adc_to_bar(pressure_value)
-            self.pressure_label.setText(f"Paine: {pressure_bar:.2f} BAR")
+            self.pressure = self.convert_adc_to_bar(pressure_value)
         else:
-            self.pressure_label.setText("Paine: ERR")
+            self.pressure = None
+        self.update_display()
+
+    def update_display(self):
+        """Päivitä säiliön näyttöteksti"""
+        temp_str = f"{self.temperature:.1f}°C" if self.temperature is not None else "--.-°C"
+        humidity_str = f"{self.humidity:.1f} %" if self.humidity is not None else "--.- %"
+        pressure_str = f"{self.pressure:.2f} BAR" if self.pressure is not None else "-.-- BAR"
+        
+        self.container_label.setText(f"SÄILIÖ: {temp_str} / {humidity_str} / {pressure_str}")
 
     def convert_adc_to_bar(self, adc_value):
         calibration_table = [
@@ -96,11 +95,13 @@ class EnvironmentStatusBar(QWidget):
         return 0.0
 
     def show_sensor_error(self, error_message):
-        self.temp_label.setText("Lämpötila: ERR")
-        self.humidity_label.setText("Kosteus: ERR")
+        self.temperature = None
+        self.humidity = None
+        self.update_display()
 
     def show_pressure_error(self):
-        self.pressure_label.setText("Paine: ERR")
+        self.pressure = None
+        self.update_display()
 
     def request_sensor_update(self):
         if hasattr(self.parent(), 'update_environment_sensors'):
