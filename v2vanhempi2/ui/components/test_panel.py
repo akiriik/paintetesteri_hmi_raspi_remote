@@ -29,7 +29,7 @@ class TestPanel(QWidget):
 
         # Tulosnäyttö
         self.pressure_result = QLabel("", self)
-        self.pressure_result.setGeometry(0, 65, 380, 350)
+        self.pressure_result.setGeometry(0, 50, 380, 350)
         self.pressure_result.setAlignment(Qt.AlignCenter)
         self.pressure_result.setStyleSheet("""
             background-color: black;
@@ -43,13 +43,13 @@ class TestPanel(QWidget):
 
         # Ohjelmatiedot
         self.program_label = QLabel("Ohjelma: --", self)
-        self.program_label.setGeometry(0, 370, 380, 60)
+        self.program_label.setGeometry(0, 410, 380, 60)
         self.program_label.setAlignment(Qt.AlignCenter)
         self.program_label.setFont(QFont("Arial", 14, QFont.Bold))
 
         # Valitse ohjelma -nappi
-        self.select_program_btn = QPushButton("VALITSE", self)
-        self.select_program_btn.setGeometry(65, 500, 250, 80)
+        self.select_program_btn = QPushButton("VALITSE OHJELMA", self)
+        self.select_program_btn.setGeometry(65, 500, 250, 70)
         self.select_program_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
@@ -63,18 +63,17 @@ class TestPanel(QWidget):
         """)
         self.select_program_btn.clicked.connect(self.request_program_selection)
 
-        # Aktiivinen-nappi
-        self.active_btn = QPushButton("AKTIIVINEN", self)
-        self.active_btn.setGeometry(20, 0, 340, 50)
+        # Aktiivinen-nappi - MUUTETTU NIMI
+        self.active_btn = QPushButton(f"TESTI {test_number}", self)
+        self.active_btn.setGeometry(90, 0, 200, 40)
         self.active_btn.setStyleSheet("""
             QPushButton {
-                background-color: #888888;
+                background-color: #5e5e5e;
                 color: white;
                 border-radius: 5px;
                 border: none;
-                font-weight: bold;
-                font-size: 20px;
-                padding: 8px;
+                font-size: 30px;
+                padding: 2px;
             }
         """)
         self.active_btn.clicked.connect(self.toggle_active)
@@ -139,21 +138,19 @@ class TestPanel(QWidget):
                     color: white;
                     border-radius: 5px;
                     border: none;
-                    font-weight: bold;
-                    font-size: 20px;
-                    padding: 8px;
+                    font-size: 34px;
+                    padding: 2px;
                 }
             """)
         else:
             self.active_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #888888;
+                    background-color: #5e5e5e;
                     color: white;
                     border-radius: 5px;
                     border: none;
-                    font-weight: bold;
-                    font-size: 20px;
-                    padding: 8px;
+                    font-size: 34px;
+                    padding: 2px;
                 }
             """)
 
