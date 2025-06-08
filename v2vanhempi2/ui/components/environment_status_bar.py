@@ -9,12 +9,13 @@ class EnvironmentStatusBar(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(45)
+        self.setFixedHeight(40)
 
         # Musta tausta ja rajaus kuten log_panelissa
         self.setStyleSheet("""
             background-color: black;
             border-top: 1px solid #333333;
+            border-radius: 5px;
         """)
 
         self.init_ui()
@@ -26,10 +27,10 @@ class EnvironmentStatusBar(QWidget):
 
     def init_ui(self):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(250, 0, 10, 0)  # Pieni marginaali
-        layout.setSpacing(0)  # Ei väliä elementtien väliin
+        layout.setContentsMargins(0, 0, 0, 0)  # Pieni marginaali
+        layout.setSpacing(5)  # Ei väliä elementtien väliin
 
-        label_font = QFont("Consolas", 18, QFont.Bold)
+        label_font = QFont("Consolas", 18)
 
         # Lämpötila
         self.temp_label = QLabel("Lämpötila: --.-°C", self)

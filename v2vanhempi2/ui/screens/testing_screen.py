@@ -103,11 +103,11 @@ class TestingScreen(BaseScreen):
             title = QLabel(f"TESTI {i}", self)
             title.setFont(QFont("Arial", 20, QFont.Bold))
             title.setAlignment(Qt.AlignCenter)
-            title.setGeometry(120 + (i-1)*400, 80, 150, 30)
+            title.setGeometry(120 + (i-1)*400, 150, 150, 30)
             
             # Testipaneeli
             panel = TestPanel(i, self)
-            panel.move(30 + (i-1)*420, 120)
+            panel.move(30 + (i-1)*420, 180)
             panel.program_selection_requested.connect(self.start_program_selection)
             panel.status_message.connect(self.handle_status_message)
             self.test_panels.append(panel)
@@ -419,11 +419,11 @@ class TestingScreen(BaseScreen):
         style = "color: #33FF33;"  # Normaali viesti (vihreä)
         
         if message_type == "ERROR":
-            style = "color: red; font-weight: bold;"
+            style = "color: red; font-weight: normal;"
         elif message_type == "WARNING":
-            style = "color: orange; font-weight: bold;"
+            style = "color: orange; font-weight: normal;"
         elif message_type == "SUCCESS":
-            style = "color: #00FF00; font-weight: bold;"
+            style = "color: #00FF00; font-weight: normal;"
                 
         self.status_label.setStyleSheet(style + " background-color: transparent;")
         self.status_label.setText(message)

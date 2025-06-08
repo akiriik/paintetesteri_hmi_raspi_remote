@@ -52,7 +52,7 @@ class MainWindow(QWidget):
 
         # Ympäristötietojen statusrivi alareunaan kiinteillä koordinaateilla
         self.environment_status_bar = EnvironmentStatusBar(self)
-        self.environment_status_bar.setGeometry(0, 660, 1280, 40)
+        self.environment_status_bar.setGeometry(250, 50, 1280, 40)
 
         # Alusta modbus-hallinta
         self.modbus_manager = ModbusManager(port='/dev/ttyUSB0', baudrate=19200)
