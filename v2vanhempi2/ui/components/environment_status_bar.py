@@ -39,13 +39,13 @@ class EnvironmentStatusBar(QWidget):
         layout.addWidget(self.temp_label)
 
         # Kosteus
-        self.humidity_label = QLabel("  Kosteus: --.-%", self)
+        self.humidity_label = QLabel("Kosteus: --.- %", self)
         self.humidity_label.setFont(label_font)
         self.humidity_label.setStyleSheet("color: #33FF33; background-color: black;")
         layout.addWidget(self.humidity_label)
 
         # Paine
-        self.pressure_label = QLabel("  Paine: ---- BAR", self)
+        self.pressure_label = QLabel("Paine: ---- BAR", self)
         self.pressure_label.setFont(label_font)
         self.pressure_label.setStyleSheet("color: #33FF33; background-color: black;")
         layout.addWidget(self.pressure_label)
@@ -62,16 +62,16 @@ class EnvironmentStatusBar(QWidget):
             self.temp_label.setText("Lämpötila: ERR")
 
         if humidity is not None:
-            self.humidity_label.setText(f"  Kosteus: {humidity:.1f}%")
+            self.humidity_label.setText(f"Kosteus: {humidity:.1f} %")
         else:
-            self.humidity_label.setText("  Kosteus: ERR")
+            self.humidity_label.setText("Kosteus: ERR")
 
     def update_pressure_data(self, pressure_value):
         if pressure_value is not None:
             pressure_bar = self.convert_adc_to_bar(pressure_value)
-            self.pressure_label.setText(f"  Paine: {pressure_bar:.2f} BAR")
+            self.pressure_label.setText(f"Paine: {pressure_bar:.2f} BAR")
         else:
-            self.pressure_label.setText("  Paine: ERR")
+            self.pressure_label.setText("Paine: ERR")
 
     def convert_adc_to_bar(self, adc_value):
         calibration_table = [
@@ -97,10 +97,10 @@ class EnvironmentStatusBar(QWidget):
 
     def show_sensor_error(self, error_message):
         self.temp_label.setText("Lämpötila: ERR")
-        self.humidity_label.setText("  Kosteus: ERR")
+        self.humidity_label.setText("Kosteus: ERR")
 
     def show_pressure_error(self):
-        self.pressure_label.setText("  Paine: ERR")
+        self.pressure_label.setText("Paine: ERR")
 
     def request_sensor_update(self):
         if hasattr(self.parent(), 'update_environment_sensors'):
