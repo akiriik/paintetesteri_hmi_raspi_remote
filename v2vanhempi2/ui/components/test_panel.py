@@ -15,7 +15,7 @@ class TestPanel(QWidget):
         self.is_active = False
         self.modbus_register = 17000 + self.test_number
 
-        self.setFixedSize(400, 600)
+        self.setFixedSize(400, 650)
         self.setStyleSheet("""
             QWidget {
                 background-color: #f5f5f5;
@@ -29,7 +29,7 @@ class TestPanel(QWidget):
 
         # Tulosnäyttö
         self.pressure_result = QLabel("", self)
-        self.pressure_result.setGeometry(0, 0, 380, 350)
+        self.pressure_result.setGeometry(0, 65, 380, 350)
         self.pressure_result.setAlignment(Qt.AlignCenter)
         self.pressure_result.setStyleSheet("""
             background-color: black;
@@ -49,12 +49,13 @@ class TestPanel(QWidget):
 
         # Valitse ohjelma -nappi
         self.select_program_btn = QPushButton("VALITSE", self)
-        self.select_program_btn.setGeometry(0, 450, 180, 80)
+        self.select_program_btn.setGeometry(65, 500, 250, 80)
         self.select_program_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
                 color: white;
                 border-radius: 5px;
+                border: none;
                 font-size: 20px;
                 font-weight: bold;
                 padding: 8px;
@@ -64,12 +65,13 @@ class TestPanel(QWidget):
 
         # Aktiivinen-nappi
         self.active_btn = QPushButton("AKTIIVINEN", self)
-        self.active_btn.setGeometry(210, 450, 160, 60)
+        self.active_btn.setGeometry(20, 0, 340, 50)
         self.active_btn.setStyleSheet("""
             QPushButton {
                 background-color: #888888;
                 color: white;
                 border-radius: 5px;
+                border: none;
                 font-weight: bold;
                 font-size: 20px;
                 padding: 8px;
@@ -136,6 +138,7 @@ class TestPanel(QWidget):
                     background-color: #4CAF50;
                     color: white;
                     border-radius: 5px;
+                    border: none;
                     font-weight: bold;
                     font-size: 20px;
                     padding: 8px;
@@ -147,6 +150,7 @@ class TestPanel(QWidget):
                     background-color: #888888;
                     color: white;
                     border-radius: 5px;
+                    border: none;
                     font-weight: bold;
                     font-size: 20px;
                     padding: 8px;

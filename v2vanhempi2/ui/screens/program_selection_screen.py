@@ -15,6 +15,9 @@ class ProgramSelectionScreen(BaseScreen):
         super().__init__(parent)
         
     def init_ui(self):
+        # Aseta musta tausta 
+        self.setStyleSheet("background-color: black;")
+
         # Päälayout
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(20, 20, 20, 20)
@@ -25,7 +28,7 @@ class ProgramSelectionScreen(BaseScreen):
         
         # Takaisin-nappi
         self.back_button = QPushButton("← TAKAISIN", self)
-        self.back_button.setFixedSize(150, 60)
+        self.back_button.setFixedSize(150, 80)
         self.back_button.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
@@ -44,6 +47,7 @@ class ProgramSelectionScreen(BaseScreen):
         # Otsikko
         title = QLabel("VALITSE OHJELMA", self)
         title.setFont(QFont("Arial", 30, QFont.Bold))
+        title.setStyleSheet("color: white;")
         title.setAlignment(Qt.AlignCenter)
         top_bar.addWidget(title, 1)  # Lisää stretch factor jotta otsikko keskittyy
         
@@ -68,7 +72,7 @@ class ProgramSelectionScreen(BaseScreen):
         
         # Edellinen sivu -nappi
         self.prev_button = QPushButton("◄ EDELLINEN", self)
-        self.prev_button.setFixedSize(180, 60)
+        self.prev_button.setFixedSize(180, 80)
         self.prev_button.setStyleSheet("""
             QPushButton {
                 background-color: #f0f0f0;
@@ -93,12 +97,13 @@ class ProgramSelectionScreen(BaseScreen):
         self.page_label = QLabel("Sivu 1/1", self)
         self.page_label.setFixedSize(100, 60)
         self.page_label.setAlignment(Qt.AlignCenter)
-        self.page_label.setFont(QFont("Arial", 16))
+        self.page_label.setFont(QFont("Arial", 18))
+        self.page_label.setStyleSheet("color: white;")
         nav_bar.addWidget(self.page_label)
         
         # Seuraava sivu -nappi
         self.next_button = QPushButton("SEURAAVA ►", self)
-        self.next_button.setFixedSize(180, 60)
+        self.next_button.setFixedSize(180, 80)
         self.next_button.setStyleSheet("""
             QPushButton {
                 background-color: #f0f0f0;
@@ -165,27 +170,27 @@ class ProgramSelectionScreen(BaseScreen):
             # ID-label (ylärivinä)
             id_label = QLabel(f"{program_id}", button)
             id_label.setAlignment(Qt.AlignCenter)
-            id_label.setStyleSheet("color: #1976D2; font-size: 22px; font-weight: bold;")
+            id_label.setStyleSheet("color: #1976D2; font-size: 26px; font-weight: bold; background-color: transparent;")
             button_layout.addWidget(id_label)
             
             # Nimi-label (alarivinä)
             name_label = QLabel(program_name, button)
             name_label.setAlignment(Qt.AlignCenter)
-            name_label.setStyleSheet("color: #333333; font-size: 16px;")
+            name_label.setStyleSheet("color: #333333; font-size: 22px; font-weight: bold; background-color: transparent;")
             name_label.setWordWrap(True)
             button_layout.addWidget(name_label)
             
             # Tyylittele painike
             button.setStyleSheet("""
                 QPushButton {
-                    background-color: #f0f0f0;
+                    background-color: white;
                     border-radius: 10px;
                     border: 1px solid #dddddd;
                     text-align: center;
                     padding: 5px;
                 }
                 QPushButton:hover {
-                    background-color: #e0e0e0;
+                    background-color: #f0f0f0;
                     border: 1px solid #bbbbbb;
                 }
                 QPushButton:pressed {
@@ -194,7 +199,7 @@ class ProgramSelectionScreen(BaseScreen):
                     border: 1px solid #1976D2;
                 }
             """)
-            
+                        
             # Paikkaindeksi: 3 riviä, 4 nappia per rivi
             row = i // 4
             col = i % 4

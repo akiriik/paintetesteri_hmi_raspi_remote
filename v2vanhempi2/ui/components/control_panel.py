@@ -11,14 +11,9 @@ class ControlPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         
-        # Layout
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignCenter)
-        layout.setSpacing(20)
-
-        # Käynnistä nappi
+        # Käynnistä nappi - aseta suoraan koordinaateilla
         self.start_button = QPushButton("I", self)
-        self.start_button.setFixedSize(80, 80)
+        self.start_button.setGeometry(0, 0, 80, 80)  # x, y, leveys, korkeus
         self.start_button.setStyleSheet("""
             QPushButton {
                 background-color: #888888;
@@ -32,7 +27,7 @@ class ControlPanel(QWidget):
         
         # Pysäytä nappi
         self.stop_button = QPushButton("O", self)
-        self.stop_button.setFixedSize(80, 80)
+        self.stop_button.setGeometry(100, 0, 80, 80)  # x, y, leveys, korkeus
         self.stop_button.setStyleSheet("""
             QPushButton {
                 background-color: #888888;
@@ -43,9 +38,6 @@ class ControlPanel(QWidget):
             }
         """)
         self.stop_button.clicked.connect(self.stop_clicked.emit)
-        
-        layout.addWidget(self.start_button)
-        layout.addWidget(self.stop_button)
     
     def update_button_states(self, running=False, ready_to_start=False):
         """Päivitä nappien tyylit tilan mukaan"""
