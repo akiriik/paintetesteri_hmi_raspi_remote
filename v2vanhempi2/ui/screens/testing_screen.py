@@ -154,9 +154,9 @@ class TestingScreen(BaseScreen):
         self.manual_button.clicked.connect(self.show_manual)
 
         # New confirmation shutdown button
-        self.confirm_shutdown_button = IconButton(QStyle.SP_DialogCancelButton, "Sammuta järjestelmä", self)
-        self.confirm_shutdown_button.move(5, 5)
-        self.confirm_shutdown_button.clicked.connect(self.show_confirm_shutdown_dialog)        
+        self.system_status_button = IconButton(QStyle.SP_DialogCancelButton, "Järjestelmän tila", self)
+        self.system_status_button.move(5, 5)
+        self.system_status_button.clicked.connect(self.show_system_status)    
         
         # Testipaneelit
         self.test_panels = []
@@ -197,6 +197,12 @@ class TestingScreen(BaseScreen):
         self.fortest_timer = QTimer(self)
         self.fortest_timer.timeout.connect(self.update_fortest_data)
         self.fortest_timer.start(1000)  # Päivitys sekunnin välein
+
+    def show_system_status(self):
+        """Näytä system status -dialogi"""
+        from ui.components.system_status_dialog import SystemStatusDialog
+        dialog = SystemStatusDialog(self, self.parent().modbus_manager)
+        dialog.exec_()
 
     def show_confirm_shutdown_dialog(self):
         """Show system shutdown confirmation dialog with custom layout"""
