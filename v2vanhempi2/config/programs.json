@@ -249,6 +249,56 @@
             "id": 50,
             "name": "Erikoisnopea",
             "description": "Erikoisnopea tarkastustesti"
+        },
+        {
+            "id": 51,
+            "name": "Automaattisykli A",
+            "description": "Automaattinen testisykli A-sarja"
+        },
+        {
+            "id": 52,
+            "name": "Automaattisykli B",
+            "description": "Automaattinen testisykli B-sarja"
+        },
+        {
+            "id": 53,
+            "name": "Lämpötilakompensaatio",
+            "description": "Lämpötilakompensoidut mittaukset"
+        },
+        {
+            "id": 54,
+            "name": "Pitkäaikaisvuoto",
+            "description": "Pitkäaikainen vuototesti 60min"
+        },
+        {
+            "id": 55,
+            "name": "Erikoisventtiili Pro",
+            "description": "Erikoisventtiilien Pro-testaus"
+        },
+        {
+            "id": 56,
+            "name": "Sarjatuotantotesti",
+            "description": "Sarjatuotannon laatutesti"
+        },
+        {
+            "id": 57,
+            "name": "Prototyyppi",
+            "description": "Prototyyppien kehitystesti"
+        },
+        {
+            "id": 58,
+            "name": "Vientilaatu",
+            "description": "Vientilaadun varmistustesti"
+        },
+        {
+            "id": 59,
+            "name": "Asiakastesti Custom",
+            "description": "Asiakaskohtainen erikoistesti"
+        },
+        {
+            "id": 60,
+            "name": "Lopputarkastus",
+            "description": "Lopullinen laatutarkastus"
         }
     ],
     "last_updated": "2025-05-13",
