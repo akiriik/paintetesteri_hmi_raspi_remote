@@ -18,6 +18,7 @@ from utils.gpio_handler import GPIOHandler
 from utils.gpio_input_handler import GPIOInputHandler
 from utils.program_manager import ProgramManager
 from utils.sht20_handler import SHT20Manager
+from ui.components.system_status_dialog import SystemStatusDialog
 
 class MainWindow(QWidget):
     def __init__(self, parent=None):
@@ -94,6 +95,14 @@ class MainWindow(QWidget):
         self.emergency_stop_timer = QTimer(self)
         self.emergency_stop_timer.timeout.connect(self.check_emergency_stop)
         self.emergency_stop_timer.start(1000)  # Tarkista hätäseis kerran sekunnissa
+
+        # Järjestelmätilan tarkistuksen ajastin
+        self.system_status_timer = QTimer(self)
+        self.system_status_timer.timeout.connect(self.check_system_status)
+        self.system_status_timer.start(2000)  # Tarkista järjestelmätila 2 sekunnin välein
+
+        self.system_dialog_open = False
+        self.system_dialog = None
 
         # Paineen lukemisen ajastin
         self.pressure_timer = QTimer(self)
@@ -179,6 +188,8 @@ class MainWindow(QWidget):
         if result == 1:  # QDialog.Accepted
             self.testing_screen.update_status("Hätäseis kuitattu", "INFO")
         self._emergency_dialog = None
+        # Tarkista järjestelmätila hätäseis-kuittauksen jälkeen
+        QTimer.singleShot(1000, self.check_system_status)
 
     def handle_modbus_result(self, result, op_code, error_msg):
         """Käsittelee modbus-kyselyn tuloksen"""
@@ -191,11 +202,23 @@ class MainWindow(QWidget):
             if op_code == 2:  # Rekisterin kirjoitus
                 return
         
+        # Käsittele tulopaineen tila (rekisteri 18101)
+        if op_code == 1 and hasattr(result, 'address') and result.address == 18101:
+            if result and hasattr(result, 'registers') and len(result.registers) > 0:
+                input_pressure_status = result.registers[0]
+                if hasattr(self, 'system_dialog') and self.system_dialog:
+                    self.system_dialog.update_input_pressure_status(input_pressure_status)
+            return        
+
         # Käsittele paineen lukutulos
         if op_code == 1 and hasattr(result, 'address') and result.address == 19500:
             if result and hasattr(result, 'registers') and len(result.registers) > 0:
                 pressure_value = result.registers[0]  # UINT arvo
                 self.environment_status_bar.update_pressure_data(pressure_value)
+                # Päivitä myös system_dialog jos auki
+                if hasattr(self, 'system_dialog') and self.system_dialog:
+                    pressure_bar = self.environment_status_bar.pressure or 0.0
+                    self.system_dialog.update_pressure(pressure_bar)
             else:
                 self.environment_status_bar.show_pressure_error()
             return
@@ -316,9 +339,54 @@ class MainWindow(QWidget):
         """Näyttää ikkunan koko ruudussa"""
         self.showFullScreen()
 
+    def check_system_status(self):
+        """Tarkista järjestelmän tila ja näytä dialogi tarvittaessa"""
+        if self.emergency_dialog_open:
+            return  # Hätäseis on prioriteetti
+        
+        if not hasattr(self, 'modbus_manager') or not self.modbus_manager or not self.modbus_manager.is_connected():
+            return
+        
+        # Hae painearvo environment_status_bar:ilta
+        current_pressure = 0.0
+        if hasattr(self, 'environment_status_bar') and self.environment_status_bar.pressure is not None:
+            current_pressure = self.environment_status_bar.pressure
+        
+        # Tarkista pitääkö dialogi avata
+        should_show_dialog = current_pressure < 6.0
+        
+        if should_show_dialog and not self.system_dialog_open:
+            self.system_dialog_open = True
+            self.system_dialog = SystemStatusDialog(self, self.modbus_manager)
+            
+            # Päivitä alkutiedot
+            self.system_dialog.update_pressure(current_pressure)
+            if hasattr(self, 'environment_status_bar'):
+                temperature = self.environment_status_bar.temperature
+                self.system_dialog.update_temperature(temperature)
+            
+            # Lue tulopaineen tila
+            self.modbus_manager.read_register(18101, 1)
+            
+            self.system_dialog.finished.connect(self.on_system_dialog_closed)
+            self.system_dialog.exec_()
+        elif not should_show_dialog and self.system_dialog_open and self.system_dialog:
+            # Tarkista voiko dialogi sulkeutua automaattisesti
+            if self.system_dialog.check_auto_close_conditions():
+                self.system_dialog.accept()
+
+    def on_system_dialog_closed(self, result):
+        """Järjestelmädialogin sulkemisen käsittely"""
+        self.system_dialog_open = False
+        self.system_dialog = None
+
     def closeEvent(self, event):
         """Käsittelee sovelluksen sulkemisen"""
         try:
+            # Sulje järjestelmädialogi
+            if hasattr(self, 'system_dialog') and self.system_dialog:
+                self.system_dialog.close()
+
             # Siivoa SHT20-anturi
             if hasattr(self, 'sht20_manager') and self.sht20_manager:
                 self.sht20_manager.cleanup()
