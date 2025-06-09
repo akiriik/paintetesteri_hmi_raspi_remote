@@ -119,6 +119,7 @@ class SystemStatusDialog(QDialog):
             }
         """)
         self.start_system_btn.clicked.connect(self.start_system)
+        self.start_system_btn.setEnabled(False)  # Aluksi pois käytöstä
         buttons_layout.addWidget(self.start_system_btn)
 
         self.stop_system_btn = QPushButton("PYSÄYTÄ JÄRJESTELMÄ", self.main_frame)
@@ -200,7 +201,9 @@ class SystemStatusDialog(QDialog):
     def update_pressure(self, pressure_bar):
         self.current_pressure = pressure_bar
         self.pressure_label.setText(f"Järjestelmän paine: {pressure_bar:.2f} BAR")
-        if pressure_bar >= 6.0 and self.pressure_raising:
+        
+        # Päivitä tilaviesti paineen mukaan
+        if pressure_bar >= 6.0:
             self.status_message.setText("Paine riittävä!")
             self.status_message.setStyleSheet("""
                 color: #4CAF50;
@@ -208,7 +211,14 @@ class SystemStatusDialog(QDialog):
                 border: none;
                 font-weight: bold;
             """)
-            QTimer.singleShot(2000, self.accept)
+        else:
+            self.status_message.setText("Järjestelmän paine liian matala")
+            self.status_message.setStyleSheet("""
+                color: #F44336;
+                background-color: transparent;
+                border: none;
+                font-weight: bold;
+            """)
 
     def update_temperature(self, temperature):
         self.current_temperature = temperature
@@ -227,6 +237,8 @@ class SystemStatusDialog(QDialog):
                 border: none;
             """)
             self.stop_system_btn.setEnabled(True)
+            # Käynnistysnappi pysyy pois käytöstä kun tulopaine on päällä ja paine alle 6 BAR
+            self.start_system_btn.setEnabled(False)
         else:
             self.input_pressure_label.setText("Tulopaine: POIS")
             self.input_pressure_label.setStyleSheet("""
@@ -235,6 +247,7 @@ class SystemStatusDialog(QDialog):
                 border: none;
             """)
             self.stop_system_btn.setEnabled(False)
+            # Vain kun tulopaine on pois, voidaan käynnistää
             self.start_system_btn.setEnabled(True)
             self.pressure_raising = False
 
