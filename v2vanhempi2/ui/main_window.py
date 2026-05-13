@@ -20,6 +20,8 @@ from utils.program_manager import ProgramManager
 from utils.sht20_handler import SHT20Manager
 from ui.components.system_status_dialog import SystemStatusDialog
 
+DEV_MODE = True
+
 class MainWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -56,30 +58,40 @@ class MainWindow(QWidget):
         self.environment_status_bar.setGeometry(265, 50, 750, 40)
 
         # Alusta modbus-hallinta
-        self.modbus_manager = ModbusManager(port='/dev/ttyUSB0', baudrate=19200)
-        self.fortest_manager = ForTestManager(port='/dev/ttyUSB1', baudrate=19200)
+        if not DEV_MODE:
+            self.modbus_manager = ModbusManager(port='/dev/ttyUSB0', baudrate=19200)
+            self.fortest_manager = ForTestManager(port='/dev/ttyUSB1', baudrate=19200)
 
-        # Yhdistä signaalit
-        self.modbus_manager.resultReady.connect(self.handle_modbus_result)
-        self.fortest_manager.resultReady.connect(self.handle_fortest_result)
+            self.modbus_manager.resultReady.connect(self.handle_modbus_result)
+            self.fortest_manager.resultReady.connect(self.handle_fortest_result)
         
         # Yhdistä ohjelmamanagerin signaali ohjelmiston päivitykseen
         self.program_manager.program_list_updated.connect(self.program_selection_screen.update_program_list)
 
         # Alusta SHT20-anturi
-        try:
-            self.sht20_manager = SHT20Manager()
-            self.sht20_manager.data_updated.connect(self.environment_status_bar.update_sensor_data)
-            self.sht20_manager.error_occurred.connect(self.environment_status_bar.show_sensor_error)
-        except Exception as e:
-            print(f"Varoitus: SHT20-anturin alustus epäonnistui: {e}")
+        if not DEV_MODE:
+            try:
+                self.sht20_manager = SHT20Manager()
+                self.sht20_manager.data_updated.connect(
+                    self.environment_status_bar.update_sensor_data
+                )
+                self.sht20_manager.error_occurred.connect(
+                    self.environment_status_bar.show_sensor_error
+                )
+            except Exception as e:
+                print(f"Varoitus: SHT20-anturin alustus epäonnistui: {e}")
+                self.sht20_manager = None
+        else:
             self.sht20_manager = None
 
         # Alusta GPIO jos mahdollista
-        try:
-            self.gpio_handler = GPIOHandler()
-        except Exception as e:
-            print(f"Varoitus: GPIO-alustus epäonnistui: {e}")
+        if not DEV_MODE:
+            try:
+                self.gpio_handler = GPIOHandler()
+            except Exception as e:
+                print(f"Varoitus: GPIO-alustus epäonnistui: {e}")
+                self.gpio_handler = None
+        else:
             self.gpio_handler = None
             
         # Alusta GPIO-nappulat
