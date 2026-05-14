@@ -162,16 +162,61 @@ class TestingScreen(BaseScreen):
         self.test_panels = []
         for i in range(1, 2):
 
-            # Testipaneeli
+            # Testipaneeli / tulosruutu
             panel = TestPanel(i, self)
-            panel.move(5 + (i-1)*445, 130)
+            panel.move(20, 140)
             panel.program_selection_requested.connect(self.start_program_selection)
             panel.status_message.connect(self.handle_status_message)
             self.test_panels.append(panel)
         
+        # Infolaatikko: ohjelma, ympäristötiedot ja nykyinen tila
+        self.info_box = QFrame(self)
+        self.info_box.setGeometry(820, 140, 420, 170)
+        self.info_box.setStyleSheet("""
+            QFrame {
+                background-color: black;
+                border: 2px solid #333333;
+                border-radius: 10px;
+            }
+        """)
+
+        self.info_program_label = QLabel("OHJELMA: --", self.info_box)
+        self.info_program_label.setGeometry(15, 15, 390, 35)
+        self.info_program_label.setFont(QFont("Consolas", 16, QFont.Bold))
+        self.info_program_label.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
+
+        self.info_environment_label = QLabel("SÄILIÖ: --.-°C / --.- % / -.-- BAR", self.info_box)
+        self.info_environment_label.setGeometry(15, 65, 390, 35)
+        self.info_environment_label.setFont(QFont("Consolas", 14))
+        self.info_environment_label.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
+
+        self.info_state_label = QLabel("TILA: EI OHJELMAA VALITTU", self.info_box)
+        self.info_state_label.setGeometry(15, 115, 390, 35)
+        self.info_state_label.setFont(QFont("Consolas", 14))
+        self.info_state_label.setStyleSheet("color: orange; background-color: transparent; border: none;")
+
+        # Ohjelman valinta oikeaan reunaan
+        self.select_program_btn = QPushButton("VALITSE OHJELMA", self)
+        self.select_program_btn.setGeometry(820, 335, 420, 90)
+        self.select_program_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border-radius: 10px;
+                border: none;
+                font-size: 24px;
+                font-weight: bold;
+                padding: 8px;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+        """)
+        self.select_program_btn.clicked.connect(lambda: self.start_program_selection(1))
+
         # Ohjauskomponentti
         self.control_panel = ControlPanel(self)
-        self.control_panel.move(1095, 5)
+        self.control_panel.move(820, 455)
         self.control_panel.start_clicked.connect(self.start_test)
         self.control_panel.stop_clicked.connect(self.stop_test)
         
@@ -412,8 +457,15 @@ class TestingScreen(BaseScreen):
             # Hae oikea paneeli ja aseta ohjelma
             panel = self.test_panels[self.current_test_panel - 1]
             panel.set_program(program_name)
+
+            if hasattr(self, "info_program_label"):
+                self.info_program_label.setText(f"OHJELMA: {program_name}")
+
+            if hasattr(self, "info_state_label"):
+                self.info_state_label.setText("TILA: VALMIS")
+                self.info_state_label.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
+
             self.current_test_panel = None
-            # Poistettu tarpeeton lokitus
     
     def start_test(self):
         """Käynnistä testi ForTestManager-luokan avulla, vaihda ensin ohjelmat"""
@@ -567,6 +619,10 @@ class TestingScreen(BaseScreen):
                 
         self.status_label.setStyleSheet(style + " background-color: transparent;")
         self.status_label.setText(message)
+
+        if hasattr(self, "info_state_label"):
+            self.info_state_label.setText(f"TILA: {message}")
+            self.info_state_label.setStyleSheet(style + " background-color: transparent; border: none;")        
     
     def handle_status_message(self, message, message_type):        
         # Päivitä tilaviesti myös näkymään

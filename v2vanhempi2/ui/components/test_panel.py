@@ -16,7 +16,7 @@ class TestPanel(QWidget):
         self.results_started = False
         self.modbus_register = 17000 + self.test_number
 
-        self.setFixedSize(400, 590)
+        self.setFixedSize(760, 360)
         self.setStyleSheet("""
             QWidget {
                 background-color: #f5f5f5;
@@ -30,7 +30,7 @@ class TestPanel(QWidget):
 
         # Tulosnäyttö
         self.pressure_result = QLabel("", self)
-        self.pressure_result.setGeometry(0, 50, 380, 350)
+        self.pressure_result.setGeometry(0, 0, 760, 360)
         self.pressure_result.setAlignment(Qt.AlignCenter)
         self.pressure_result.setStyleSheet("""
             background-color: black;
@@ -41,28 +41,6 @@ class TestPanel(QWidget):
             border: 2px solid #ffffff;
             border-radius: 10px;
         """)
-
-        # Ohjelmatiedot
-        self.program_label = QLabel("Ohjelma: --", self)
-        self.program_label.setGeometry(0, 420, 380, 60)
-        self.program_label.setAlignment(Qt.AlignCenter)
-        self.program_label.setFont(QFont("Arial", 18, QFont.Bold))
-
-        # Valitse ohjelma -nappi
-        self.select_program_btn = QPushButton("VALITSE OHJELMA", self)
-        self.select_program_btn.setGeometry(65, 510, 250, 70)
-        self.select_program_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
-                border-radius: 5px;
-                border: none;
-                font-size: 20px;
-                font-weight: bold;
-                padding: 8px;
-            }
-        """)
-        self.select_program_btn.clicked.connect(self.request_program_selection)
 
         # Aktiivinen-nappi poistettu käytöstä, koska laitteella on jatkossa aina yksi aktiivinen testi
         self.active_btn = None
@@ -86,8 +64,7 @@ class TestPanel(QWidget):
                 self.program_number = int(program_name.split(" ")[1])
             except (IndexError, ValueError):
                 self.program_number = 0
-        self.program_label.setText(f" {program_name}")
-    
+        # Ohjelman nimi näytetään jatkossa TestingScreenin infolaatikossa    
     @pyqtSlot()
     def toggle_active(self):
         """Vaihda aktiivisuustila ja päivitä vain UI ja GPIO"""
