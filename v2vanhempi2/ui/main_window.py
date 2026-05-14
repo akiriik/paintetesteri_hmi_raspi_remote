@@ -143,14 +143,13 @@ class MainWindow(QWidget):
         elif button_name == "STOP":
             self.testing_screen.stop_test()
         elif button_name == "TEST1":
-            self.toggle_test(0)
-        elif button_name == "TEST2":
-            self.toggle_test(1)
-        elif button_name == "TEST3":
-            self.toggle_test(2)
+            return
                 
     def toggle_test(self, panel_index):
         """Vaihda testin tila hallitusti"""
+        if panel_index < 0 or panel_index >= len(self.testing_screen.test_panels):
+            return
+
         panel = self.testing_screen.test_panels[panel_index]
         panel.is_active = not panel.is_active
         panel.update_button_style()

@@ -160,7 +160,7 @@ class TestingScreen(BaseScreen):
         
         # Testipaneelit
         self.test_panels = []
-        for i in range(1, 4):
+        for i in range(1, 2):
 
             # Testipaneeli
             panel = TestPanel(i, self)
@@ -417,13 +417,8 @@ class TestingScreen(BaseScreen):
     
     def start_test(self):
         """Käynnistä testi ForTestManager-luokan avulla, vaihda ensin ohjelmat"""
-        # Tarkista, mitkä testipaneelit ovat aktiivisia
-        active_panels = [panel for panel in self.test_panels if panel.is_active]
-        
-        # Jos yhtään paneelia ei ole aktiivisena, testiä ei voi käynnistää
-        if not active_panels:
-            self.update_status("Valitse vähintään yksi testi aktiiviseksi ennen käynnistystä", "WARNING")
-            return
+        # Yhden testin versiossa ainoa testipaneeli on aina aktiivinen
+        active_panels = self.test_panels
         
         # Tarkista että modbus-yhteys on kunnossa
         if not hasattr(self.parent(), 'fortest_manager') or \
@@ -511,10 +506,8 @@ class TestingScreen(BaseScreen):
     # Lisää uusi metodi tarkistamaan onko testeri valmis käynnistykseen
     def check_ready_to_start(self):
         """Tarkista onko testeri valmis käynnistykseen"""
-        # Tarkista onko aktiivisia paneeleja
-        active_panels = [panel for panel in self.test_panels if panel.is_active]
-        if not active_panels:
-            return False
+        # Yhden testin versiossa ainoa testipaneeli on aina aktiivinen
+        active_panels = self.test_panels
         
         # Tarkista että aktiivisissa paneeleissa on ohjelma valittuna
         for panel in active_panels:

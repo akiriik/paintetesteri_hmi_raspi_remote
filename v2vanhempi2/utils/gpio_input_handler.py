@@ -27,10 +27,7 @@ class GPIOInputHandler(QObject):
             # Määritä nappien pinnit
             self.button_pins = {
                 "START": 5,   # GPIO 5 (START-kytkin)
-                "STOP": 6,    # GPIO 6 (STOP-kytkin)
-                "TEST1": 12,  # GPIO 12 (TEST1-kytkin)
-                "TEST2": 13,  # GPIO 13 (TEST2-kytkin)
-                "TEST3": 16   # GPIO 16 (TEST3-kytkin)
+                "STOP": 6     # GPIO 6 (STOP-kytkin)
             }
             
             # Alusta pinnit sisääntuloiksi pullup-vastuksilla

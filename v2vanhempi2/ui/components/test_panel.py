@@ -12,7 +12,8 @@ class TestPanel(QWidget):
         super().__init__(parent)
         self.test_number = test_number
         self.selected_program = None
-        self.is_active = False
+        self.is_active = True
+        self.results_started = False
         self.modbus_register = 17000 + self.test_number
 
         self.setFixedSize(400, 590)
@@ -63,20 +64,8 @@ class TestPanel(QWidget):
         """)
         self.select_program_btn.clicked.connect(self.request_program_selection)
 
-        # Aktiivinen-nappi - MUUTETTU NIMI
-        self.active_btn = QPushButton(f"TESTI {test_number}", self)
-        self.active_btn.setGeometry(90, 0, 200, 40)
-        self.active_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #5e5e5e;
-                color: white;
-                border-radius: 5px;
-                border: none;
-                font-size: 30px;
-                padding: 2px;
-            }
-        """)
-        self.active_btn.clicked.connect(self.toggle_active)
+        # Aktiivinen-nappi poistettu käytöstä, koska laitteella on jatkossa aina yksi aktiivinen testi
+        self.active_btn = None
 
     
     def request_program_selection(self):
@@ -130,29 +119,8 @@ class TestPanel(QWidget):
                 self.status_message.emit(error_msg, 1)  # 1 = SUCCESS
     
     def update_button_style(self):
-        """Päivitä napin tyyli tilan mukaan"""
-        if self.is_active:
-            self.active_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #4CAF50;
-                    color: white;
-                    border-radius: 5px;
-                    border: none;
-                    font-size: 34px;
-                    padding: 2px;
-                }
-            """)
-        else:
-            self.active_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #5e5e5e;
-                    color: white;
-                    border-radius: 5px;
-                    border: none;
-                    font-size: 34px;
-                    padding: 2px;
-                }
-            """)
+        """Aktiivisuusnappi on poistettu käytöstä yhden testin versiossa"""
+        return
 
     def update_test_results(self, result):
         # Poistettu debug-tulostukset
