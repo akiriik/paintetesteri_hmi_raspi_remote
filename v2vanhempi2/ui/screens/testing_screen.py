@@ -147,16 +147,40 @@ class TestingScreen(BaseScreen):
         # Aseta musta tausta testaussivulle
         self.setStyleSheet("background-color: black;")
 
-        # Ikonipainikkeet
-        # Käsikäyttö-painike
-        self.manual_button = IconButton(QStyle.SP_DialogResetButton, "Käsikäyttö", self)
-        self.manual_button.move(205, 5)
+        # Yläpainikkeet oikeaan reunaan
+        self.manual_button = QPushButton("KÄSIKÄYTTÖ", self)
+        self.manual_button.setGeometry(820, 55, 200, 60)
+        self.manual_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border-radius: 10px;
+                border: none;
+                font-size: 20px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+        """)
         self.manual_button.clicked.connect(self.show_manual)
 
-        # New confirmation shutdown button
-        self.system_status_button = IconButton(QStyle.SP_DialogCancelButton, "Järjestelmän tila", self)
-        self.system_status_button.move(5, 5)
-        self.system_status_button.clicked.connect(self.show_system_status)    
+        self.system_status_button = QPushButton("SAMMUTUS", self)
+        self.system_status_button.setGeometry(1040, 55, 200, 60)
+        self.system_status_button.setStyleSheet("""
+            QPushButton {
+                background-color: #F44336;
+                color: white;
+                border-radius: 10px;
+                border: none;
+                font-size: 20px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #D32F2F;
+            }
+        """)
+        self.system_status_button.clicked.connect(self.show_confirm_shutdown_dialog)
         
         # Testipaneelit
         self.test_panels = []
@@ -169,9 +193,26 @@ class TestingScreen(BaseScreen):
             panel.status_message.connect(self.handle_status_message)
             self.test_panels.append(panel)
         
+        # Yhteystilat
+        self.connection_box = QFrame(self)
+        self.connection_box.setGeometry(820, 130, 420, 70)
+        self.connection_box.setStyleSheet("""
+            QFrame {
+                background-color: black;
+                border: 2px solid #333333;
+                border-radius: 10px;
+            }
+        """)
+
+        self.connection_label = QLabel("YHTEYDET: IO --   FORTEST --   ANTURI --", self.connection_box)
+        self.connection_label.setGeometry(15, 18, 390, 35)
+        self.connection_label.setFont(QFont("Consolas", 12))
+        self.connection_label.setAlignment(Qt.AlignCenter)
+        self.connection_label.setStyleSheet("color: orange; background-color: transparent; border: none;")
+
         # Infolaatikko: ohjelma, ympäristötiedot ja nykyinen tila
         self.info_box = QFrame(self)
-        self.info_box.setGeometry(820, 140, 420, 170)
+        self.info_box.setGeometry(820, 220, 420, 110)
         self.info_box.setStyleSheet("""
             QFrame {
                 background-color: black;
@@ -181,23 +222,18 @@ class TestingScreen(BaseScreen):
         """)
 
         self.info_program_label = QLabel("OHJELMA: --", self.info_box)
-        self.info_program_label.setGeometry(15, 15, 390, 35)
+        self.info_program_label.setGeometry(15, 12, 390, 35)
         self.info_program_label.setFont(QFont("Consolas", 16, QFont.Bold))
         self.info_program_label.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
 
         self.info_environment_label = QLabel("SÄILIÖ: --.-°C / --.- % / -.-- BAR", self.info_box)
-        self.info_environment_label.setGeometry(15, 65, 390, 35)
+        self.info_environment_label.setGeometry(15, 58, 390, 35)
         self.info_environment_label.setFont(QFont("Consolas", 14))
         self.info_environment_label.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
 
-        self.info_state_label = QLabel("TILA: EI OHJELMAA VALITTU", self.info_box)
-        self.info_state_label.setGeometry(15, 115, 390, 35)
-        self.info_state_label.setFont(QFont("Consolas", 14))
-        self.info_state_label.setStyleSheet("color: orange; background-color: transparent; border: none;")
-
         # Ohjelman valinta oikeaan reunaan
         self.select_program_btn = QPushButton("VALITSE OHJELMA", self)
-        self.select_program_btn.setGeometry(820, 335, 420, 90)
+        self.select_program_btn.setGeometry(820, 355, 420, 90)
         self.select_program_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
@@ -216,14 +252,14 @@ class TestingScreen(BaseScreen):
 
         # Ohjauskomponentti
         self.control_panel = ControlPanel(self)
-        self.control_panel.move(820, 455)
+        self.control_panel.move(820, 475)
         self.control_panel.start_clicked.connect(self.start_test)
         self.control_panel.stop_clicked.connect(self.stop_test)
         
         # Tilaviestikenttä
         self.status_label = QLabel("", self)
-        self.status_label.setGeometry(265, 5, 750, 40)  # Laajennettu korkeus, koska ei ole ulkoista kehystä
-        self.status_label.setFont(QFont("Consolas", 14))
+        self.status_label.setGeometry(20, 55, 770, 65)
+        self.status_label.setFont(QFont("Consolas", 15))
         self.status_label.setIndent(10)
         self.status_label.setStyleSheet("""
             color: #33FF33;
@@ -461,10 +497,6 @@ class TestingScreen(BaseScreen):
             if hasattr(self, "info_program_label"):
                 self.info_program_label.setText(f"OHJELMA: {program_name}")
 
-            if hasattr(self, "info_state_label"):
-                self.info_state_label.setText("TILA: VALMIS")
-                self.info_state_label.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
-
             self.current_test_panel = None
     
     def start_test(self):
@@ -618,11 +650,7 @@ class TestingScreen(BaseScreen):
             style = "color: #00FF00; font-weight: normal;"
                 
         self.status_label.setStyleSheet(style + " background-color: transparent;")
-        self.status_label.setText(message)
-
-        if hasattr(self, "info_state_label"):
-            self.info_state_label.setText(f"TILA: {message}")
-            self.info_state_label.setStyleSheet(style + " background-color: transparent; border: none;")        
+        self.status_label.setText(message)      
     
     def handle_status_message(self, message, message_type):        
         # Päivitä tilaviesti myös näkymään

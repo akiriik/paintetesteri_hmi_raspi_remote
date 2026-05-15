@@ -72,6 +72,13 @@ class EnvironmentStatusBar(QWidget):
         
         self.container_label.setText(f"SÄILIÖ: {temp_str} / {humidity_str} / {pressure_str}")
 
+        if hasattr(self.parent(), "testing_screen"):
+            testing_screen = self.parent().testing_screen
+            if hasattr(testing_screen, "info_environment_label"):
+                testing_screen.info_environment_label.setText(
+                    f"SÄILIÖ: {temp_str} / {humidity_str} / {pressure_str}"
+                )
+
     def convert_adc_to_bar(self, adc_value):
         calibration_table = [
             (3277, 0.0),   # 0 bar

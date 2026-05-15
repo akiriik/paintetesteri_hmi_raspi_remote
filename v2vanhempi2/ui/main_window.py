@@ -53,9 +53,11 @@ class MainWindow(QWidget):
         self.program_selection_screen.hide()
         self.program_selection_screen.program_selected.connect(self.on_program_selected)
 
-        # Ympäristötietojen statusrivi alareunaan kiinteillä koordinaateilla
+        # Ympäristötietojen statusrivi pidetään piilossa.
+        # Komponenttia käytetään vielä lämpötila-, kosteus- ja painetiedon käsittelyyn.
         self.environment_status_bar = EnvironmentStatusBar(self)
         self.environment_status_bar.setGeometry(265, 50, 750, 40)
+        self.environment_status_bar.hide()
 
         # Alusta modbus-hallinta
         if not DEV_MODE:
@@ -316,11 +318,10 @@ class MainWindow(QWidget):
 
     def show_testing(self):
         """Näyttää testaussivun"""
-        self.environment_status_bar.show()
+        self.environment_status_bar.hide()
         self.manual_screen.hide()
         self.program_selection_screen.hide()
         self.testing_screen.show()
-
     def show_manual(self):
         """Näyttää käsikäyttösivun"""
         self.testing_screen.hide()
