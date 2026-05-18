@@ -18,9 +18,10 @@ from utils.gpio_handler import GPIOHandler
 from utils.gpio_input_handler import GPIOInputHandler
 from utils.program_manager import ProgramManager
 from utils.sht20_handler import SHT20Manager
-from ui.components.system_status_dialog import SystemStatusDialog
 
-DEV_MODE = True
+DEV_MODE_FORTEST = True   # oikea ForTest käytössä
+DEV_MODE_MODBUS = True     # pää-Modbus pois
+DEV_MODE_GPIO = True       # GPIO pois
 
 class MainWindow(QWidget):
     def __init__(self, parent=None):
@@ -59,19 +60,21 @@ class MainWindow(QWidget):
         self.environment_status_bar.setGeometry(265, 50, 750, 40)
         self.environment_status_bar.hide()
 
-        # Alusta modbus-hallinta
-        if not DEV_MODE:
-            self.modbus_manager = ModbusManager(port='/dev/ttyUSB0', baudrate=19200)
-            self.fortest_manager = ForTestManager(port='/dev/ttyUSB1', baudrate=19200)
+        self.modbus_manager = None
+        self.fortest_manager = None
 
+        if not DEV_MODE_MODBUS:
+            self.modbus_manager = ModbusManager(port='/dev/ttyUSB0', baudrate=19200)
             self.modbus_manager.resultReady.connect(self.handle_modbus_result)
+
+        if not DEV_MODE_FORTEST:
+            self.fortest_manager = ForTestManager(port='/dev/ttyUSB1', baudrate=19200)
             self.fortest_manager.resultReady.connect(self.handle_fortest_result)
-        
-        # Yhdistä ohjelmamanagerin signaali ohjelmiston päivitykseen
-        self.program_manager.program_list_updated.connect(self.program_selection_screen.update_program_list)
 
         # Alusta SHT20-anturi
-        if not DEV_MODE:
+        # SHT20 kulkee tässä samassa dev mode -ryhmässä GPIO:n kanssa,
+        # koska se on fyysistä Raspberry/I2C-laitteistoa.
+        if not DEV_MODE_GPIO:
             try:
                 self.sht20_manager = SHT20Manager()
                 self.sht20_manager.data_updated.connect(
@@ -86,8 +89,8 @@ class MainWindow(QWidget):
         else:
             self.sht20_manager = None
 
-        # Alusta GPIO jos mahdollista
-        if not DEV_MODE:
+        # Alusta GPIO-outputit
+        if not DEV_MODE_GPIO:
             try:
                 self.gpio_handler = GPIOHandler()
             except Exception as e:
@@ -95,33 +98,22 @@ class MainWindow(QWidget):
                 self.gpio_handler = None
         else:
             self.gpio_handler = None
-            
-        # Alusta GPIO-nappulat
-        try:
-            self.gpio_input_handler = GPIOInputHandler()
-            # Yhdistä nappulasignaalit
-            self.gpio_input_handler.button_changed.connect(self.handle_button_press)
-        except Exception as e:
-            print(f"Varoitus: GPIO-nappuloiden alustus epäonnistui: {e}")
+
+        # Alusta GPIO-nappulat / fyysiset painikkeet
+        if not DEV_MODE_GPIO:
+            try:
+                self.gpio_input_handler = GPIOInputHandler()
+                self.gpio_input_handler.button_changed.connect(self.handle_button_press)
+            except Exception as e:
+                print(f"Varoitus: GPIO-nappuloiden alustus epäonnistui: {e}")
+                self.gpio_input_handler = None
+        else:
             self.gpio_input_handler = None
 
         # Ajastimet
         self.emergency_stop_timer = QTimer(self)
         self.emergency_stop_timer.timeout.connect(self.check_emergency_stop)
         self.emergency_stop_timer.start(1000)  # Tarkista hätäseis kerran sekunnissa
-
-        # Järjestelmätilan tarkistuksen ajastin
-        self.system_status_timer = QTimer(self)
-        self.system_status_timer.timeout.connect(self.check_system_status)
-        self.system_status_timer.start(2000)  # Tarkista järjestelmätila 2 sekunnin välein
-
-        self.system_dialog_open = False
-        self.system_dialog = None
-
-        # Paineen lukemisen ajastin
-        self.pressure_timer = QTimer(self)
-        self.pressure_timer.timeout.connect(self.read_pressure)
-        self.pressure_timer.start(1000)  # Lue paine kerran sekunnissa
 
         self.emergency_dialog_open = False
         self._dialog_opened_time = 0
@@ -130,11 +122,6 @@ class MainWindow(QWidget):
         """Päivitä ympäristöanturit - kutsutaan statusrivin ajastimesta"""
         if hasattr(self, 'sht20_manager') and self.sht20_manager:
             self.sht20_manager.read_once()
-        
-    def read_pressure(self):
-        """Lue painearvo rekisteristä 19500"""
-        if hasattr(self, 'modbus_manager') and self.modbus_manager and self.modbus_manager.is_connected():
-            self.modbus_manager.read_register(19500, 1)
         
     def handle_button_press(self, button_name, is_pressed):
         """Käsittelee GPIO-nappulan painalluksen - reagoidaan vain painallukseen"""
@@ -201,8 +188,6 @@ class MainWindow(QWidget):
         if result == 1:  # QDialog.Accepted
             self.testing_screen.update_status("Hätäseis kuitattu", "INFO")
         self._emergency_dialog = None
-        # Tarkista järjestelmätila hätäseis-kuittauksen jälkeen
-        QTimer.singleShot(1000, self.check_system_status)
 
     def handle_modbus_result(self, result, op_code, error_msg):
         """Käsittelee modbus-kyselyn tuloksen"""
@@ -213,28 +198,7 @@ class MainWindow(QWidget):
         # Ohita myös jos kyseessä on hätäseisdialogi
         if hasattr(self, '_emergency_dialog') and getattr(self._emergency_dialog, '_is_emergency_stop_dialog', False):
             if op_code == 2:  # Rekisterin kirjoitus
-                return
-        
-        # Käsittele tulopaineen tila (rekisteri 18101)
-        if op_code == 1 and hasattr(result, 'address') and result.address == 18101:
-            if result and hasattr(result, 'registers') and len(result.registers) > 0:
-                input_pressure_status = result.registers[0]
-                if hasattr(self, 'system_dialog') and self.system_dialog:
-                    self.system_dialog.update_input_pressure_status(input_pressure_status)
-            return        
-
-        # Käsittele paineen lukutulos
-        if op_code == 1 and hasattr(result, 'address') and result.address == 19500:
-            if result and hasattr(result, 'registers') and len(result.registers) > 0:
-                pressure_value = result.registers[0]  # UINT arvo
-                self.environment_status_bar.update_pressure_data(pressure_value)
-                # Päivitä myös system_dialog jos auki
-                if hasattr(self, 'system_dialog') and self.system_dialog:
-                    pressure_bar = self.environment_status_bar.pressure or 0.0
-                    self.system_dialog.update_pressure(pressure_bar)
-            else:
-                self.environment_status_bar.show_pressure_error()
-            return
+                return   
         
         if error_msg:
             # Päivitä tilaviesti päänäkymään
@@ -351,53 +315,9 @@ class MainWindow(QWidget):
         """Näyttää ikkunan koko ruudussa"""
         self.showFullScreen()
 
-    def check_system_status(self):
-        """Tarkista järjestelmän tila ja näytä dialogi tarvittaessa"""
-        if self.emergency_dialog_open:
-            return  # Hätäseis on prioriteetti
-        
-        if not hasattr(self, 'modbus_manager') or not self.modbus_manager or not self.modbus_manager.is_connected():
-            return
-        
-        # Hae painearvo environment_status_bar:ilta
-        current_pressure = 0.0
-        if hasattr(self, 'environment_status_bar') and self.environment_status_bar.pressure is not None:
-            current_pressure = self.environment_status_bar.pressure
-        
-        # Tarkista pitääkö dialogi avata
-        should_show_dialog = current_pressure < 6.0
-        
-        if should_show_dialog and not self.system_dialog_open:
-            self.system_dialog_open = True
-            self.system_dialog = SystemStatusDialog(self, self.modbus_manager)
-            
-            # Päivitä alkutiedot
-            self.system_dialog.update_pressure(current_pressure)
-            if hasattr(self, 'environment_status_bar'):
-                temperature = self.environment_status_bar.temperature
-                self.system_dialog.update_temperature(temperature)
-            
-            # Lue tulopaineen tila
-            self.modbus_manager.read_register(18101, 1)
-            
-            self.system_dialog.finished.connect(self.on_system_dialog_closed)
-            self.system_dialog.exec_()
-        elif not should_show_dialog and self.system_dialog_open and self.system_dialog:
-            # Tarkista voiko dialogi sulkeutua automaattisesti
-            if self.system_dialog.check_auto_close_conditions():
-                self.system_dialog.accept()
-
-    def on_system_dialog_closed(self, result):
-        """Järjestelmädialogin sulkemisen käsittely"""
-        self.system_dialog_open = False
-        self.system_dialog = None
-
     def closeEvent(self, event):
         """Käsittelee sovelluksen sulkemisen"""
         try:
-            # Sulje järjestelmädialogi
-            if hasattr(self, 'system_dialog') and self.system_dialog:
-                self.system_dialog.close()
 
             # Siivoa SHT20-anturi
             if hasattr(self, 'sht20_manager') and self.sht20_manager:
@@ -411,11 +331,17 @@ class MainWindow(QWidget):
             if hasattr(self, 'gpio_input_handler') and self.gpio_input_handler:
                 self.gpio_input_handler.cleanup()
                 
-            # Sitten muut resurssit
-            self.testing_screen.cleanup()
-            self.manual_screen.cleanup()
-            self.modbus_manager.cleanup()
-            self.fortest_manager.cleanup()
+            if hasattr(self, 'testing_screen') and self.testing_screen:
+                self.testing_screen.cleanup()
+
+            if hasattr(self, 'manual_screen') and self.manual_screen:
+                self.manual_screen.cleanup()
+
+            if hasattr(self, 'modbus_manager') and self.modbus_manager:
+                self.modbus_manager.cleanup()
+
+            if hasattr(self, 'fortest_manager') and self.fortest_manager:
+                self.fortest_manager.cleanup()
             
             # Lopuksi GPIO-outputit
             if hasattr(self, 'gpio_handler') and self.gpio_handler:
