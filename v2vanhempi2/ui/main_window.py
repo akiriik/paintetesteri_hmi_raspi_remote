@@ -19,7 +19,7 @@ from utils.gpio_input_handler import GPIOInputHandler
 from utils.program_manager import ProgramManager
 from utils.sht20_handler import SHT20Manager
 
-DEV_MODE_FORTEST = True   # oikea ForTest käytössä
+DEV_MODE_FORTEST = False   # oikea ForTest käytössä
 DEV_MODE_MODBUS = True     # pää-Modbus pois
 DEV_MODE_GPIO = True       # GPIO pois
 
