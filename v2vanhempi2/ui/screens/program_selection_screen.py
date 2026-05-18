@@ -5,7 +5,7 @@ from PyQt5.QtGui import QFont, QFontMetrics
 from ui.screens.base_screen import BaseScreen
 
 class ProgramSelectionScreen(BaseScreen):
-    program_selected = pyqtSignal(str)  # Signaali valitulle ohjelmalle
+    program_selected = pyqtSignal(dict)  # Signaali valitulle ohjelmalle
     
     def __init__(self, parent=None, program_manager=None):
         self.program_manager = program_manager
@@ -156,11 +156,25 @@ class ProgramSelectionScreen(BaseScreen):
         # Luo ohjelmapainikkeet
         for i, program_name in enumerate(displayed_programs):
             # Hae ohjelman oikea ID
-            program_id = start_idx + i + 1
+            program_index = start_idx + i
+            program_data = None
+
+            if self.program_manager:
+                program_data = self.program_manager.get_program_by_index(program_index)
+
+            if program_data is None:
+                program_data = {
+                    "id": start_idx + i + 1,
+                    "name": program_name,
+                    "description": ""
+                }
+
+            program_id = program_data.get("id", start_idx + i + 1)
+            description = program_data.get("description", "")
             
             # Luo painike, jossa on sekä ID että nimi
             button = QPushButton(self.grid_container)
-            button.setFixedSize(300, 120)
+            button.setFixedSize(300, 135)
             
             # Luo selkeä layout painikkeelle
             button_layout = QVBoxLayout(button)
@@ -176,9 +190,15 @@ class ProgramSelectionScreen(BaseScreen):
             # Nimi-label (alarivinä)
             name_label = QLabel(program_name, button)
             name_label.setAlignment(Qt.AlignCenter)
-            name_label.setStyleSheet("color: #333333; font-size: 22px; font-weight: bold; background-color: transparent;")
+            name_label.setStyleSheet("color: #333333; font-size: 20px; font-weight: bold; background-color: transparent;")
             name_label.setWordWrap(True)
             button_layout.addWidget(name_label)
+
+            desc_label = QLabel(description, button)
+            desc_label.setAlignment(Qt.AlignCenter)
+            desc_label.setStyleSheet("color: #666666; font-size: 15px; background-color: transparent;")
+            desc_label.setWordWrap(True)
+            button_layout.addWidget(desc_label)
             
             # Tyylittele painike
             button.setStyleSheet("""
@@ -205,8 +225,8 @@ class ProgramSelectionScreen(BaseScreen):
             col = i % 4
             
             # Yhdistä painallus signaaliin (käytä ID:tä ja nimeä)
-            button.clicked.connect(lambda checked, prog_id=program_id, prog_name=program_name: 
-                                 self.select_program(prog_id, prog_name))
+            button.clicked.connect(lambda checked, prog=program_data:
+                                self.select_program(prog))
             
             self.grid_layout.addWidget(button, row, col)
             self.program_buttons.append(button)
@@ -235,10 +255,9 @@ class ProgramSelectionScreen(BaseScreen):
             self.current_page += 1
             self.update_program_list()
     
-    def select_program(self, program_id, program_name):
-        """Valitse ohjelma ja lähetä signaali"""
-        # Käytetään ForTest-laitteen ohjelman valinnassa suoraan program_id:tä (1-50)
-        self.program_selected.emit(f"{program_id}. {program_name}")
+    def select_program(self, program_data):
+        """Valitse ohjelma ja lähetä koko ohjelmatiedot"""
+        self.program_selected.emit(program_data)
         self.go_back()
     
     def go_back(self):

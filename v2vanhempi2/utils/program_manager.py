@@ -81,3 +81,9 @@ class ProgramManager(QObject):
         if 'programs' in self.program_data and index < len(self.program_data['programs']):
             return self.program_data['programs'][index].get('id', index + 1)
         return index + 1
+
+    def get_program_by_index(self, index):
+        """Palauta koko ohjelman tiedot indeksin perusteella"""
+        if 'programs' in self.program_data and 0 <= index < len(self.program_data['programs']):
+            return self.program_data['programs'][index]
+        return None

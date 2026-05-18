@@ -240,8 +240,10 @@ class TestingScreen(BaseScreen):
         """)
 
         self.info_program_label = QLabel("OHJELMA: --", self.info_box)
-        self.info_program_label.setGeometry(15, 12, 415, 35)
-        self.info_program_label.setFont(QFont("Consolas", 16, QFont.Bold))
+        self.info_program_label.setGeometry(15, 12, 415, 190)
+        self.info_program_label.setFont(QFont("Consolas", 13))
+        self.info_program_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.info_program_label.setWordWrap(True)
         self.info_program_label.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
 
         # Ohjelman valinta oikeaan reunaan
@@ -500,15 +502,52 @@ class TestingScreen(BaseScreen):
         # Kerro pääikkunalle, että halutaan näyttää ohjelman valintasivu
         self.program_selection_requested.emit(test_number)
     
-    def set_program_for_test(self, program_name):
-        """Aseta ohjelma valitulle testille"""
+    def set_program_for_test(self, program_data):
+        """Aseta ohjelma valitulle testille ja näytä ohjelman speksit"""
+
+        if not program_data:
+            return
+
+        program_id = program_data.get("id", 0)
+        program_name = program_data.get("name", f"Ohjelma {program_id}")
+        description = program_data.get("description", "")
+
+        display_name = f"{program_id}. {program_name}"
+
         if self.current_test_panel:
-            # Hae oikea paneeli ja aseta ohjelma
             panel = self.test_panels[self.current_test_panel - 1]
-            panel.set_program(program_name)
+            panel.set_program(display_name)
+
+            pressure = program_data.get("pressure_mbar", "--")
+            fill_time = program_data.get("fill_time_s", "--")
+            settle_time = program_data.get("settle_time_s", "--")
+            test_time = program_data.get("test_time_s", "--")
+            volume = program_data.get("piece_volume_ml", "--")
+
+            max_decay = program_data.get("max_decay", {})
+            decay_value = max_decay.get("value", "--")
+            decay_unit = max_decay.get("unit", "")
+            decay_mode = max_decay.get("mode", "")
+
+            if decay_unit:
+                decay_text = f"{decay_value} {decay_unit}"
+            else:
+                decay_text = str(decay_value)
+
+            if decay_mode:
+                decay_text += f" ({decay_mode})"
+
+            info_text = (
+                f"OHJELMA: {display_name}\n"
+                f"{description}\n"
+                f"Paine: {pressure} mbar\n"
+                f"Täyttö: {fill_time}s  Tasaus: {settle_time}s\n"
+                f"Testi: {test_time}s  Raja: {decay_text}\n"
+                f"Tilavuus: {volume} ml"
+            )
 
             if hasattr(self, "info_program_label"):
-                self.info_program_label.setText(f"OHJELMA: {program_name}")
+                self.info_program_label.setText(info_text)
 
             self.current_test_panel = None
     
