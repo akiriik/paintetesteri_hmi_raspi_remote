@@ -149,7 +149,7 @@ class TestingScreen(BaseScreen):
 
         # Yläpainikkeet oikeaan reunaan
         self.manual_button = QPushButton("KÄSIKÄYTTÖ", self)
-        self.manual_button.setGeometry(825, 10, 205, 65)
+        self.manual_button.setGeometry(825, 10, 160, 65)
         self.manual_button.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
@@ -195,7 +195,7 @@ class TestingScreen(BaseScreen):
         
         # Yhteystilat
         self.connection_box = QFrame(self)
-        self.connection_box.setGeometry(825, 100, 445, 70)
+        self.connection_box.setGeometry(825, 100, 445, 160)
         self.connection_box.setStyleSheet("""
             QFrame {
                 background-color: black;
@@ -204,15 +204,33 @@ class TestingScreen(BaseScreen):
             }
         """)
 
-        self.connection_label = QLabel("YHTEYDET: IO --   FORTEST --   ANTURI --", self.connection_box)
-        self.connection_label.setGeometry(15, 18, 390, 35)
+        self.connection_label = QLabel("YHTEYDET:  IO --   FORTEST --   ANTURI --", self.connection_box)
+        self.connection_label.setGeometry(15, 12, 415, 30)
         self.connection_label.setFont(QFont("Consolas", 12))
-        self.connection_label.setAlignment(Qt.AlignCenter)
+        self.connection_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.connection_label.setStyleSheet("color: orange; background-color: transparent; border: none;")
+
+        self.info_environment_label = QLabel("SÄILIÖ:    --.-°C / --.- % / -.-- BAR", self.connection_box)
+        self.info_environment_label.setGeometry(15, 55, 415, 30)
+        self.info_environment_label.setFont(QFont("Consolas", 13))
+        self.info_environment_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.info_environment_label.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
+
+        self.room_environment_label = QLabel("HUONE:     --.-°C / --.- %", self.connection_box)
+        self.room_environment_label.setGeometry(15, 92, 415, 30)
+        self.room_environment_label.setFont(QFont("Consolas", 13))
+        self.room_environment_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.room_environment_label.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
+
+        self.part_temperature_label = QLabel("KAPPALE:   --.-°C", self.connection_box)
+        self.part_temperature_label.setGeometry(15, 122, 415, 30)
+        self.part_temperature_label.setFont(QFont("Consolas", 13))
+        self.part_temperature_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.part_temperature_label.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
 
         # Infolaatikko: ohjelma, ympäristötiedot ja nykyinen tila
         self.info_box = QFrame(self)
-        self.info_box.setGeometry(825, 190, 445, 135)
+        self.info_box.setGeometry(825, 275, 445, 290)
         self.info_box.setStyleSheet("""
             QFrame {
                 background-color: black;
@@ -222,18 +240,13 @@ class TestingScreen(BaseScreen):
         """)
 
         self.info_program_label = QLabel("OHJELMA: --", self.info_box)
-        self.info_program_label.setGeometry(15, 12, 390, 35)
+        self.info_program_label.setGeometry(15, 12, 415, 35)
         self.info_program_label.setFont(QFont("Consolas", 16, QFont.Bold))
         self.info_program_label.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
 
-        self.info_environment_label = QLabel("SÄILIÖ: --.-°C / --.- % / -.-- BAR", self.info_box)
-        self.info_environment_label.setGeometry(15, 58, 390, 35)
-        self.info_environment_label.setFont(QFont("Consolas", 14))
-        self.info_environment_label.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
-
         # Ohjelman valinta oikeaan reunaan
         self.select_program_btn = QPushButton("VALITSE OHJELMA", self)
-        self.select_program_btn.setGeometry(825, 350, 445, 95)
+        self.select_program_btn.setGeometry(913, 470, 270, 80)
         self.select_program_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
@@ -252,13 +265,13 @@ class TestingScreen(BaseScreen):
 
         # Ohjauskomponentti
         self.control_panel = ControlPanel(self)
-        self.control_panel.move(825, 475)
+        self.control_panel.move(825, 600)
         self.control_panel.start_clicked.connect(self.start_test)
         self.control_panel.stop_clicked.connect(self.stop_test)
         
         # Tilaviestikenttä
         self.status_label = QLabel("", self)
-        self.status_label.setGeometry(10, 45, 800, 70)
+        self.status_label.setGeometry(10, 10, 800, 70)
         self.status_label.setFont(QFont("Consolas", 15))
         self.status_label.setIndent(10)
         self.status_label.setStyleSheet("""
