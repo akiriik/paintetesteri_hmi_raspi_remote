@@ -16,7 +16,7 @@ class TestPanel(QWidget):
         self.results_started = False
         self.modbus_register = 17000 + self.test_number
 
-        self.setFixedSize(800, 400)
+        self.setFixedSize(800, 610)
         self.setStyleSheet("""
             QWidget {
                 background-color: #f5f5f5;
@@ -30,7 +30,7 @@ class TestPanel(QWidget):
 
         # Tulosnäyttö
         self.pressure_result = QLabel("", self)
-        self.pressure_result.setGeometry(0, 0, 800, 400)
+        self.pressure_result.setGeometry(0, 0, 800, 610)
         self.pressure_result.setAlignment(Qt.AlignCenter)
         self.pressure_result.setStyleSheet("""
             background-color: black;
@@ -38,7 +38,7 @@ class TestPanel(QWidget):
             font-family: 'Digital-7', 'Consolas', monospace;
             font-size: 40px;
             font-weight: bold;
-            border: 2px solid #ffffff;
+            border: 2px solid #b8b6b6;
             border-radius: 10px;
         """)
 
@@ -141,7 +141,7 @@ class TestPanel(QWidget):
                 3: "OK?",
                 4: "NOK?",
                 5: "Virheellinen referenssi",
-                6: "Virheellinen soitto",
+                6: "Virheellinen täyttö",
                 7: "Virtaus alle rajan",
                 8: "Paine yli asteikon",
                 9: "VOUT yli asteikon",

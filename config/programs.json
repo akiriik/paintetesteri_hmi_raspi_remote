@@ -2,33 +2,753 @@
   "programs": [
     {
       "id": 1,
-      "name": "Ohjelma 1",
-      "description": "Tämä on testiohjelma numero 1",
-      "pressure_mbar": 3500,
-      "fill_time_s": 10,
-      "settle_time_s": 90,
-      "test_time_s": 60,
+      "name": "ABB R8",
+      "description": "Decay 10bar",
+      "pressure_mbar": 10000,
+      "fill_time_s": 18,
+      "settle_time_s": 50,
+      "test_time_s": 30,
       "max_decay": {
         "value": 2.0,
-        "unit": "Pa/s",
-        "mode": "rate"
+        "unit": "mbar",
+        "mode": "decay"
       },
       "piece_volume_ml": 1500
     },
     {
       "id": 2,
       "name": "Ohjelma 2",
-      "description": "Absoluuttinen paineenalenemaraja",
-      "pressure_mbar": 3500,
-      "fill_time_s": 10,
-      "settle_time_s": 90,
-      "test_time_s": 60,
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
       "max_decay": {
-        "value": 1.5,
+        "value": 0,
         "unit": "mbar",
-        "mode": "absolute"
+        "mode": "decay"
       },
-      "piece_volume_ml": 1500
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 3,
+      "name": "Ohjelma 3",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 4,
+      "name": "Ohjelma 4",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 5,
+      "name": "Ohjelma 5",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 6,
+      "name": "Ohjelma 6",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 7,
+      "name": "Ohjelma 7",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 8,
+      "name": "Ohjelma 8",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 9,
+      "name": "Ohjelma 9",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 10,
+      "name": "Ohjelma 10",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 11,
+      "name": "Ohjelma 11",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 12,
+      "name": "Ohjelma 12",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 13,
+      "name": "Ohjelma 13",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 14,
+      "name": "Ohjelma 14",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 15,
+      "name": "Ohjelma 15",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 16,
+      "name": "Ohjelma 16",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 17,
+      "name": "Ohjelma 17",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 18,
+      "name": "Ohjelma 18",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 19,
+      "name": "Ohjelma 19",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 20,
+      "name": "Ohjelma 20",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 21,
+      "name": "Ohjelma 21",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 22,
+      "name": "Ohjelma 22",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 23,
+      "name": "Ohjelma 23",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 24,
+      "name": "Ohjelma 24",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 25,
+      "name": "Ohjelma 25",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 26,
+      "name": "Ohjelma 26",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 27,
+      "name": "Ohjelma 27",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 28,
+      "name": "Ohjelma 28",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 29,
+      "name": "Ohjelma 29",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 30,
+      "name": "Ohjelma 30",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 31,
+      "name": "Ohjelma 31",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 32,
+      "name": "Ohjelma 32",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 33,
+      "name": "Ohjelma 33",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 34,
+      "name": "Ohjelma 34",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 35,
+      "name": "Ohjelma 35",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 36,
+      "name": "Ohjelma 36",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 37,
+      "name": "Ohjelma 37",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 38,
+      "name": "Ohjelma 38",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 39,
+      "name": "Ohjelma 39",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 40,
+      "name": "Ohjelma 40",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 41,
+      "name": "Ohjelma 41",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 42,
+      "name": "Ohjelma 42",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 43,
+      "name": "Ohjelma 43",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 44,
+      "name": "Ohjelma 44",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 45,
+      "name": "Ohjelma 45",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 46,
+      "name": "Ohjelma 46",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 47,
+      "name": "Ohjelma 47",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 48,
+      "name": "Ohjelma 48",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 49,
+      "name": "Ohjelma 49",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
+    },
+    {
+      "id": 50,
+      "name": "Ohjelma 50",
+      "description": "",
+      "pressure_mbar": 0,
+      "fill_time_s": 0,
+      "settle_time_s": 0,
+      "test_time_s": 0,
+      "max_decay": {
+        "value": 0,
+        "unit": "mbar",
+        "mode": "decay"
+      },
+      "piece_volume_ml": 0
     }
   ],
   "last_updated": "2026-05-18",

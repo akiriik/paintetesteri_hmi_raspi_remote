@@ -152,7 +152,7 @@ class TestingScreen(BaseScreen):
         self.manual_button.setGeometry(825, 10, 160, 65)
         self.manual_button.setStyleSheet("""
             QPushButton {
-                background-color: #2196F3;
+                background-color: #303030;
                 color: white;
                 border-radius: 10px;
                 border: none;
@@ -165,7 +165,7 @@ class TestingScreen(BaseScreen):
         """)
         self.manual_button.clicked.connect(self.show_manual)
 
-        self.system_status_button = QPushButton("SAMMUTUS", self)
+        self.system_status_button = QPushButton("SAMMUTA", self)
         self.system_status_button.setGeometry(1110, 10, 160, 65)
         self.system_status_button.setStyleSheet("""
             QPushButton {
@@ -188,14 +188,14 @@ class TestingScreen(BaseScreen):
 
             # Testipaneeli / tulosruutu
             panel = TestPanel(i, self)
-            panel.move(10, 130)
+            panel.move(10, 100)
             panel.program_selection_requested.connect(self.start_program_selection)
             panel.status_message.connect(self.handle_status_message)
             self.test_panels.append(panel)
         
         # Yhteystilat
         self.connection_box = QFrame(self)
-        self.connection_box.setGeometry(825, 100, 445, 160)
+        self.connection_box.setGeometry(825, 85, 445, 160)
         self.connection_box.setStyleSheet("""
             QFrame {
                 background-color: black;
@@ -230,7 +230,7 @@ class TestingScreen(BaseScreen):
 
         # Infolaatikko: ohjelma, ympäristötiedot ja nykyinen tila
         self.info_box = QFrame(self)
-        self.info_box.setGeometry(825, 275, 445, 290)
+        self.info_box.setGeometry(825, 250, 445, 210)
         self.info_box.setStyleSheet("""
             QFrame {
                 background-color: black;
@@ -238,20 +238,54 @@ class TestingScreen(BaseScreen):
                 border-radius: 10px;
             }
         """)
+        #ohjelman infotekstit etusivulle
 
-        self.info_program_label = QLabel("OHJELMA: --", self.info_box)
-        self.info_program_label.setGeometry(15, 12, 415, 190)
-        self.info_program_label.setFont(QFont("Consolas", 13))
-        self.info_program_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.info_program_label.setWordWrap(True)
-        self.info_program_label.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
+        self.info_program_title = QLabel("OHJELMA: --", self.info_box)
+        self.info_program_title.setGeometry(15, 12, 415, 28)
+        self.info_program_title.setFont(QFont("Consolas", 14, QFont.Bold))
+        self.info_program_title.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
+
+        self.info_program_desc = QLabel("", self.info_box)
+        self.info_program_desc.setGeometry(15, 42, 415, 28)
+        self.info_program_desc.setFont(QFont("Consolas", 12))
+        self.info_program_desc.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
+
+        self.info_program_pressure = QLabel("PAINE: --", self.info_box)
+        self.info_program_pressure.setGeometry(15, 80, 200, 26)
+        self.info_program_pressure.setFont(QFont("Consolas", 12))
+        self.info_program_pressure.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
+
+        self.info_program_volume = QLabel("TILAVUUS: --", self.info_box)
+        self.info_program_volume.setGeometry(230, 80, 190, 26)
+        self.info_program_volume.setFont(QFont("Consolas", 12))
+        self.info_program_volume.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
+
+        self.info_program_fill = QLabel("TÄYTTÖ: --", self.info_box)
+        self.info_program_fill.setGeometry(15, 112, 200, 26)
+        self.info_program_fill.setFont(QFont("Consolas", 12))
+        self.info_program_fill.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
+
+        self.info_program_settle = QLabel("TASAUS: --", self.info_box)
+        self.info_program_settle.setGeometry(230, 112, 190, 26)
+        self.info_program_settle.setFont(QFont("Consolas", 12))
+        self.info_program_settle.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
+
+        self.info_program_test = QLabel("TESTI: --", self.info_box)
+        self.info_program_test.setGeometry(15, 144, 200, 26)
+        self.info_program_test.setFont(QFont("Consolas", 12))
+        self.info_program_test.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
+
+        self.info_program_decay = QLabel("RAJA: --", self.info_box)
+        self.info_program_decay.setGeometry(15, 176, 400, 26)
+        self.info_program_decay.setFont(QFont("Consolas", 12))
+        self.info_program_decay.setStyleSheet("color: #33FF33; background-color: transparent; border: none;")
 
         # Ohjelman valinta oikeaan reunaan
         self.select_program_btn = QPushButton("VALITSE OHJELMA", self)
-        self.select_program_btn.setGeometry(913, 470, 270, 80)
+        self.select_program_btn.setGeometry(918, 470, 260, 80)
         self.select_program_btn.setStyleSheet("""
             QPushButton {
-                background-color: #2196F3;
+                background-color: #074678;
                 color: white;
                 border-radius: 10px;
                 border: none;
@@ -267,7 +301,7 @@ class TestingScreen(BaseScreen):
 
         # Ohjauskomponentti
         self.control_panel = ControlPanel(self)
-        self.control_panel.move(825, 600)
+        self.control_panel.move(845, 590)
         self.control_panel.start_clicked.connect(self.start_test)
         self.control_panel.stop_clicked.connect(self.stop_test)
         
@@ -537,17 +571,15 @@ class TestingScreen(BaseScreen):
             if decay_mode:
                 decay_text += f" ({decay_mode})"
 
-            info_text = (
-                f"OHJELMA: {display_name}\n"
-                f"{description}\n"
-                f"Paine: {pressure} mbar\n"
-                f"Täyttö: {fill_time}s  Tasaus: {settle_time}s\n"
-                f"Testi: {test_time}s  Raja: {decay_text}\n"
-                f"Tilavuus: {volume} ml"
-            )
-
-            if hasattr(self, "info_program_label"):
-                self.info_program_label.setText(info_text)
+            if hasattr(self, "info_program_title"):
+                self.info_program_title.setText(f"OHJELMA: {display_name}")
+                self.info_program_desc.setText(description)
+                self.info_program_pressure.setText(f"PAINE: {pressure} mbar")
+                self.info_program_volume.setText(f"TILAVUUS: {volume} ml")
+                self.info_program_fill.setText(f"TÄYTTÖ: {fill_time}s")
+                self.info_program_settle.setText(f"TASAUS: {settle_time}s")
+                self.info_program_test.setText(f"TESTI: {test_time}s")
+                self.info_program_decay.setText(f"RAJA: {decay_text}")
 
             self.current_test_panel = None
     
