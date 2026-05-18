@@ -128,7 +128,7 @@ class TestPanel(QWidget):
             display_time = f"{hours:02d}:{minutes:02d}"
             
             timestamp = f"{day:02d}.{month:02d}.{year} {hours:02d}:{minutes:02d}:{seconds:02d}"
-            current_result_id = f"{timestamp}-{test_result}-{result.registers[6]}"
+            current_result_id = f"{timestamp}-{test_result}-{result.registers[6]}-{result.registers[21]}"
             
             if hasattr(self, 'last_result_id') and self.last_result_id == current_result_id:
                 return
@@ -272,10 +272,9 @@ class TestPanel(QWidget):
                 self.results_history = []
                 
             self.results_history.insert(0, new_result)
-            
-            # Pidä vain 5 viimeisintä tulosta
+
             if len(self.results_history) > 12:
-                self.results_history.pop(0)
+                self.results_history.pop()
 
             # Rakenna näyttöteksti (uusin alimmaisena)
             display_html = f"""
