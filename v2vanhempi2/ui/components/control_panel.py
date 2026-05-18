@@ -13,12 +13,12 @@ class ControlPanel(QWidget):
         
         # Käynnistä nappi - aseta suoraan koordinaateilla
         self.start_button = QPushButton("START", self)
-        self.start_button.setGeometry(0, 0, 200, 120)
+        self.start_button.setGeometry(20, 0, 160, 100)
         self.start_button.setStyleSheet("""
             QPushButton {
                 background-color: #888888;
                 color: white;
-                border-radius: 5px;
+                border-radius: 10px;
                 font-size: 30px;
                 font-weight: bold;
             }
@@ -27,12 +27,12 @@ class ControlPanel(QWidget):
         
         # Pysäytä nappi
         self.stop_button = QPushButton("STOP", self)
-        self.stop_button.setGeometry(220, 0, 200, 120)
+        self.stop_button.setGeometry(265, 0, 160, 100)
         self.stop_button.setStyleSheet("""
             QPushButton {
                 background-color: #888888;
                 color: white;
-                border-radius: 5px;
+                border-radius: 10px;
                 font-size: 30px;
                 font-weight: bold;
             }

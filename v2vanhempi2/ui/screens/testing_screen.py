@@ -188,7 +188,7 @@ class TestingScreen(BaseScreen):
 
             # Testipaneeli / tulosruutu
             panel = TestPanel(i, self)
-            panel.move(10, 100)
+            panel.move(10, 85)
             panel.program_selection_requested.connect(self.start_program_selection)
             panel.status_message.connect(self.handle_status_message)
             self.test_panels.append(panel)
@@ -282,7 +282,7 @@ class TestingScreen(BaseScreen):
 
         # Ohjelman valinta oikeaan reunaan
         self.select_program_btn = QPushButton("VALITSE OHJELMA", self)
-        self.select_program_btn.setGeometry(918, 470, 260, 80)
+        self.select_program_btn.setGeometry(918, 490, 260, 80)
         self.select_program_btn.setStyleSheet("""
             QPushButton {
                 background-color: #074678;
@@ -301,19 +301,19 @@ class TestingScreen(BaseScreen):
 
         # Ohjauskomponentti
         self.control_panel = ControlPanel(self)
-        self.control_panel.move(845, 590)
+        self.control_panel.move(825, 610)
         self.control_panel.start_clicked.connect(self.start_test)
         self.control_panel.stop_clicked.connect(self.stop_test)
         
         # Tilaviestikenttä
         self.status_label = QLabel("", self)
-        self.status_label.setGeometry(10, 10, 800, 70)
+        self.status_label.setGeometry(10, 10, 800, 65)
         self.status_label.setFont(QFont("Consolas", 15))
         self.status_label.setIndent(10)
         self.status_label.setStyleSheet("""
             color: #33FF33;
             background-color: black;
-            border-radius: 5px;
+            border-radius: 10px;
             border: 1px solid #333333;
         """)
         self.status_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
