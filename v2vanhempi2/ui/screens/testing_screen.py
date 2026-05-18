@@ -307,7 +307,7 @@ class TestingScreen(BaseScreen):
         self.control_panel.dev_result_clicked.connect(self.show_dev_fortest_result)
 
         # Näytä DEV-tulosnappi vain ForTest devmodessa
-        fortest_dev_mode = getattr(self.parent(), "fortest_dev_mode", False)
+        fortest_dev_mode = getattr(self.parent(), "DEV_MODE_FORTEST", False)
         self.control_panel.set_dev_mode(fortest_dev_mode)
         
         # Tilaviestikenttä

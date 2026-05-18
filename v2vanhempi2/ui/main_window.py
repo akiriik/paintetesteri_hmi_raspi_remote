@@ -19,7 +19,7 @@ from utils.gpio_input_handler import GPIOInputHandler
 from utils.program_manager import ProgramManager
 from utils.sht20_handler import SHT20Manager
 
-DEV_MODE_FORTEST = True   # oikea ForTest käytössä
+DEV_MODE_FORTEST = True   # True = ForTest DEV mode / ei oikeaa ForTest-yhteyttä
 DEV_MODE_MODBUS = True     # pää-Modbus pois
 DEV_MODE_GPIO = True       # GPIO pois
 
@@ -38,6 +38,9 @@ class MainWindow(QWidget):
 
         # Alusta ohjelmamanageri ensin
         self.program_manager = ProgramManager()
+
+        # DEV mode -liput käyttöliittymälle
+        self.DEV_MODE_FORTEST = DEV_MODE_FORTEST
 
         # Näytöt - luodaan suoraan MainWindowiin
         self.testing_screen = TestingScreen(self)
