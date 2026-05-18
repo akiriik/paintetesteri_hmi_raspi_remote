@@ -16,7 +16,7 @@ class TestPanel(QWidget):
         self.results_started = False
         self.modbus_register = 17000 + self.test_number
 
-        self.setFixedSize(760, 360)
+        self.setFixedSize(800, 400)
         self.setStyleSheet("""
             QWidget {
                 background-color: #f5f5f5;
@@ -30,7 +30,7 @@ class TestPanel(QWidget):
 
         # Tulosnäyttö
         self.pressure_result = QLabel("", self)
-        self.pressure_result.setGeometry(0, 0, 760, 360)
+        self.pressure_result.setGeometry(0, 0, 800, 400)
         self.pressure_result.setAlignment(Qt.AlignCenter)
         self.pressure_result.setStyleSheet("""
             background-color: black;

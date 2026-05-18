@@ -149,7 +149,7 @@ class TestingScreen(BaseScreen):
 
         # Yläpainikkeet oikeaan reunaan
         self.manual_button = QPushButton("KÄSIKÄYTTÖ", self)
-        self.manual_button.setGeometry(820, 55, 200, 60)
+        self.manual_button.setGeometry(825, 10, 205, 65)
         self.manual_button.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
@@ -166,7 +166,7 @@ class TestingScreen(BaseScreen):
         self.manual_button.clicked.connect(self.show_manual)
 
         self.system_status_button = QPushButton("SAMMUTUS", self)
-        self.system_status_button.setGeometry(1040, 55, 200, 60)
+        self.system_status_button.setGeometry(1110, 10, 160, 65)
         self.system_status_button.setStyleSheet("""
             QPushButton {
                 background-color: #F44336;
@@ -188,14 +188,14 @@ class TestingScreen(BaseScreen):
 
             # Testipaneeli / tulosruutu
             panel = TestPanel(i, self)
-            panel.move(20, 140)
+            panel.move(10, 130)
             panel.program_selection_requested.connect(self.start_program_selection)
             panel.status_message.connect(self.handle_status_message)
             self.test_panels.append(panel)
         
         # Yhteystilat
         self.connection_box = QFrame(self)
-        self.connection_box.setGeometry(820, 130, 420, 70)
+        self.connection_box.setGeometry(825, 100, 445, 70)
         self.connection_box.setStyleSheet("""
             QFrame {
                 background-color: black;
@@ -212,7 +212,7 @@ class TestingScreen(BaseScreen):
 
         # Infolaatikko: ohjelma, ympäristötiedot ja nykyinen tila
         self.info_box = QFrame(self)
-        self.info_box.setGeometry(820, 220, 420, 110)
+        self.info_box.setGeometry(825, 190, 445, 135)
         self.info_box.setStyleSheet("""
             QFrame {
                 background-color: black;
@@ -233,7 +233,7 @@ class TestingScreen(BaseScreen):
 
         # Ohjelman valinta oikeaan reunaan
         self.select_program_btn = QPushButton("VALITSE OHJELMA", self)
-        self.select_program_btn.setGeometry(820, 355, 420, 90)
+        self.select_program_btn.setGeometry(825, 350, 445, 95)
         self.select_program_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
@@ -252,13 +252,13 @@ class TestingScreen(BaseScreen):
 
         # Ohjauskomponentti
         self.control_panel = ControlPanel(self)
-        self.control_panel.move(820, 475)
+        self.control_panel.move(825, 475)
         self.control_panel.start_clicked.connect(self.start_test)
         self.control_panel.stop_clicked.connect(self.stop_test)
         
         # Tilaviestikenttä
         self.status_label = QLabel("", self)
-        self.status_label.setGeometry(20, 55, 770, 65)
+        self.status_label.setGeometry(10, 45, 800, 70)
         self.status_label.setFont(QFont("Consolas", 15))
         self.status_label.setIndent(10)
         self.status_label.setStyleSheet("""
