@@ -7,6 +7,7 @@ class ControlPanel(QWidget):
     """Ohjauskomponentti testaustoiminnoille"""
     start_clicked = pyqtSignal()
     stop_clicked = pyqtSignal()
+    dev_result_clicked = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -38,6 +39,24 @@ class ControlPanel(QWidget):
             }
         """)
         self.stop_button.clicked.connect(self.stop_clicked.emit)
+
+        # DEV tulosnappi - näkyy vain ForTest devmodessa
+        self.dev_result_button = QPushButton("TULOS", self)
+        self.dev_result_button.setGeometry(190, 15, 65, 70)
+        self.dev_result_button.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: black;
+                border-radius: 8px;
+                font-size: 15px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #FBC02D;
+            }
+        """)
+        self.dev_result_button.clicked.connect(self.dev_result_clicked.emit)
+        self.dev_result_button.hide()
     
     def update_button_states(self, running=False, ready_to_start=False):
         """Päivitä nappien tyylit tilan mukaan"""
@@ -101,3 +120,7 @@ class ControlPanel(QWidget):
                     font-weight: bold;
                 }
             """)
+
+    def set_dev_mode(self, enabled):
+        """Näytä/piilota DEV-tulosnappi"""
+        self.dev_result_button.setVisible(enabled)

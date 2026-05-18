@@ -304,6 +304,11 @@ class TestingScreen(BaseScreen):
         self.control_panel.move(825, 610)
         self.control_panel.start_clicked.connect(self.start_test)
         self.control_panel.stop_clicked.connect(self.stop_test)
+        self.control_panel.dev_result_clicked.connect(self.show_dev_fortest_result)
+
+        # Näytä DEV-tulosnappi vain ForTest devmodessa
+        fortest_dev_mode = getattr(self.parent(), "fortest_dev_mode", False)
+        self.control_panel.set_dev_mode(fortest_dev_mode)
         
         # Tilaviestikenttä
         self.status_label = QLabel("", self)
@@ -854,3 +859,60 @@ class TestingScreen(BaseScreen):
     def cleanup(self):
         """Siivoa resurssit"""
         pass
+
+    def show_dev_fortest_result(self):
+        """Näytä emuloitu ForTest-tulos samalla reitillä kuin oikea testitulos"""
+        from types import SimpleNamespace
+        from datetime import datetime
+        import random
+
+        if not self.test_panels:
+            return
+
+        panel = self.test_panels[0]
+
+        # Varmista että ohjelmanumero löytyy, koska update_test_results tarkistaa sen
+        if not hasattr(panel, "program_number") or panel.program_number <= 0:
+            panel.program_number = 1
+
+        # Varmista että tulosten vastaanotto on päällä
+        panel.results_started = True
+
+        now = datetime.now()
+
+        # Satunnainen hyväksytty / hylätty tulos
+        test_result = random.choice([1, 1, 1, 2])  # 1 = OK, 2 = FAIL
+
+        # Emuloitu vuotoarvo
+        if test_result == 1:
+            decay_value = random.randint(5, 180)      # 0.05 ... 1.80
+        else:
+            decay_value = random.randint(210, 450)    # 2.10 ... 4.50
+
+        registers = [0] * 25
+
+        # Aika ja päivämäärä
+        registers[0] = now.hour
+        registers[1] = now.minute
+        registers[2] = now.second
+        registers[3] = now.day
+        registers[4] = now.month
+        registers[5] = now.year
+
+        # Ohjelmanumero
+        registers[6] = panel.program_number
+
+        # Testitulos
+        registers[9] = test_result
+
+        # Vuotoarvo
+        registers[20] = 0       # etumerkki, 0 = positiivinen
+        registers[21] = decay_value
+        registers[23] = 23      # 23 = Pa/s
+        registers[24] = 2       # 2 desimaalia
+
+        fake_result = SimpleNamespace(registers=registers)
+
+        panel.update_test_results(fake_result)
+
+        self.update_status("DEV: emuloitu ForTest-tulos lisätty", "INFO")
