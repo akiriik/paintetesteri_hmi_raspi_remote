@@ -871,12 +871,37 @@ class TestingScreen(BaseScreen):
 
         panel = self.test_panels[0]
 
-        # Varmista että ohjelmanumero löytyy, koska update_test_results tarkistaa sen
+        # Ohjelma on pakko valita ennen DEV-tuloksen luontia
         if not hasattr(panel, "program_number") or panel.program_number <= 0:
-            panel.program_number = 1
+            self.update_status("VIRHE: valitse ohjelma ennen DEV-tuloksen lisäämistä", "ERROR")
+            return
+
+        if not hasattr(panel, "selected_program") or not panel.selected_program:
+            self.update_status("VIRHE: ohjelman nimi puuttuu, valitse ohjelma uudelleen", "ERROR")
+            return
 
         # Varmista että tulosten vastaanotto on päällä
         panel.results_started = True
+
+        # Päivitä DEV-anturidata oikean reunan laatikkoon
+        tank_temp = round(random.uniform(21.5, 23.5), 1)
+        tank_humidity = round(random.uniform(35.0, 45.0), 1)
+        tank_pressure = round(random.uniform(5.85, 6.25), 2)
+
+        room_temp = round(random.uniform(20.8, 22.6), 1)
+        room_humidity = round(random.uniform(32.0, 42.0), 1)
+
+        part_temp = round(random.uniform(21.0, 23.0), 1)
+
+        self.info_environment_label.setText(
+            f"SÄILIÖ:    {tank_temp:.1f}°C / {tank_humidity:.1f} % / {tank_pressure:.2f} BAR"
+        )
+        self.room_environment_label.setText(
+            f"HUONE:     {room_temp:.1f}°C / {room_humidity:.1f} %"
+        )
+        self.part_temperature_label.setText(
+            f"KAPPALE:   {part_temp:.1f}°C"
+        )
 
         now = datetime.now()
 
@@ -911,8 +936,16 @@ class TestingScreen(BaseScreen):
         registers[23] = 23      # 23 = Pa/s
         registers[24] = 2       # 2 desimaalia
 
-        fake_result = SimpleNamespace(registers=registers)
+        # Hae ohjelman nimi näytölle
+        program_name = getattr(panel, "selected_program", f"{panel.program_number}. Ohjelma {panel.program_number}")
+
+        fake_result = SimpleNamespace(
+            registers=registers,
+            program_name=program_name,
+            room_temp=room_temp,
+            part_temp=part_temp
+        )
 
         panel.update_test_results(fake_result)
 
-        self.update_status("DEV: emuloitu ForTest-tulos lisätty", "INFO")
+        self.update_status("DEV: emuloitu ForTest-tulos ja anturidata lisätty", "INFO")

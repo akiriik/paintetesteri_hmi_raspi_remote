@@ -34,13 +34,15 @@ class TestPanel(QWidget):
         self.pressure_result.setAlignment(Qt.AlignCenter)
         self.pressure_result.setStyleSheet("""
             background-color: black;
-            color: #33FF33;
+            color: white;
             font-family: 'Digital-7', 'Consolas', monospace;
-            font-size: 40px;
-            font-weight: bold;
-            border: 2px solid #b8b6b6;
+            font-size: 28px;
+            text-align: left;
+            border: 2px solid #444444;
             border-radius: 10px;
+            padding: 18px;
         """)
+        self.pressure_result.setAlignment(Qt.AlignTop | Qt.AlignLeft)
 
         # Aktiivinen-nappi poistettu käytöstä, koska laitteella on jatkossa aina yksi aktiivinen testi
         self.active_btn = None
@@ -197,8 +199,70 @@ class TestPanel(QWidget):
             
             # Luo tulos näytettävän tyypin mukaan
             if test_result in [1, 2, 3, 4]:
-                # Näytetään normaali tulos värikoodattuna
-                new_result = f"{display_time}   <span style='color:{result_color};'>{formatted_decay}</span> {decay_unit}   <span style='color:{result_color};'>{result_status}</span>"
+                # Näytetään normaali tulos kahdella rivillä:
+                # 1. rivi: aika, vuoto, tulos
+                # 2. rivi: ohjelma ja lämpötilat
+
+                program_text = ""
+
+                if hasattr(result, "program_name") and result.program_name:
+                    program_text = result.program_name
+                elif hasattr(self, "selected_program") and self.selected_program:
+                    program_text = self.selected_program
+                elif hasattr(self, "program_number"):
+                    program_text = f"{self.program_number}. Ohjelma {self.program_number}"
+
+                room_temp_text = ""
+                part_temp_text = ""
+
+                if hasattr(result, "room_temp"):
+                    room_temp_text = f"HUONE {result.room_temp:.1f}°C"
+
+                if hasattr(result, "part_temp"):
+                    part_temp_text = f"KAPPALE {result.part_temp:.1f}°C"
+
+                temp_text = ""
+
+                if room_temp_text and part_temp_text:
+                    temp_text = f"{room_temp_text}   {part_temp_text}"
+                elif room_temp_text:
+                    temp_text = room_temp_text
+                elif part_temp_text:
+                    temp_text = part_temp_text
+
+                if temp_text:
+                    second_line = f"{program_text}   {temp_text}"
+                else:
+                    second_line = program_text
+
+                program_text = ""
+
+                if hasattr(result, "program_name") and result.program_name:
+                    program_text = result.program_name
+                elif hasattr(self, "selected_program") and self.selected_program:
+                    program_text = self.selected_program
+                elif hasattr(self, "program_number"):
+                    program_text = f"{self.program_number}. Ohjelma {self.program_number}"
+
+                room_temp_text = ""
+                part_temp_text = ""
+
+                if hasattr(result, "room_temp"):
+                    room_temp_text = f"{result.room_temp:.1f}°C"
+
+                if hasattr(result, "part_temp"):
+                    part_temp_text = f"{result.part_temp:.1f}°C"
+
+                new_result = f"""
+                <tr>
+                    <td>{display_time}</td>
+                    <td>{program_text}</td>
+                    <td><span style="color:{result_color};">{formatted_decay}</span> {decay_unit}</td>
+                    <td><span style="color:{result_color};">{result_status}</span></td>
+                    <td>{room_temp_text}</td>
+                    <td>{part_temp_text}</td>
+                </tr>
+                """
             else:
                 # Näytetään vain virheilmoitus
                 new_result = f"<span style='color:{result_color};'>{result_status}</span>"
@@ -207,25 +271,36 @@ class TestPanel(QWidget):
             if not hasattr(self, 'results_history'):
                 self.results_history = []
                 
-            self.results_history.append(new_result)
+            self.results_history.insert(0, new_result)
             
             # Pidä vain 5 viimeisintä tulosta
-            if len(self.results_history) > 5:
+            if len(self.results_history) > 12:
                 self.results_history.pop(0)
 
             # Rakenna näyttöteksti (uusin alimmaisena)
-            display_html = "<br>".join(self.results_history)
-            
+            display_html = f"""
+            <table width="100%" cellspacing="0" cellpadding="6">
+                <tr style="color:#888888; font-size:18px;">
+                    <td>AIKA</td>
+                    <td>OHJELMA</td>
+                    <td>VUOTO</td>
+                    <td>TULOS</td>
+                    <td>HUONE</td>
+                    <td>KAPPALE</td>
+                </tr>
+                {''.join(self.results_history)}
+            </table>
+            """
             # Päivitä tulosteksti
-            self.pressure_result.setText("")
             self.pressure_result.setTextFormat(Qt.RichText)
+            self.pressure_result.setAlignment(Qt.AlignTop | Qt.AlignLeft)
             self.pressure_result.setStyleSheet("""
                 background-color: black;
                 color: white;
-                font-family: 'Digital-7', 'Consolas', monospace;
-                font-size: 28px;
-                text-align: left;
+                font-family: 'Consolas', monospace;
+                font-size: 22px;
                 border: 2px solid #444444;
                 border-radius: 10px;
+                padding: 12px;
             """)
             self.pressure_result.setText(display_html)
