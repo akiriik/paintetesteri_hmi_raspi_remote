@@ -16,6 +16,7 @@ from services.fortest_service import ForTestService
 from controllers.station_controller import StationController
 from controllers.program_selection_controller import ProgramSelectionController
 from controllers.emergency_stop_controller import EmergencyStopController
+from controllers.button_input_controller import ButtonInputController
 
 
 DEV_MODE_FORTEST = True
@@ -124,6 +125,10 @@ class MainWindow(QWidget):
             modbus_manager=self.modbus_manager,
         )
 
+        self.button_input_controller = ButtonInputController(
+            station_controllers=self.station_controllers,
+        )
+
         self.top_bar_timer = QTimer(self)
         self.top_bar_timer.timeout.connect(self.update_top_bar_status)
         self.top_bar_timer.start(1000)
@@ -171,20 +176,13 @@ class MainWindow(QWidget):
         return f"{f1_text}    {f2_text}"
 
     def handle_button_press(self, button_name, is_pressed):
-        if not is_pressed:
-            return
+        """
+        Vanha yhteensopivuusrajapinta GPIOInputHandlerille.
+        Varsinainen logiikka on ButtonInputControllerissa.
+        """
 
-        station = self.station_controllers.get(1)
-
-        if not station:
-            return
-
-        if button_name == "START":
-            station.start_test()
-        elif button_name == "STOP":
-            station.stop_test()
-        elif button_name == "TEST1":
-            return
+        if hasattr(self, "button_input_controller") and self.button_input_controller:
+            self.button_input_controller.handle_button_press(button_name, is_pressed)
 
     def handle_modbus_result(self, result, op_code, error_msg):
         if op_code == 2 and hasattr(result, "address") and result.address == 19099:
@@ -276,6 +274,9 @@ class MainWindow(QWidget):
         try:
             if hasattr(self, "top_bar_timer") and self.top_bar_timer:
                 self.top_bar_timer.stop()
+
+            if hasattr(self, "button_input_controller") and self.button_input_controller:
+                self.button_input_controller.cleanup()
 
             if hasattr(self, "emergency_stop_controller") and self.emergency_stop_controller:
                 self.emergency_stop_controller.cleanup()
