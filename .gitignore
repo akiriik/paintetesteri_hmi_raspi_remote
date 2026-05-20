@@ -38,3 +38,7 @@ data/
 # LVGL-fonttien .c/.h -generoinnit (jos väliaikaisia)
 *.lv_font_*.h
 *.lv_font_*.c
+
+# QtCreator / paikalliset editori- ja venv-kansiot
+.qtcreator/
+dualtester/.qtcreator/
