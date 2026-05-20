@@ -1,8 +1,8 @@
-# ui/main_window.py - Päivitetty versio SHT20-anturilla ja paineella
-import sys
+# ui/main_window.py
 import os
-import time
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QApplication
+import sys
+
+from PyQt5.QtWidgets import QWidget, QApplication
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QKeyEvent
 
@@ -11,17 +11,18 @@ from ui.screens.manual_screen import ManualScreen
 from ui.screens.program_selection_screen import ProgramSelectionScreen
 from ui.components.emergency_stop_dialog import EmergencyStopDialog
 from ui.components.environment_status_bar import EnvironmentStatusBar
-from utils.fortest_handler import DummyForTestHandler
-from utils.modbus_manager import ModbusManager
-from utils.fortest_manager import ForTestManager
-from utils.gpio_handler import GPIOHandler
-from utils.gpio_input_handler import GPIOInputHandler
-from utils.program_manager import ProgramManager
-from utils.dfr0558_handler import DFR0558Manager
 
-DEV_MODE_FORTEST = True   # True = ForTest DEV mode / ei oikeaa ForTest-yhteyttä
-DEV_MODE_MODBUS = True     # pää-Modbus pois
-DEV_MODE_GPIO = True       # GPIO pois
+from utils.program_manager import ProgramManager
+
+from services.hardware_service import HardwareService
+from services.fortest_service import ForTestService
+from controllers.station_controller import StationController
+
+
+DEV_MODE_FORTEST = True
+DEV_MODE_MODBUS = True
+DEV_MODE_GPIO = True
+
 
 class MainWindow(QWidget):
     def __init__(self, parent=None):
@@ -42,13 +43,14 @@ class MainWindow(QWidget):
             }
         """)
 
-        # Alusta ohjelmamanageri ensin
+        self.DEV_MODE_FORTEST = DEV_MODE_FORTEST
+        self.DEV_MODE_MODBUS = DEV_MODE_MODBUS
+        self.DEV_MODE_GPIO = DEV_MODE_GPIO
+
+        self.pending_program_station_id = None
+
         self.program_manager = ProgramManager()
 
-        # DEV mode -liput käyttöliittymälle
-        self.DEV_MODE_FORTEST = DEV_MODE_FORTEST
-
-        # Näytöt - luodaan suoraan MainWindowiin
         self.main_screen = MainScreen(self)
         self.main_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
 
@@ -56,305 +58,254 @@ class MainWindow(QWidget):
         self.manual_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
         self.manual_screen.hide()
 
-        # Välitä ohjelmamanageri ohjelmanvalintanäkymälle
         self.program_selection_screen = ProgramSelectionScreen(self, self.program_manager)
         self.program_selection_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
         self.program_selection_screen.hide()
         self.program_selection_screen.program_selected.connect(self.on_program_selected)
 
-        # Ympäristötietojen statusrivi pidetään piilossa.
-        # Komponenttia käytetään vielä lämpötila-, kosteus- ja painetiedon käsittelyyn.
         self.environment_status_bar = EnvironmentStatusBar(self)
         self.environment_status_bar.setGeometry(265, 50, 750, 40)
         self.environment_status_bar.hide()
 
-        self.modbus_manager = None
-        self.fortest_manager = None
+        self.hardware_service = HardwareService(
+            parent=self,
+            dev_mode_modbus=DEV_MODE_MODBUS,
+            dev_mode_gpio=DEV_MODE_GPIO,
+            modbus_port="/dev/ttyUSB0",
+            modbus_baudrate=19200,
+        )
 
-        if not DEV_MODE_MODBUS:
-            self.modbus_manager = ModbusManager(port='/dev/ttyUSB0', baudrate=19200)
-            self.modbus_manager.resultReady.connect(self.handle_modbus_result)
+        self.fortest_service = ForTestService(
+            parent=self,
+            dev_mode_fortest=DEV_MODE_FORTEST,
+            station_ports={
+                1: "/dev/ttyUSB1",
+                2: None,
+            },
+            baudrate=19200,
+        )
 
-        if not DEV_MODE_FORTEST:
-            self.fortest_manager = ForTestManager(port='/dev/ttyUSB1', baudrate=19200)
-            self.fortest_manager.resultReady.connect(self.handle_fortest_result)
+        # Vanhojen näkymien ja komponenttien yhteensopivuus.
+        # ManualScreen käyttää edelleen parent().modbus_manager-rakennetta.
+        self.modbus_manager = self.hardware_service.modbus_manager
+        self.gpio_handler = self.hardware_service.gpio_handler
+        self.gpio_input_handler = self.hardware_service.gpio_input_handler
+        self.dfr0558_manager = self.hardware_service.dfr0558_manager
 
-        # Alusta DFR0558 kappalelämpötila-anturi
-        # Fyysinen I2C-laite, joten käytetään samaa dev mode -ryhmää kuin GPIO:lla.
-        if not DEV_MODE_GPIO:
-            try:
-                self.dfr0558_manager = DFR0558Manager()
-                self.dfr0558_manager.data_updated.connect(
-                    self.environment_status_bar.update_part_temperature_data
-                )
-                self.dfr0558_manager.error_occurred.connect(
-                    self.environment_status_bar.show_part_temperature_error
-                )
-            except Exception as e:
-                print(f"Varoitus: DFR0558-anturin alustus epäonnistui: {e}")
-                self.dfr0558_manager = None
-        else:
-            self.dfr0558_manager = None
+        # Vanhan yhden testerin yhteensopivuus.
+        # Station 1 käyttää samaa ForTestManager-polkuviittausta kuin v2vanhempi2.
+        self.fortest_manager = self.fortest_service.get_manager(1)
 
-        # Alusta GPIO-outputit
-        if not DEV_MODE_GPIO:
-            try:
-                self.gpio_handler = GPIOHandler()
-            except Exception as e:
-                print(f"Varoitus: GPIO-alustus epäonnistui: {e}")
-                self.gpio_handler = None
-        else:
-            self.gpio_handler = None
+        self.station_controllers = {
+            1: StationController(
+                station_id=1,
+                station_widget=self.main_screen.fortest1,
+                main_window=self,
+                fortest_service=self.fortest_service,
+                hardware_service=self.hardware_service,
+                dev_mode_fortest=DEV_MODE_FORTEST,
+                parent=self,
+            ),
+            2: StationController(
+                station_id=2,
+                station_widget=self.main_screen.fortest2,
+                main_window=self,
+                fortest_service=self.fortest_service,
+                hardware_service=self.hardware_service,
+                dev_mode_fortest=DEV_MODE_FORTEST,
+                parent=self,
+            ),
+        }
 
-        # Alusta GPIO-nappulat / fyysiset painikkeet
-        if not DEV_MODE_GPIO:
-            try:
-                self.gpio_input_handler = GPIOInputHandler()
-                self.gpio_input_handler.button_changed.connect(self.handle_button_press)
-            except Exception as e:
-                print(f"Varoitus: GPIO-nappuloiden alustus epäonnistui: {e}")
-                self.gpio_input_handler = None
-        else:
-            self.gpio_input_handler = None
-
-        # Ajastimet
         self.emergency_stop_timer = QTimer(self)
         self.emergency_stop_timer.timeout.connect(self.check_emergency_stop)
-        self.emergency_stop_timer.start(1000)  # Tarkista hätäseis kerran sekunnissa
+        self.emergency_stop_timer.start(1000)
 
         self.emergency_dialog_open = False
+        self._emergency_dialog = None
         self._dialog_opened_time = 0
 
     def update_environment_sensors(self):
-        """Päivitä I2C-anturit - kutsutaan statusrivin ajastimesta"""
-        if hasattr(self, 'dfr0558_manager') and self.dfr0558_manager:
-            self.dfr0558_manager.read_once()
-        
+        self.hardware_service.update_environment_sensors()
+
     def handle_button_press(self, button_name, is_pressed):
-        """Käsittelee GPIO-nappulan painalluksen - reagoidaan vain painallukseen"""
-        # Tässä tapauksessa is_pressed on aina True (vain painallus tulee signaalina)
-        
+        if not is_pressed:
+            return
+
+        station = self.station_controllers.get(1)
+
+        if not station:
+            return
+
         if button_name == "START":
-            self.testing_screen.start_test()
+            station.start_test()
         elif button_name == "STOP":
-            self.testing_screen.stop_test()
+            station.stop_test()
         elif button_name == "TEST1":
             return
-                
-    def toggle_test(self, panel_index):
-        """Vaihda testin tila hallitusti"""
-        if panel_index < 0 or panel_index >= len(self.testing_screen.test_panels):
-            return
-
-        panel = self.testing_screen.test_panels[panel_index]
-        panel.is_active = not panel.is_active
-        panel.update_button_style()
-        
-        # Aseta GPIO-lähtö uudessa tilassa
-        if self.gpio_handler:
-            self.gpio_handler.set_output(panel_index + 1, panel.is_active)
 
     def check_emergency_stop(self):
-        """Tarkista hätäseistila"""
-        if not hasattr(self, 'modbus_manager') or not self.modbus_manager or not self.modbus_manager.is_connected():
+        if not self.hardware_service.is_modbus_connected():
             return
 
         try:
-            status = self.modbus_manager.read_emergency_stop_status()
-            
-            # Jos hätäseis ei ole päällä, mutta dialog on auki, sulje se
+            status = self.hardware_service.read_emergency_stop_status()
+
             if status == 1 and self.emergency_dialog_open:
-                if hasattr(self, '_emergency_dialog') and self._emergency_dialog is not None:
+                if self._emergency_dialog is not None:
                     self._emergency_dialog.accept()
                     self._emergency_dialog = None
                     self.emergency_dialog_open = False
 
-            # Jos hätäseis on päällä, mutta dialog ei ole auki, avaa se
             elif status == 0 and not self.emergency_dialog_open:
-                # Lähetä heti pysäytyskäsky kun hätäseis aktivoituu
-                if hasattr(self, 'fortest_manager') and self.fortest_manager:
+                station = self.station_controllers.get(1)
+
+                if station:
                     try:
-                        self.fortest_manager.abort_test()
-                        self.testing_screen.update_status("HÄTÄSEIS AKTIVOITU, TESTI PYSÄYTETTY", "ERROR")
+                        station.stop_test()
+                        station.update_status("HÄTÄSEIS AKTIVOITU, TESTI PYSÄYTETTY", "ERROR")
                     except Exception as e:
                         print(f"Virhe testin pysäytyksessä: {e}")
-                
-                # Avaa dialogi normaalisti
+
                 self.emergency_dialog_open = True
                 self._emergency_dialog = EmergencyStopDialog(self, self.modbus_manager)
                 self._emergency_dialog._is_emergency_stop_dialog = True
                 self._emergency_dialog.finished.connect(self.on_emergency_dialog_closed)
                 self._emergency_dialog.exec_()
+
         except Exception as e:
             print(f"Virhe hätäseistilan tarkistuksessa: {e}")
             self.emergency_stop_timer.stop()
 
     def on_emergency_dialog_closed(self, result):
-        """Hätäseisdialogin sulkemisen käsittely"""
         self.emergency_dialog_open = False
-        if result == 1:  # QDialog.Accepted
-            self.testing_screen.update_status("Hätäseis kuitattu", "INFO")
+
+        station = self.station_controllers.get(1)
+        if result == 1 and station:
+            station.update_status("HÄTÄSEIS KUITATTU", "INFO")
+
         self._emergency_dialog = None
 
     def handle_modbus_result(self, result, op_code, error_msg):
-        """Käsittelee modbus-kyselyn tuloksen"""
-        # Estä täysin rekisterin 19099 (hätäseis) kirjoitusten käsittely
-        if op_code == 2 and hasattr(result, 'address') and result.address == 19099:
+        if op_code == 2 and hasattr(result, "address") and result.address == 19099:
             return
-            
-        # Ohita myös jos kyseessä on hätäseisdialogi
-        if hasattr(self, '_emergency_dialog') and getattr(self._emergency_dialog, '_is_emergency_stop_dialog', False):
-            if op_code == 2:  # Rekisterin kirjoitus
-                return   
-        
+
+        if hasattr(self, "_emergency_dialog") and getattr(self._emergency_dialog, "_is_emergency_stop_dialog", False):
+            if op_code == 2:
+                return
+
+        station = self.station_controllers.get(1)
+
         if error_msg:
-            # Päivitä tilaviesti päänäkymään
-            self.testing_screen.update_status(error_msg, "ERROR")
+            if station:
+                station.update_status(error_msg, "ERROR")
             return
-        
+
         if not result:
             return
 
-        # Ohjelmanvaihdon tulos (Write Single Register, 0x06)
-        if op_code == 2:  # Rekisterin kirjoitus
-            if hasattr(result, 'isError') and not result.isError():
-                # Ohjelmanvaihto onnistui, jatka testin käynnistystä
-                self.testing_screen.update_status(f"Ohjelma vaihdettu onnistuneesti", "SUCCESS")
+        if op_code == 2:
+            if hasattr(result, "isError") and not result.isError():
+                if station:
+                    station.update_status("OHJELMANVAIHTO / MODBUS-KIRJOITUS OK", "SUCCESS")
             else:
-                # Ohjelmanvaihto epäonnistui
-                self.testing_screen.update_status("Ohjelmanvaihto epäonnistui", "ERROR")
+                if station:
+                    station.update_status("MODBUS-KIRJOITUS EPÄONNISTUI", "ERROR")
+
+    def handle_fortest_result(self, station_id, result, op_code, error_msg):
+        station = self.station_controllers.get(station_id)
+
+        if not station:
             return
 
-    def handle_fortest_result(self, result, op_code, error_msg):
-        # Rajoita tulostusta vain tärkeisiin tapahtumiin
-        if op_code != 3 and op_code != 4:  # Älä tulosta status ja results kyselyjen tuloksia
-            print(f"handle_fortest_result: op_code={op_code}, error_msg={error_msg}")
- 
-        """Käsittelee ForTest-laitteen operaatiotulokset"""
-        if op_code == 999:  # Erityinen koodi yhteyden epäonnistumiselle
-            self.testing_screen.update_status(error_msg, "WARNING")
+        if op_code != 3 and op_code != 4:
+            print(f"ForTest {station_id}: op_code={op_code}, error_msg={error_msg}")
+
+        if op_code == 999:
+            station.update_status(error_msg, "WARNING")
             return
 
         if error_msg:
-            self.testing_screen.update_status(error_msg, "ERROR")
+            station.update_status(error_msg, "ERROR")
             return
 
         if result:
-            msg = ""
-            level = "INFO"
+            if op_code == 1:
+                station.update_status("TESTI KÄYNNISTETTY ONNISTUNEESTI", "SUCCESS")
+            elif op_code == 2:
+                station.update_status("TESTI PYSÄYTETTY", "INFO")
 
-            if op_code == 1:  # Testin käynnistys
-                msg = "Testi käynnistetty onnistuneesti"
-                level = "SUCCESS"
-                # Käynnissä: punainen päällä, vihreä pois
-                if self.gpio_handler:
-                    self.gpio_handler.set_output(4, False)  # GPIO 23 (vihreä) pois
-                    self.gpio_handler.set_output(5, True)   # GPIO 24 (punainen) päälle
-            elif op_code == 2:  # Testin pysäytys
-                msg = "Testi pysäytetty"
-                level = "INFO"
-                # Pysäytetty: vihreä päällä, punainen pois
-                if self.gpio_handler:
-                    self.gpio_handler.set_output(4, True)   # GPIO 23 (vihreä) päälle
-                    self.gpio_handler.set_output(5, False)  # GPIO 24 (punainen) pois
+        if op_code == 3:
+            station.update_status_from_fortest(result)
+        elif op_code == 4:
+            station.update_test_results(result)
 
-            if msg:
-                self.testing_screen.update_status(msg, level)
+    def on_program_selected(self, program_data):
+        if not self.pending_program_station_id:
+            self.show_testing()
+            return
 
-        if op_code == 3:  # Status read
-            # Välitä status testingscreen:lle
-            self.testing_screen.update_status_from_fortest(result)
-        elif op_code == 4:  # Results read
-            # Välitä tulokset aktiivisille paneeleille
-            for panel in self.testing_screen.test_panels:
-                if panel.is_active:
-                    panel.update_test_results(result)
+        station = self.station_controllers.get(self.pending_program_station_id)
 
-    def toggle_test_active(self, test_number, active):
-        """Vaihda testin aktiivisuustila vain UI:n ja GPIO:n osalta"""
-        # Varmista että test_number on sallituissa rajoissa
-        if 1 <= test_number <= len(self.testing_screen.test_panels):
-            panel = self.testing_screen.test_panels[test_number - 1]
-            panel.is_active = active
-            panel.update_button_style()
+        if station:
+            station.set_program(program_data)
 
-            # Ohjaa vain GPIO-lähtö
-            if self.gpio_handler:
-                self.gpio_handler.set_output(test_number, active)
-
-    def on_program_selected(self, program_name):
-        """Käsittelee ohjelman valinnan"""
-        self.testing_screen.set_program_for_test(program_name)
+        self.pending_program_station_id = None
         self.show_testing()
 
     def show_testing(self):
-        """Näyttää päänäkymän"""
         self.environment_status_bar.hide()
         self.manual_screen.hide()
         self.program_selection_screen.hide()
         self.main_screen.show()
 
     def show_manual(self):
-        """Näyttää käsikäyttösivun"""
         self.main_screen.hide()
         self.environment_status_bar.hide()
         self.program_selection_screen.hide()
         self.manual_screen.show()
 
-    def show_program_selection(self, test_number=None):
-        """Näyttää ohjelman valintasivun"""
+    def show_program_selection(self, station_id=None):
+        self.pending_program_station_id = station_id
         self.environment_status_bar.hide()
         self.main_screen.hide()
         self.manual_screen.hide()
         self.program_selection_screen.show()
 
     def keyPressEvent(self, event: QKeyEvent):
-        """Käsittelee näppäimistötapahtumat"""
         if event.key() == Qt.Key_Escape:
             if self.manual_screen.isVisible() or self.program_selection_screen.isVisible():
                 self.show_testing()
             else:
                 self.close()
+
         super().keyPressEvent(event)
 
     def show(self):
-        """Näyttää ikkunan koko ruudussa"""
         self.showFullScreen()
 
     def closeEvent(self, event):
-        """Käsittelee sovelluksen sulkemisen"""
         try:
+            for controller in self.station_controllers.values():
+                controller.cleanup()
 
-            # Siivoa DFR0558-anturi
-            if hasattr(self, 'dfr0558_manager') and self.dfr0558_manager:
-                self.dfr0558_manager.cleanup()
-                
-            # Siivoa environment status bar
-            if hasattr(self, 'environment_status_bar') and self.environment_status_bar:
+            if hasattr(self, "environment_status_bar") and self.environment_status_bar:
                 self.environment_status_bar.cleanup()
-                
-            # Siivoa ensin GPIO-nappuloiden tapahtumakuuntelijat
-            if hasattr(self, 'gpio_input_handler') and self.gpio_input_handler:
-                self.gpio_input_handler.cleanup()
-                
-            if hasattr(self, 'main_screen') and self.main_screen:
-                if hasattr(self.main_screen, 'cleanup'):
-                    self.main_screen.cleanup()
 
-            if hasattr(self, 'manual_screen') and self.manual_screen:
+            if hasattr(self, "manual_screen") and self.manual_screen:
                 self.manual_screen.cleanup()
 
-            if hasattr(self, 'modbus_manager') and self.modbus_manager:
-                self.modbus_manager.cleanup()
+            if hasattr(self, "main_screen") and self.main_screen:
+                if hasattr(self.main_screen, "cleanup"):
+                    self.main_screen.cleanup()
 
-            if hasattr(self, 'fortest_manager') and self.fortest_manager:
-                self.fortest_manager.cleanup()
-            
-            # Lopuksi GPIO-outputit
-            if hasattr(self, 'gpio_handler') and self.gpio_handler:
-                self.gpio_handler.cleanup()
-                 
+            if hasattr(self, "fortest_service") and self.fortest_service:
+                self.fortest_service.cleanup()
+
+            if hasattr(self, "hardware_service") and self.hardware_service:
+                self.hardware_service.cleanup()
+
         except Exception as e:
-            # Virhetilanteessa älä tulosta täyttä virhettä
             print("Virhe sovelluksen sulkemisessa")
+
         super().closeEvent(event)

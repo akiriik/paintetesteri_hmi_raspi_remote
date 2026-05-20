@@ -1,13 +1,23 @@
+# ui/components/fortest_station.py
 from PyQt5.QtWidgets import QFrame, QLabel, QPushButton
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
 
 class ForTestStation(QFrame):
+    """
+    Yhden ForTest-aseman UI-komponentti.
+
+    Tämä ei sisällä Modbus-, GPIO- tai ForTest-yhteyslogiikkaa.
+    """
+
     def __init__(self, station_id, title, parent=None):
         super().__init__(parent)
+
         self.station_id = station_id
         self.title = title
+        self.results_history = []
+
         self.init_ui()
 
     def init_ui(self):
@@ -46,19 +56,25 @@ class ForTestStation(QFrame):
         self.program_label.setFont(QFont("Consolas", 18, QFont.Bold))
         self.program_label.setStyleSheet("color: #33FF33; background: transparent; border: none;")
 
+        self.program_desc_label = QLabel("", self.program_box)
+        self.program_desc_label.setGeometry(15, 45, 850, 28)
+        self.program_desc_label.setFont(QFont("Consolas", 13))
+        self.program_desc_label.setStyleSheet("color: #33FF33; background: transparent; border: none;")
+
         self.program_info_label = QLabel(
             "PAINE: --     TILAVUUS: --     TÄYTTÖ: --     TASAUS: --     TESTI: --     RAJA: --",
             self.program_box
         )
-        self.program_info_label.setGeometry(15, 55, 850, 95)
+        self.program_info_label.setGeometry(15, 75, 850, 80)
         self.program_info_label.setFont(QFont("Consolas", 14))
         self.program_info_label.setWordWrap(True)
         self.program_info_label.setStyleSheet("color: #33FF33; background: transparent; border: none;")
 
         self.results_box = QLabel("", self)
-        self.results_box.setGeometry(20, 255, 880, 580)
+        self.results_box.setGeometry(20, 255, 880, 520)
         self.results_box.setFont(QFont("Consolas", 15))
         self.results_box.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.results_box.setTextFormat(Qt.RichText)
         self.results_box.setStyleSheet("""
             QLabel {
                 background-color: black;
@@ -68,10 +84,10 @@ class ForTestStation(QFrame):
                 padding: 12px;
             }
         """)
-        self.results_box.setText("AIKA        OHJELMA        VUOTO        TULOS        HUONE        KAPPALE")
+        self._refresh_results_table()
 
         self.select_program_button = QPushButton("VALITSE OHJELMA", self)
-        self.select_program_button.setGeometry(20, 850, 280, 75)
+        self.select_program_button.setGeometry(20, 795, 280, 75)
         self.select_program_button.setFont(QFont("Arial", 18, QFont.Bold))
         self.select_program_button.setStyleSheet("""
             QPushButton {
@@ -86,7 +102,7 @@ class ForTestStation(QFrame):
         """)
 
         self.start_button = QPushButton("START", self)
-        self.start_button.setGeometry(330, 850, 250, 75)
+        self.start_button.setGeometry(330, 795, 250, 75)
         self.start_button.setFont(QFont("Arial", 22, QFont.Bold))
         self.start_button.setStyleSheet("""
             QPushButton {
@@ -95,10 +111,14 @@ class ForTestStation(QFrame):
                 border-radius: 10px;
                 border: none;
             }
+            QPushButton:disabled {
+                background-color: #333333;
+                color: #777777;
+            }
         """)
 
         self.stop_button = QPushButton("STOP", self)
-        self.stop_button.setGeometry(610, 850, 290, 75)
+        self.stop_button.setGeometry(610, 795, 290, 75)
         self.stop_button.setFont(QFont("Arial", 22, QFont.Bold))
         self.stop_button.setStyleSheet("""
             QPushButton {
@@ -107,4 +127,117 @@ class ForTestStation(QFrame):
                 border-radius: 10px;
                 border: none;
             }
+            QPushButton:disabled {
+                background-color: #333333;
+                color: #777777;
+            }
         """)
+
+        self.dev_result_button = QPushButton("DEV TULOS", self)
+        self.dev_result_button.setGeometry(20, 885, 280, 60)
+        self.dev_result_button.setFont(QFont("Arial", 15, QFont.Bold))
+        self.dev_result_button.setStyleSheet("""
+            QPushButton {
+                background-color: #555555;
+                color: white;
+                border-radius: 10px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #777777;
+            }
+        """)
+        self.dev_result_button.hide()
+
+        self.update_running_state(False, False)
+
+    def update_program_info(
+        self,
+        display_name,
+        description,
+        pressure,
+        volume,
+        fill_time,
+        settle_time,
+        test_time,
+        decay_text,
+    ):
+        self.program_label.setText(f"OHJELMA: {display_name}")
+        self.program_desc_label.setText(description)
+
+        self.program_info_label.setText(
+            f"PAINE: {pressure} mbar     "
+            f"TILAVUUS: {volume} ml     "
+            f"TÄYTTÖ: {fill_time}s     "
+            f"TASAUS: {settle_time}s     "
+            f"TESTI: {test_time}s     "
+            f"RAJA: {decay_text}"
+        )
+
+    def update_status(self, message, level="INFO"):
+        color = "#33FF33"
+
+        if level == "ERROR":
+            color = "red"
+        elif level == "WARNING":
+            color = "orange"
+        elif level == "SUCCESS":
+            color = "#00FF00"
+
+        self.status_label.setStyleSheet(
+            f"color: {color}; background: transparent; border: none;"
+        )
+        self.status_label.setText(message)
+
+    def update_running_state(self, is_running, ready):
+        if is_running:
+            self.start_button.setEnabled(False)
+            self.stop_button.setEnabled(True)
+        else:
+            self.start_button.setEnabled(bool(ready))
+            self.stop_button.setEnabled(False)
+
+    def add_result_row(
+        self,
+        display_time,
+        program_text,
+        decay_text,
+        result_text,
+        result_color,
+        room_temp_text,
+        part_temp_text,
+    ):
+        new_result = f"""
+        <tr>
+            <td>{display_time}</td>
+            <td>{program_text}</td>
+            <td><span style="color:{result_color};">{decay_text}</span></td>
+            <td><span style="color:{result_color};">{result_text}</span></td>
+            <td>{room_temp_text}</td>
+            <td>{part_temp_text}</td>
+        </tr>
+        """
+
+        self.results_history.insert(0, new_result)
+
+        if len(self.results_history) > 12:
+            self.results_history.pop()
+
+        self._refresh_results_table()
+
+    def _refresh_results_table(self):
+        display_html = f"""
+        <table width="100%" cellspacing="0" cellpadding="6">
+            <tr style="color:#888888; font-size:18px;">
+                <td>AIKA</td>
+                <td>OHJELMA</td>
+                <td>VUOTO</td>
+                <td>TULOS</td>
+                <td>HUONE</td>
+                <td>KAPPALE</td>
+            </tr>
+            {''.join(self.results_history)}
+        </table>
+        """
+
+        self.results_box.setText(display_html)
