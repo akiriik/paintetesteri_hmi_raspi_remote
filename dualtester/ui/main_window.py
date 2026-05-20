@@ -17,6 +17,7 @@ from controllers.station_controller import StationController
 from controllers.program_selection_controller import ProgramSelectionController
 from controllers.emergency_stop_controller import EmergencyStopController
 from controllers.button_input_controller import ButtonInputController
+from controllers.modbus_result_controller import ModbusResultController
 
 
 DEV_MODE_FORTEST = True
@@ -129,6 +130,11 @@ class MainWindow(QWidget):
             station_controllers=self.station_controllers,
         )
 
+        self.modbus_result_controller = ModbusResultController(
+            station_controllers=self.station_controllers,
+            emergency_stop_controller=self.emergency_stop_controller,
+        )
+
         self.top_bar_timer = QTimer(self)
         self.top_bar_timer.timeout.connect(self.update_top_bar_status)
         self.top_bar_timer.start(1000)
@@ -185,31 +191,13 @@ class MainWindow(QWidget):
             self.button_input_controller.handle_button_press(button_name, is_pressed)
 
     def handle_modbus_result(self, result, op_code, error_msg):
-        if op_code == 2 and hasattr(result, "address") and result.address == 19099:
-            return
+        """
+        Vanha yhteensopivuusrajapinta ModbusManagerille.
+        Varsinainen logiikka on ModbusResultControllerissa.
+        """
 
-        if hasattr(self, "emergency_stop_controller"):
-            if self.emergency_stop_controller.is_emergency_dialog_active():
-                if op_code == 2:
-                    return
-
-        station = self.station_controllers.get(1)
-
-        if error_msg:
-            if station:
-                station.update_status(error_msg, "ERROR")
-            return
-
-        if not result:
-            return
-
-        if op_code == 2:
-            if hasattr(result, "isError") and not result.isError():
-                if station:
-                    station.update_status("MODBUS-KIRJOITUS OK", "SUCCESS")
-            else:
-                if station:
-                    station.update_status("MODBUS-KIRJOITUS EPÄONNISTUI", "ERROR")
+        if hasattr(self, "modbus_result_controller") and self.modbus_result_controller:
+            self.modbus_result_controller.handle_result(result, op_code, error_msg)
 
     def handle_fortest_result(self, station_id, result, op_code, error_msg):
         station = self.station_controllers.get(station_id)
@@ -274,6 +262,9 @@ class MainWindow(QWidget):
         try:
             if hasattr(self, "top_bar_timer") and self.top_bar_timer:
                 self.top_bar_timer.stop()
+
+            if hasattr(self, "modbus_result_controller") and self.modbus_result_controller:
+                self.modbus_result_controller.cleanup()
 
             if hasattr(self, "button_input_controller") and self.button_input_controller:
                 self.button_input_controller.cleanup()
