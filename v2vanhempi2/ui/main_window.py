@@ -2,7 +2,7 @@
 import sys
 import os
 import time
-from PyQt5.QtWidgets import QWidget, QVBoxLayout
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QApplication
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QKeyEvent
 
@@ -28,7 +28,13 @@ class MainWindow(QWidget):
         super().__init__(parent)
 
         self.setWindowTitle("Painetestaus")
-        self.setGeometry(0, 0, 1280, 720)
+
+        screen = QApplication.primaryScreen()
+        screen_geometry = screen.geometry()
+        self.screen_width = screen_geometry.width()
+        self.screen_height = screen_geometry.height()
+
+        self.setGeometry(0, 0, self.screen_width, self.screen_height)
         self.setStyleSheet("""
             QWidget {
                 background-color: white;
@@ -44,16 +50,16 @@ class MainWindow(QWidget):
 
         # Näytöt - luodaan suoraan MainWindowiin
         self.testing_screen = TestingScreen(self)
-        self.testing_screen.setGeometry(0, 0, 1280, 720)
+        self.testing_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
         self.testing_screen.program_selection_requested.connect(self.show_program_selection)
 
         self.manual_screen = ManualScreen(self)
-        self.manual_screen.setGeometry(0, 0, 1280, 720)
+        self.manual_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
         self.manual_screen.hide()
 
         # Välitä ohjelmamanageri ohjelmanvalintanäkymälle
         self.program_selection_screen = ProgramSelectionScreen(self, self.program_manager)
-        self.program_selection_screen.setGeometry(0, 0, 1280, 720)
+        self.program_selection_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
         self.program_selection_screen.hide()
         self.program_selection_screen.program_selected.connect(self.on_program_selected)
 
