@@ -20,6 +20,7 @@ from controllers.button_input_controller import ButtonInputController
 from controllers.modbus_result_controller import ModbusResultController
 from controllers.fortest_result_controller import ForTestResultController
 from controllers.top_bar_controller import TopBarController
+from controllers.application_cleanup_controller import ApplicationCleanupController
 
 
 DEV_MODE_FORTEST = True
@@ -150,6 +151,10 @@ class MainWindow(QWidget):
             parent=self,
         )
 
+        self.application_cleanup_controller = ApplicationCleanupController(
+            main_window=self,
+        )
+
     def update_environment_sensors(self):
         """
         Vanha yhteensopivuusrajapinta sensoripäivityksille.
@@ -232,42 +237,7 @@ class MainWindow(QWidget):
         self.showFullScreen()
 
     def closeEvent(self, event):
-        try:
-            if hasattr(self, "top_bar_controller") and self.top_bar_controller:
-                self.top_bar_controller.cleanup()
-
-            if hasattr(self, "fortest_result_controller") and self.fortest_result_controller:
-                self.fortest_result_controller.cleanup()
-
-            if hasattr(self, "modbus_result_controller") and self.modbus_result_controller:
-                self.modbus_result_controller.cleanup()
-
-            if hasattr(self, "button_input_controller") and self.button_input_controller:
-                self.button_input_controller.cleanup()
-
-            if hasattr(self, "emergency_stop_controller") and self.emergency_stop_controller:
-                self.emergency_stop_controller.cleanup()
-
-            for controller in self.station_controllers.values():
-                controller.cleanup()
-
-            if hasattr(self, "environment_status_bar") and self.environment_status_bar:
-                self.environment_status_bar.cleanup()
-
-            if hasattr(self, "manual_screen") and self.manual_screen:
-                self.manual_screen.cleanup()
-
-            if hasattr(self, "main_screen") and self.main_screen:
-                if hasattr(self.main_screen, "cleanup"):
-                    self.main_screen.cleanup()
-
-            if hasattr(self, "fortest_service") and self.fortest_service:
-                self.fortest_service.cleanup()
-
-            if hasattr(self, "hardware_service") and self.hardware_service:
-                self.hardware_service.cleanup()
-
-        except Exception:
-            print("Virhe sovelluksen sulkemisessa")
+        if hasattr(self, "application_cleanup_controller") and self.application_cleanup_controller:
+            self.application_cleanup_controller.cleanup()
 
         super().closeEvent(event)
