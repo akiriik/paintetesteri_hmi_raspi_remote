@@ -6,7 +6,6 @@ from PyQt5.QtGui import QKeyEvent
 from ui.screens.main_screen import MainScreen
 from ui.screens.manual_screen import ManualScreen
 from ui.screens.program_selection_screen import ProgramSelectionScreen
-from ui.components.emergency_stop_dialog import EmergencyStopDialog
 from ui.components.environment_status_bar import EnvironmentStatusBar
 
 from utils.program_manager import ProgramManager
@@ -16,6 +15,7 @@ from services.fortest_service import ForTestService
 
 from controllers.station_controller import StationController
 from controllers.program_selection_controller import ProgramSelectionController
+from controllers.emergency_stop_controller import EmergencyStopController
 
 
 DEV_MODE_FORTEST = True
@@ -117,17 +117,16 @@ class MainWindow(QWidget):
             station_controllers=self.station_controllers,
         )
 
-        self.emergency_stop_timer = QTimer(self)
-        self.emergency_stop_timer.timeout.connect(self.check_emergency_stop)
-        self.emergency_stop_timer.start(1000)
+        self.emergency_stop_controller = EmergencyStopController(
+            main_window=self,
+            hardware_service=self.hardware_service,
+            station_controllers=self.station_controllers,
+            modbus_manager=self.modbus_manager,
+        )
 
         self.top_bar_timer = QTimer(self)
         self.top_bar_timer.timeout.connect(self.update_top_bar_status)
         self.top_bar_timer.start(1000)
-
-        self.emergency_dialog_open = False
-        self._emergency_dialog = None
-        self._dialog_opened_time = 0
 
         self.update_top_bar_status()
 
@@ -187,62 +186,14 @@ class MainWindow(QWidget):
         elif button_name == "TEST1":
             return
 
-    def check_emergency_stop(self):
-        if not self.hardware_service.is_modbus_connected():
-            return
-
-        try:
-            status = self.hardware_service.read_emergency_stop_status()
-
-            if status == 1 and self.emergency_dialog_open:
-                if self._emergency_dialog is not None:
-                    self._emergency_dialog.accept()
-                    self._emergency_dialog = None
-                    self.emergency_dialog_open = False
-
-            elif status == 0 and not self.emergency_dialog_open:
-                station = self.station_controllers.get(1)
-
-                if station:
-                    try:
-                        station.stop_test()
-                        station.update_status(
-                            "HÄTÄSEIS AKTIVOITU, TESTI PYSÄYTETTY",
-                            "ERROR",
-                        )
-                    except Exception as e:
-                        print(f"Virhe testin pysäytyksessä: {e}")
-
-                self.emergency_dialog_open = True
-                self._emergency_dialog = EmergencyStopDialog(self, self.modbus_manager)
-                self._emergency_dialog._is_emergency_stop_dialog = True
-                self._emergency_dialog.finished.connect(self.on_emergency_dialog_closed)
-                self._emergency_dialog.exec_()
-
-        except Exception as e:
-            print(f"Virhe hätäseistilan tarkistuksessa: {e}")
-            self.emergency_stop_timer.stop()
-
-    def on_emergency_dialog_closed(self, result):
-        self.emergency_dialog_open = False
-
-        station = self.station_controllers.get(1)
-        if result == 1 and station:
-            station.update_status("HÄTÄSEIS KUITATTU", "INFO")
-
-        self._emergency_dialog = None
-
     def handle_modbus_result(self, result, op_code, error_msg):
         if op_code == 2 and hasattr(result, "address") and result.address == 19099:
             return
 
-        if hasattr(self, "_emergency_dialog") and getattr(
-            self._emergency_dialog,
-            "_is_emergency_stop_dialog",
-            False,
-        ):
-            if op_code == 2:
-                return
+        if hasattr(self, "emergency_stop_controller"):
+            if self.emergency_stop_controller.is_emergency_dialog_active():
+                if op_code == 2:
+                    return
 
         station = self.station_controllers.get(1)
 
@@ -326,8 +277,8 @@ class MainWindow(QWidget):
             if hasattr(self, "top_bar_timer") and self.top_bar_timer:
                 self.top_bar_timer.stop()
 
-            if hasattr(self, "emergency_stop_timer") and self.emergency_stop_timer:
-                self.emergency_stop_timer.stop()
+            if hasattr(self, "emergency_stop_controller") and self.emergency_stop_controller:
+                self.emergency_stop_controller.cleanup()
 
             for controller in self.station_controllers.values():
                 controller.cleanup()
