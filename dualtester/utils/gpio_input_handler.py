@@ -6,6 +6,14 @@ import time
 import RPi.GPIO as GPIO
 from PyQt5.QtCore import QObject, pyqtSignal
 
+from config.gpio_config import (
+    GPIO_DEBOUNCE_TIME_MS,
+    GPIO_EVENT_BOUNCETIME_MS,
+    GPIO_INPUT_ACTIVE_LOW,
+    GPIO_INPUT_PULL_UP,
+    PHYSICAL_BUTTON_PINS,
+)
+
 
 class GPIOInputHandler(QObject):
     """Hallinnoi GPIO-sisääntuloja fyysisiä painikkeita varten."""
@@ -25,51 +33,38 @@ class GPIOInputHandler(QObject):
         try:
             GPIO.setmode(GPIO.BCM)
 
-            # Fyysisten painikkeiden oletuspinnit.
-            #
-            # STATION1_START:
-            #   ForTest 1 start/stop -painike.
-            #
-            # STATION2_START:
-            #   ForTest 2 start/stop -painike.
-            #
-            # EMERGENCY_STOP:
-            #   Ohjelmallinen hätäseisinput / tilatieto.
-            #   Ei korvaa oikeaa turvapiiriä.
-            #
-            # SPARE1-4:
-            #   Varapainikkeet tulevaa käyttöä varten.
-            self.button_pins = {
-                "STATION1_START": 5,
-                "STATION2_START": 6,
-                "EMERGENCY_STOP": 12,
-                "SPARE1": 13,
-                "SPARE2": 16,
-                "SPARE3": 20,
-                "SPARE4": 21,
-            }
-
-            for pin in self.button_pins.values():
-                GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
+            self.button_pins = PHYSICAL_BUTTON_PINS
             self.button_states = {button: False for button in self.button_pins}
             self.last_press_time = {button: 0 for button in self.button_pins}
-            self.debounce_time = 200
+            self.debounce_time = GPIO_DEBOUNCE_TIME_MS
+
+            pull_mode = GPIO.PUD_UP if GPIO_INPUT_PULL_UP else GPIO.PUD_DOWN
+
+            for pin in self.button_pins.values():
+                GPIO.setup(pin, GPIO.IN, pull_up_down=pull_mode)
 
             for button, pin in self.button_pins.items():
-                self.button_states[button] = not GPIO.input(pin)
+                self.button_states[button] = self._read_gpio_pressed(pin)
 
             for button_name, pin in self.button_pins.items():
                 GPIO.add_event_detect(
                     pin,
                     GPIO.BOTH,
                     callback=lambda channel, btn=button_name: self._button_callback(btn, channel),
-                    bouncetime=100,
+                    bouncetime=GPIO_EVENT_BOUNCETIME_MS,
                 )
 
         finally:
             sys.stdout = self._original_stdout
             sys.stderr = self._original_stderr
+
+    def _read_gpio_pressed(self, pin):
+        gpio_state = GPIO.input(pin)
+
+        if GPIO_INPUT_ACTIVE_LOW:
+            return not gpio_state
+
+        return bool(gpio_state)
 
     def _button_callback(self, button_name, channel):
         current_time = time.time() * 1000
@@ -78,7 +73,7 @@ class GPIOInputHandler(QObject):
         if current_time - last_time < self.debounce_time:
             return
 
-        is_pressed = not GPIO.input(channel)
+        is_pressed = self._read_gpio_pressed(channel)
 
         if is_pressed:
             self.last_press_time[button_name] = current_time
@@ -87,7 +82,7 @@ class GPIOInputHandler(QObject):
     def read_button_state(self, button_name):
         if button_name in self.button_pins:
             pin = self.button_pins[button_name]
-            current_state = not GPIO.input(pin)
+            current_state = self._read_gpio_pressed(pin)
 
             if current_state != self.button_states[button_name]:
                 self.button_states[button_name] = current_state

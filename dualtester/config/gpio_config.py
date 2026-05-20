@@ -4,13 +4,29 @@
 GPIO- ja I/O-määritykset dualtester-versiolle.
 
 Tämä tiedosto kokoaa fyysiset napit ja nappivalot yhteen paikkaan.
-Varsinainen logiikka on controllereissa.
+Varsinainen logiikka on controllereissa ja handler-luokissa.
 
 Huom:
 - Nämä ovat vielä oletusmäärityksiä.
 - DEV_MODE_GPIO = True, joten fyysisiä GPIO-inputteja ei vielä käytetä.
 - Hätäseis ei korvaa oikeaa turvapiiriä.
 """
+
+
+# GPIO-inputtien yleinen toimintamalli:
+#
+# Raspberry Pi input:
+# - käytetään BCM-numerointia
+# - inputit ovat PUD_UP-tilassa
+# - nappi oletetaan aktiiviseksi, kun input menee GND:hen
+#
+# Eli:
+# - ei painettu = HIGH
+# - painettu = LOW
+GPIO_INPUT_PULL_UP = True
+GPIO_INPUT_ACTIVE_LOW = True
+GPIO_DEBOUNCE_TIME_MS = 200
+GPIO_EVENT_BOUNCETIME_MS = 100
 
 
 PHYSICAL_BUTTONS = {
@@ -45,6 +61,13 @@ PHYSICAL_BUTTONS = {
 }
 
 
+# Pelkkä nimi -> GPIO -kartta GPIOInputHandlerille.
+PHYSICAL_BUTTON_PINS = {
+    button_name: button_data["gpio"]
+    for button_name, button_data in PHYSICAL_BUTTONS.items()
+}
+
+
 STATION_BUTTON_MAP = {
     "STATION1_START": 1,
     "STATION2_START": 2,
@@ -63,6 +86,8 @@ SPARE_BUTTONS = {
 }
 
 
+# HardwareService output -numerot.
+# Nämä eivät ole Raspberryn GPIO-numeroita, vaan ohjelman käyttämät output-kanavat.
 STATION_LIGHT_OUTPUTS = {
     1: 4,
     2: 5,
