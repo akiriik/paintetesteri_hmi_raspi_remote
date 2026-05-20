@@ -21,6 +21,7 @@ class ApplicationCleanupController:
         try:
             cleanup_order = [
                 "top_bar_controller",
+                "navigation_controller",
                 "fortest_result_controller",
                 "modbus_result_controller",
                 "button_input_controller",

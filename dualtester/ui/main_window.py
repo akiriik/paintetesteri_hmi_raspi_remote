@@ -1,6 +1,5 @@
 # ui/main_window.py
 from PyQt5.QtWidgets import QWidget, QApplication
-from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeyEvent
 
 from ui.screens.main_screen import MainScreen
@@ -21,6 +20,7 @@ from controllers.modbus_result_controller import ModbusResultController
 from controllers.fortest_result_controller import ForTestResultController
 from controllers.top_bar_controller import TopBarController
 from controllers.application_cleanup_controller import ApplicationCleanupController
+from controllers.navigation_controller import NavigationController
 
 
 DEV_MODE_FORTEST = True
@@ -137,6 +137,15 @@ class MainWindow(QWidget):
             station_controllers=self.station_controllers,
         )
 
+        self.navigation_controller = NavigationController(
+            main_window=self,
+            main_screen=self.main_screen,
+            manual_screen=self.manual_screen,
+            program_selection_screen=self.program_selection_screen,
+            environment_status_bar=self.environment_status_bar,
+            program_selection_controller=self.program_selection_controller,
+        )
+
         self.emergency_stop_controller = EmergencyStopController(
             main_window=self,
             hardware_service=self.hardware_service,
@@ -221,32 +230,40 @@ class MainWindow(QWidget):
             )
 
     def show_testing(self):
-        self.environment_status_bar.hide()
-        self.manual_screen.hide()
-        self.program_selection_screen.hide()
-        self.main_screen.show()
-        self.update_top_bar_status()
+        """
+        Vanha yhteensopivuusrajapinta päänäkymään palaamiselle.
+        Varsinainen logiikka on NavigationControllerissa.
+        """
+
+        if hasattr(self, "navigation_controller") and self.navigation_controller:
+            self.navigation_controller.show_testing()
 
     def show_manual(self):
-        self.main_screen.hide()
-        self.environment_status_bar.hide()
-        self.program_selection_screen.hide()
-        self.manual_screen.show()
+        """
+        Vanha yhteensopivuusrajapinta käsikäytön avaamiselle.
+        Varsinainen logiikka on NavigationControllerissa.
+        """
+
+        if hasattr(self, "navigation_controller") and self.navigation_controller:
+            self.navigation_controller.show_manual()
 
     def show_program_selection(self, station_id=None):
-        self.program_selection_controller.open_for_station(station_id)
+        """
+        Vanha yhteensopivuusrajapinta ohjelmanvalinnan avaamiselle.
+        Varsinainen logiikka on NavigationControllerissa.
+        """
+
+        if hasattr(self, "navigation_controller") and self.navigation_controller:
+            self.navigation_controller.show_program_selection(station_id)
 
     def keyPressEvent(self, event: QKeyEvent):
-        if event.key() == Qt.Key_Escape:
-            if self.manual_screen.isVisible() or self.program_selection_screen.isVisible():
-                if self.program_selection_screen.isVisible():
-                    self.program_selection_controller.cancel_selection()
-                else:
-                    self.show_testing()
-            else:
-                self.close()
+        handled = False
 
-        super().keyPressEvent(event)
+        if hasattr(self, "navigation_controller") and self.navigation_controller:
+            handled = self.navigation_controller.handle_key_press(event)
+
+        if not handled:
+            super().keyPressEvent(event)
 
     def show(self):
         self.showFullScreen()
