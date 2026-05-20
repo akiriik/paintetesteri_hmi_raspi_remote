@@ -13,7 +13,9 @@ from utils.program_manager import ProgramManager
 
 from services.hardware_service import HardwareService
 from services.fortest_service import ForTestService
+
 from controllers.station_controller import StationController
+from controllers.program_selection_controller import ProgramSelectionController
 
 
 DEV_MODE_FORTEST = True
@@ -44,8 +46,6 @@ class MainWindow(QWidget):
         self.DEV_MODE_MODBUS = DEV_MODE_MODBUS
         self.DEV_MODE_GPIO = DEV_MODE_GPIO
 
-        self.pending_program_station_id = None
-
         self.program_manager = ProgramManager()
 
         self.main_screen = MainScreen(self)
@@ -58,7 +58,6 @@ class MainWindow(QWidget):
         self.program_selection_screen = ProgramSelectionScreen(self, self.program_manager)
         self.program_selection_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
         self.program_selection_screen.hide()
-        self.program_selection_screen.program_selected.connect(self.on_program_selected)
 
         self.environment_status_bar = EnvironmentStatusBar(self)
         self.environment_status_bar.setGeometry(265, 50, 750, 40)
@@ -111,6 +110,12 @@ class MainWindow(QWidget):
                 parent=self,
             ),
         }
+
+        self.program_selection_controller = ProgramSelectionController(
+            main_window=self,
+            program_selection_screen=self.program_selection_screen,
+            station_controllers=self.station_controllers,
+        )
 
         self.emergency_stop_timer = QTimer(self)
         self.emergency_stop_timer.timeout.connect(self.check_emergency_stop)
@@ -201,7 +206,10 @@ class MainWindow(QWidget):
                 if station:
                     try:
                         station.stop_test()
-                        station.update_status("HÄTÄSEIS AKTIVOITU, TESTI PYSÄYTETTY", "ERROR")
+                        station.update_status(
+                            "HÄTÄSEIS AKTIVOITU, TESTI PYSÄYTETTY",
+                            "ERROR",
+                        )
                     except Exception as e:
                         print(f"Virhe testin pysäytyksessä: {e}")
 
@@ -228,7 +236,11 @@ class MainWindow(QWidget):
         if op_code == 2 and hasattr(result, "address") and result.address == 19099:
             return
 
-        if hasattr(self, "_emergency_dialog") and getattr(self._emergency_dialog, "_is_emergency_stop_dialog", False):
+        if hasattr(self, "_emergency_dialog") and getattr(
+            self._emergency_dialog,
+            "_is_emergency_stop_dialog",
+            False,
+        ):
             if op_code == 2:
                 return
 
@@ -278,19 +290,6 @@ class MainWindow(QWidget):
         elif op_code == 4:
             station.update_test_results(result)
 
-    def on_program_selected(self, program_data):
-        if not self.pending_program_station_id:
-            self.show_testing()
-            return
-
-        station = self.station_controllers.get(self.pending_program_station_id)
-
-        if station:
-            station.set_program(program_data)
-
-        self.pending_program_station_id = None
-        self.show_testing()
-
     def show_testing(self):
         self.environment_status_bar.hide()
         self.manual_screen.hide()
@@ -305,16 +304,15 @@ class MainWindow(QWidget):
         self.manual_screen.show()
 
     def show_program_selection(self, station_id=None):
-        self.pending_program_station_id = station_id
-        self.environment_status_bar.hide()
-        self.main_screen.hide()
-        self.manual_screen.hide()
-        self.program_selection_screen.show()
+        self.program_selection_controller.open_for_station(station_id)
 
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key_Escape:
             if self.manual_screen.isVisible() or self.program_selection_screen.isVisible():
-                self.show_testing()
+                if self.program_selection_screen.isVisible():
+                    self.program_selection_controller.cancel_selection()
+                else:
+                    self.show_testing()
             else:
                 self.close()
 
