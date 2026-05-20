@@ -4,7 +4,7 @@ import json
 from PyQt5.QtCore import QObject, pyqtSignal
 
 class ProgramManager(QObject):
-    """Hallinnoi testiohjelmia"""
+    """Hallinnoi testiohjelmia."""
     program_list_updated = pyqtSignal(list)
     
     def __init__(self, config_path=None):
