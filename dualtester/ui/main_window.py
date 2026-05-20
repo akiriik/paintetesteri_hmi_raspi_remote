@@ -1,7 +1,4 @@
 # ui/main_window.py
-import os
-import sys
-
 from PyQt5.QtWidgets import QWidget, QApplication
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QKeyEvent
@@ -85,15 +82,13 @@ class MainWindow(QWidget):
             baudrate=19200,
         )
 
-        # Vanhojen näkymien ja komponenttien yhteensopivuus.
-        # ManualScreen käyttää edelleen parent().modbus_manager-rakennetta.
+        # Vanhojen komponenttien yhteensopivuus.
         self.modbus_manager = self.hardware_service.modbus_manager
         self.gpio_handler = self.hardware_service.gpio_handler
         self.gpio_input_handler = self.hardware_service.gpio_input_handler
         self.dfr0558_manager = self.hardware_service.dfr0558_manager
 
-        # Vanhan yhden testerin yhteensopivuus.
-        # Station 1 käyttää samaa ForTestManager-polkuviittausta kuin v2vanhempi2.
+        # Vanhan yhden testerin yhteensopivuus station 1:lle.
         self.fortest_manager = self.fortest_service.get_manager(1)
 
         self.station_controllers = {
@@ -121,12 +116,55 @@ class MainWindow(QWidget):
         self.emergency_stop_timer.timeout.connect(self.check_emergency_stop)
         self.emergency_stop_timer.start(1000)
 
+        self.top_bar_timer = QTimer(self)
+        self.top_bar_timer.timeout.connect(self.update_top_bar_status)
+        self.top_bar_timer.start(1000)
+
         self.emergency_dialog_open = False
         self._emergency_dialog = None
         self._dialog_opened_time = 0
 
+        self.update_top_bar_status()
+
     def update_environment_sensors(self):
         self.hardware_service.update_environment_sensors()
+
+    def update_top_bar_status(self):
+        if not hasattr(self, "main_screen"):
+            return
+
+        if not hasattr(self.main_screen, "environment_bar"):
+            return
+
+        environment_bar = self.main_screen.environment_bar
+
+        if hasattr(self, "hardware_service") and self.hardware_service:
+            environment_bar.update_hardware_status(
+                self.hardware_service.get_connection_status_text()
+            )
+
+        fortest_status_text = self.get_fortest_status_text()
+        environment_bar.update_fortest_status(fortest_status_text)
+
+        if hasattr(self, "environment_status_bar") and self.environment_status_bar:
+            self.environment_status_bar.update_main_environment_bar()
+
+    def get_fortest_status_text(self):
+        if self.DEV_MODE_FORTEST:
+            return "FORTEST 1: DEV    FORTEST 2: DEV"
+
+        f1_ok = self.fortest_service.is_connected(1)
+        f2_ok = self.fortest_service.is_connected(2)
+
+        f1_text = "FORTEST 1: OK" if f1_ok else "FORTEST 1: EI YHTEYTTÄ"
+
+        station2_port = self.fortest_service.station_ports.get(2)
+        if not station2_port:
+            f2_text = "FORTEST 2: EI MÄÄRITETTY"
+        else:
+            f2_text = "FORTEST 2: OK" if f2_ok else "FORTEST 2: EI YHTEYTTÄ"
+
+        return f"{f1_text}    {f2_text}"
 
     def handle_button_press(self, button_name, is_pressed):
         if not is_pressed:
@@ -207,7 +245,7 @@ class MainWindow(QWidget):
         if op_code == 2:
             if hasattr(result, "isError") and not result.isError():
                 if station:
-                    station.update_status("OHJELMANVAIHTO / MODBUS-KIRJOITUS OK", "SUCCESS")
+                    station.update_status("MODBUS-KIRJOITUS OK", "SUCCESS")
             else:
                 if station:
                     station.update_status("MODBUS-KIRJOITUS EPÄONNISTUI", "ERROR")
@@ -258,6 +296,7 @@ class MainWindow(QWidget):
         self.manual_screen.hide()
         self.program_selection_screen.hide()
         self.main_screen.show()
+        self.update_top_bar_status()
 
     def show_manual(self):
         self.main_screen.hide()
@@ -286,6 +325,12 @@ class MainWindow(QWidget):
 
     def closeEvent(self, event):
         try:
+            if hasattr(self, "top_bar_timer") and self.top_bar_timer:
+                self.top_bar_timer.stop()
+
+            if hasattr(self, "emergency_stop_timer") and self.emergency_stop_timer:
+                self.emergency_stop_timer.stop()
+
             for controller in self.station_controllers.values():
                 controller.cleanup()
 
@@ -305,7 +350,7 @@ class MainWindow(QWidget):
             if hasattr(self, "hardware_service") and self.hardware_service:
                 self.hardware_service.cleanup()
 
-        except Exception as e:
+        except Exception:
             print("Virhe sovelluksen sulkemisessa")
 
         super().closeEvent(event)

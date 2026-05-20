@@ -5,17 +5,22 @@ from PyQt5.QtGui import QFont
 
 
 class EnvironmentStatusBar(QWidget):
-    """Ympäristötilojen statusrivit"""
+    """
+    Ympäristö- ja sensoridatan välikerros.
+
+    Tämä komponentti saa sensorisignaaleja vanhoilta toimivilta handlereilta,
+    säilyttää viimeisimmät arvot ja välittää ne uudelle EnvironmentBarille.
+
+    Tämä widget pidetään edelleen piilossa MainWindowissa.
+    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        
-        # Layout
+
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        
-        # Säiliö-label
+
         self.container_label = QLabel("SÄILIÖ: --.-°C / --.- % / -.-- BAR", self)
         self.container_label.setFont(QFont("Consolas", 14))
         self.container_label.setStyleSheet("""
@@ -25,9 +30,8 @@ class EnvironmentStatusBar(QWidget):
             border: 1px solid #333333;
             padding: 5px 10px;
         """)
-        
-        # Tila-label
-        self.status_label = QLabel("TILA: 99.0°C / 99.0 %", self)
+
+        self.status_label = QLabel("HUONE: --.-°C / --.- %", self)
         self.status_label.setFont(QFont("Consolas", 14))
         self.status_label.setStyleSheet("""
             color: #33FF33;
@@ -36,30 +40,54 @@ class EnvironmentStatusBar(QWidget):
             border: 1px solid #333333;
             padding: 5px 10px;
         """)
-        
+
         layout.addWidget(self.container_label)
         layout.addStretch()
         layout.addWidget(self.status_label)
-        
-        
-        # Tallennetut arvot
-        self.temperature = None
-        self.humidity = None
-        self.pressure = None
+
+        self.tank_temperature = None
+        self.tank_humidity = None
+        self.tank_pressure = None
+
+        self.room_temperature = None
+        self.room_humidity = None
+
         self.part_temperature = None
-        
-        # Tietojen päivitysajastin
+
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self.request_sensor_update)
         self.update_timer.start(100)
 
     def update_sensor_data(self, data):
-        self.temperature = data.get('temperature')
-        self.humidity = data.get('humidity')
+        """
+        Vanhan SHT20/SHT-tyyppisen datan vastaanotto.
+
+        Jos data ei erikseen kerro onko kyse huoneesta vai säiliöstä,
+        käsitellään se säiliödatana vanhan ohjelmalogiikan mukaisesti.
+        """
+        if not isinstance(data, dict):
+            return
+
+        self.tank_temperature = data.get("temperature")
+        self.tank_humidity = data.get("humidity")
+        self.update_display()
+
+    def update_room_sensor_data(self, data):
+        """
+        Varattu erilliselle huoneanturille.
+        """
+        if not isinstance(data, dict):
+            return
+
+        self.room_temperature = data.get("temperature")
+        self.room_humidity = data.get("humidity")
         self.update_display()
 
     def update_part_temperature_data(self, data):
-        self.part_temperature = data.get('part_temperature')
+        if not isinstance(data, dict):
+            return
+
+        self.part_temperature = data.get("part_temperature")
         self.update_display()
 
     def show_part_temperature_error(self, error_message):
@@ -68,71 +96,98 @@ class EnvironmentStatusBar(QWidget):
 
     def update_pressure_data(self, pressure_value):
         if pressure_value is not None:
-            self.pressure = self.convert_adc_to_bar(pressure_value)
+            self.tank_pressure = self.convert_adc_to_bar(pressure_value)
         else:
-            self.pressure = None
+            self.tank_pressure = None
+
         self.update_display()
 
     def update_display(self):
-        """Päivitä säiliön ja kappaleen näyttötekstit"""
-        temp_str = f"{self.temperature:.1f}°C" if self.temperature is not None else "--.-°C"
-        humidity_str = f"{self.humidity:.1f} %" if self.humidity is not None else "--.- %"
-        pressure_str = f"{self.pressure:.2f} BAR" if self.pressure is not None else "-.-- BAR"
-        part_temp_str = f"{self.part_temperature:.1f}°C" if self.part_temperature is not None else "--.-°C"
+        tank_temp_str = f"{self.tank_temperature:.1f}°C" if self.tank_temperature is not None else "--.-°C"
+        tank_humidity_str = f"{self.tank_humidity:.1f} %" if self.tank_humidity is not None else "--.- %"
+        tank_pressure_str = f"{self.tank_pressure:.2f} BAR" if self.tank_pressure is not None else "-.-- BAR"
 
-        self.container_label.setText(f"SÄILIÖ: {temp_str} / {humidity_str} / {pressure_str}")
+        room_temp_str = f"{self.room_temperature:.1f}°C" if self.room_temperature is not None else "--.-°C"
+        room_humidity_str = f"{self.room_humidity:.1f} %" if self.room_humidity is not None else "--.- %"
 
-        if hasattr(self.parent(), "testing_screen"):
-            testing_screen = self.parent().testing_screen
+        self.container_label.setText(
+            f"SÄILIÖ: {tank_temp_str} / {tank_humidity_str} / {tank_pressure_str}"
+        )
+        self.status_label.setText(
+            f"HUONE: {room_temp_str} / {room_humidity_str}"
+        )
 
-            if hasattr(testing_screen, "info_environment_label"):
-                testing_screen.info_environment_label.setText(
-                    f"SÄILIÖ:    {temp_str} / {humidity_str} / {pressure_str}"
-                )
+        self.update_main_environment_bar()
 
-            if hasattr(testing_screen, "part_temperature_label"):
-                testing_screen.part_temperature_label.setText(
-                    f"KAPPALE:   {part_temp_str}"
-                )
+    def update_main_environment_bar(self):
+        parent = self.parent()
+
+        if not parent:
+            return
+
+        if not hasattr(parent, "main_screen"):
+            return
+
+        main_screen = parent.main_screen
+
+        if not hasattr(main_screen, "environment_bar"):
+            return
+
+        main_screen.environment_bar.update_environment_values(
+            room_temperature=self.room_temperature,
+            room_humidity=self.room_humidity,
+            tank_temperature=self.tank_temperature,
+            tank_humidity=self.tank_humidity,
+            tank_pressure=self.tank_pressure,
+            part_temperature=self.part_temperature,
+        )
 
     def convert_adc_to_bar(self, adc_value):
         calibration_table = [
-            (3277, 0.0),   # 0 bar
-            (5482, 1.0),   # 1 bar
-            (7966, 2.0),   # 2 bar
-            (10500, 3.0),  # 3 bar
-            (12655, 4.0),  # 4 bar
-            (15443, 5.0),  # 5 bar
-            (20385, 7.0),  # 7 bar
-            (23553, 8.0)   # 8 bar
+            (3277, 0.0),
+            (5482, 1.0),
+            (7966, 2.0),
+            (10500, 3.0),
+            (12655, 4.0),
+            (15443, 5.0),
+            (20385, 7.0),
+            (23553, 8.0),
         ]
 
         if adc_value <= calibration_table[0][0]:
             return 0.0
+
         if adc_value >= calibration_table[-1][0]:
             return calibration_table[-1][1]
 
         for i in range(len(calibration_table) - 1):
             adc1, bar1 = calibration_table[i]
             adc2, bar2 = calibration_table[i + 1]
+
             if adc1 <= adc_value <= adc2:
                 ratio = (adc_value - adc1) / (adc2 - adc1)
                 return bar1 + ratio * (bar2 - bar1)
+
         return 0.0
 
     def show_sensor_error(self, error_message):
-        self.temperature = None
-        self.humidity = None
+        self.tank_temperature = None
+        self.tank_humidity = None
+        self.update_display()
+
+    def show_room_sensor_error(self, error_message):
+        self.room_temperature = None
+        self.room_humidity = None
         self.update_display()
 
     def show_pressure_error(self):
-        self.pressure = None
+        self.tank_pressure = None
         self.update_display()
 
     def request_sensor_update(self):
-        if hasattr(self.parent(), 'update_environment_sensors'):
+        if hasattr(self.parent(), "update_environment_sensors"):
             self.parent().update_environment_sensors()
 
     def cleanup(self):
-        if hasattr(self, 'update_timer') and self.update_timer:
+        if hasattr(self, "update_timer") and self.update_timer:
             self.update_timer.stop()
