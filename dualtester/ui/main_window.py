@@ -32,6 +32,15 @@ class MainWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        self.setup_window()
+        self.create_managers()
+        self.create_screens()
+        self.create_services()
+        self.create_compatibility_refs()
+        self.create_station_controllers()
+        self.create_controllers()
+
+    def setup_window(self):
         self.setWindowTitle("Painetestaus")
 
         screen = QApplication.primaryScreen()
@@ -51,8 +60,10 @@ class MainWindow(QWidget):
         self.DEV_MODE_MODBUS = DEV_MODE_MODBUS
         self.DEV_MODE_GPIO = DEV_MODE_GPIO
 
+    def create_managers(self):
         self.program_manager = ProgramManager()
 
+    def create_screens(self):
         self.main_screen = MainScreen(self)
         self.main_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
 
@@ -68,6 +79,7 @@ class MainWindow(QWidget):
         self.environment_status_bar.setGeometry(265, 50, 750, 40)
         self.environment_status_bar.hide()
 
+    def create_services(self):
         self.hardware_service = HardwareService(
             parent=self,
             dev_mode_modbus=DEV_MODE_MODBUS,
@@ -86,6 +98,7 @@ class MainWindow(QWidget):
             baudrate=19200,
         )
 
+    def create_compatibility_refs(self):
         # Vanhojen komponenttien yhteensopivuus.
         self.modbus_manager = self.hardware_service.modbus_manager
         self.gpio_handler = self.hardware_service.gpio_handler
@@ -95,6 +108,7 @@ class MainWindow(QWidget):
         # Vanhan yhden testerin yhteensopivuus station 1:lle.
         self.fortest_manager = self.fortest_service.get_manager(1)
 
+    def create_station_controllers(self):
         self.station_controllers = {
             1: StationController(
                 station_id=1,
@@ -116,6 +130,7 @@ class MainWindow(QWidget):
             ),
         }
 
+    def create_controllers(self):
         self.program_selection_controller = ProgramSelectionController(
             main_window=self,
             program_selection_screen=self.program_selection_screen,
