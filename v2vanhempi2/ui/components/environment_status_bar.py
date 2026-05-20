@@ -51,7 +51,7 @@ class EnvironmentStatusBar(QWidget):
         # Tietojen päivitysajastin
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self.request_sensor_update)
-        self.update_timer.start(200)
+        self.update_timer.start(100)
 
     def update_sensor_data(self, data):
         self.temperature = data.get('temperature')

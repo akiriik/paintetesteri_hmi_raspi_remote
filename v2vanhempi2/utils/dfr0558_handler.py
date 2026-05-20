@@ -17,7 +17,13 @@ class DFR0558Handler(QObject):
         self.connected = False
 
         self.last_valid_temperature = None
+        self.pending_temperature = None
+        self.pending_count = 0
+
         self.max_jump_c = 10.0
+        self.confirm_jump_count = 3
+        self.absolute_min_c = -20.0
+        self.absolute_max_c = 250.0
 
         self.init_sensor()
 
@@ -66,20 +72,56 @@ class DFR0558Handler(QObject):
 
             temperature = raw * 0.25
 
-            # Hylkää epärealistinen yksittäinen hyppy
-            if self.last_valid_temperature is not None:
-                if abs(temperature - self.last_valid_temperature) > self.max_jump_c:
-                    print(
-                        f"DFR0558 hyppylukema hylätty: "
-                        f"{temperature:.1f} °C, edellinen {self.last_valid_temperature:.1f} °C"
-                    )
-                    return
+            # Hylkää täysin epäuskottavat lukemat suoraan
+            if temperature < self.absolute_min_c or temperature > self.absolute_max_c:
+                print(f"DFR0558 epäuskottava lukema hylätty: {temperature:.1f} °C")
+                return
 
-            self.last_valid_temperature = temperature
+            # Ensimmäinen hyväksytty lukema
+            if self.last_valid_temperature is None:
+                self.last_valid_temperature = temperature
+                self.sensor_data_ready.emit({
+                    "part_temperature": round(temperature, 1)
+                })
+                return
 
-            self.sensor_data_ready.emit({
-                "part_temperature": round(temperature, 1)
-            })
+            diff = abs(temperature - self.last_valid_temperature)
+
+            # Normaali pieni muutos hyväksytään heti
+            if diff <= self.max_jump_c:
+                self.last_valid_temperature = temperature
+                self.pending_temperature = None
+                self.pending_count = 0
+                self.sensor_data_ready.emit({
+                    "part_temperature": round(temperature, 1)
+                })
+                return
+
+            # Iso muutos: hyväksytään vasta jos se toistuu useamman kerran
+            if self.pending_temperature is None:
+                self.pending_temperature = temperature
+                self.pending_count = 1
+            else:
+                if abs(temperature - self.pending_temperature) <= self.max_jump_c:
+                    self.pending_count += 1
+                    self.pending_temperature = temperature
+                else:
+                    self.pending_temperature = temperature
+                    self.pending_count = 1
+
+            print(
+                f"DFR0558 hyppylukema odottaa vahvistusta: "
+                f"{temperature:.1f} °C, edellinen {self.last_valid_temperature:.1f} °C, "
+                f"vahvistus {self.pending_count}/{self.confirm_jump_count}"
+            )
+
+            if self.pending_count >= self.confirm_jump_count:
+                self.last_valid_temperature = temperature
+                self.pending_temperature = None
+                self.pending_count = 0
+                self.sensor_data_ready.emit({
+                    "part_temperature": round(temperature, 1)
+                })
 
         except Exception as e:
             self.connected = False
