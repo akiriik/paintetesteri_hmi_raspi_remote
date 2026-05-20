@@ -46,15 +46,24 @@ class EnvironmentStatusBar(QWidget):
         self.temperature = None
         self.humidity = None
         self.pressure = None
+        self.part_temperature = None
         
         # Tietojen päivitysajastin
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self.request_sensor_update)
-        self.update_timer.start(500)
+        self.update_timer.start(200)
 
     def update_sensor_data(self, data):
         self.temperature = data.get('temperature')
         self.humidity = data.get('humidity')
+        self.update_display()
+
+    def update_part_temperature_data(self, data):
+        self.part_temperature = data.get('part_temperature')
+        self.update_display()
+
+    def show_part_temperature_error(self, error_message):
+        self.part_temperature = None
         self.update_display()
 
     def update_pressure_data(self, pressure_value):
@@ -65,18 +74,25 @@ class EnvironmentStatusBar(QWidget):
         self.update_display()
 
     def update_display(self):
-        """Päivitä säiliön näyttöteksti"""
+        """Päivitä säiliön ja kappaleen näyttötekstit"""
         temp_str = f"{self.temperature:.1f}°C" if self.temperature is not None else "--.-°C"
         humidity_str = f"{self.humidity:.1f} %" if self.humidity is not None else "--.- %"
         pressure_str = f"{self.pressure:.2f} BAR" if self.pressure is not None else "-.-- BAR"
-        
+        part_temp_str = f"{self.part_temperature:.1f}°C" if self.part_temperature is not None else "--.-°C"
+
         self.container_label.setText(f"SÄILIÖ: {temp_str} / {humidity_str} / {pressure_str}")
 
         if hasattr(self.parent(), "testing_screen"):
             testing_screen = self.parent().testing_screen
+
             if hasattr(testing_screen, "info_environment_label"):
                 testing_screen.info_environment_label.setText(
-                    f"SÄILIÖ: {temp_str} / {humidity_str} / {pressure_str}"
+                    f"SÄILIÖ:    {temp_str} / {humidity_str} / {pressure_str}"
+                )
+
+            if hasattr(testing_screen, "part_temperature_label"):
+                testing_screen.part_temperature_label.setText(
+                    f"KAPPALE:   {part_temp_str}"
                 )
 
     def convert_adc_to_bar(self, adc_value):

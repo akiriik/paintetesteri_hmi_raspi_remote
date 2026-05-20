@@ -7,9 +7,21 @@ class ProgramManager(QObject):
     """Hallinnoi testiohjelmia"""
     program_list_updated = pyqtSignal(list)
     
-    def __init__(self, config_path="config/programs.json"):
+    def __init__(self, config_path=None):
         super().__init__()
-        self.config_path = config_path
+
+        # Projektin juuri: /home/akiriik/painetesteri_hmi
+        project_root = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..")
+        )
+
+        if config_path is None:
+            self.config_path = os.path.join(project_root, "config", "programs.json")
+        else:
+            self.config_path = config_path
+
+        print(f"Ohjelmalista ladataan tiedostosta: {self.config_path}")
+
         self.programs = []
         self.program_data = {}  # Tallennetaan koko ohjelmatiedot
         self.load_programs()

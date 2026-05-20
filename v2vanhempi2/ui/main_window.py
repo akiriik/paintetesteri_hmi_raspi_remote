@@ -17,11 +17,11 @@ from utils.fortest_manager import ForTestManager
 from utils.gpio_handler import GPIOHandler
 from utils.gpio_input_handler import GPIOInputHandler
 from utils.program_manager import ProgramManager
-from utils.sht20_handler import SHT20Manager
+from utils.dfr0558_handler import DFR0558Manager
 
 DEV_MODE_FORTEST = True   # True = ForTest DEV mode / ei oikeaa ForTest-yhteyttä
 DEV_MODE_MODBUS = True     # pää-Modbus pois
-DEV_MODE_GPIO = True       # GPIO pois
+DEV_MODE_GPIO = False       # GPIO pois
 
 class MainWindow(QWidget):
     def __init__(self, parent=None):
@@ -74,23 +74,22 @@ class MainWindow(QWidget):
             self.fortest_manager = ForTestManager(port='/dev/ttyUSB1', baudrate=19200)
             self.fortest_manager.resultReady.connect(self.handle_fortest_result)
 
-        # Alusta SHT20-anturi
-        # SHT20 kulkee tässä samassa dev mode -ryhmässä GPIO:n kanssa,
-        # koska se on fyysistä Raspberry/I2C-laitteistoa.
+        # Alusta DFR0558 kappalelämpötila-anturi
+        # Fyysinen I2C-laite, joten käytetään samaa dev mode -ryhmää kuin GPIO:lla.
         if not DEV_MODE_GPIO:
             try:
-                self.sht20_manager = SHT20Manager()
-                self.sht20_manager.data_updated.connect(
-                    self.environment_status_bar.update_sensor_data
+                self.dfr0558_manager = DFR0558Manager()
+                self.dfr0558_manager.data_updated.connect(
+                    self.environment_status_bar.update_part_temperature_data
                 )
-                self.sht20_manager.error_occurred.connect(
-                    self.environment_status_bar.show_sensor_error
+                self.dfr0558_manager.error_occurred.connect(
+                    self.environment_status_bar.show_part_temperature_error
                 )
             except Exception as e:
-                print(f"Varoitus: SHT20-anturin alustus epäonnistui: {e}")
-                self.sht20_manager = None
+                print(f"Varoitus: DFR0558-anturin alustus epäonnistui: {e}")
+                self.dfr0558_manager = None
         else:
-            self.sht20_manager = None
+            self.dfr0558_manager = None
 
         # Alusta GPIO-outputit
         if not DEV_MODE_GPIO:
@@ -122,9 +121,9 @@ class MainWindow(QWidget):
         self._dialog_opened_time = 0
 
     def update_environment_sensors(self):
-        """Päivitä ympäristöanturit - kutsutaan statusrivin ajastimesta"""
-        if hasattr(self, 'sht20_manager') and self.sht20_manager:
-            self.sht20_manager.read_once()
+        """Päivitä I2C-anturit - kutsutaan statusrivin ajastimesta"""
+        if hasattr(self, 'dfr0558_manager') and self.dfr0558_manager:
+            self.dfr0558_manager.read_once()
         
     def handle_button_press(self, button_name, is_pressed):
         """Käsittelee GPIO-nappulan painalluksen - reagoidaan vain painallukseen"""
@@ -322,9 +321,9 @@ class MainWindow(QWidget):
         """Käsittelee sovelluksen sulkemisen"""
         try:
 
-            # Siivoa SHT20-anturi
-            if hasattr(self, 'sht20_manager') and self.sht20_manager:
-                self.sht20_manager.cleanup()
+            # Siivoa DFR0558-anturi
+            if hasattr(self, 'dfr0558_manager') and self.dfr0558_manager:
+                self.dfr0558_manager.cleanup()
                 
             # Siivoa environment status bar
             if hasattr(self, 'environment_status_bar') and self.environment_status_bar:
