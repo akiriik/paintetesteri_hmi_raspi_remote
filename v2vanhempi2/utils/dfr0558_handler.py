@@ -1,4 +1,6 @@
 # utils/dfr0558_handler.py
+from collections import deque
+
 import smbus
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 
@@ -16,14 +18,22 @@ class DFR0558Handler(QObject):
         self.bus = None
         self.connected = False
 
+        # Viimeisin hyväksytty raakalämpötila
         self.last_valid_temperature = None
+
+        # Isojen hyppyjen vahvistuslogiikka
         self.pending_temperature = None
         self.pending_count = 0
 
+        # Asetukset
         self.max_jump_c = 10.0
         self.confirm_jump_count = 3
         self.absolute_min_c = -20.0
         self.absolute_max_c = 250.0
+
+        # Liukuva keskiarvo hyväksytyistä lukemista.
+        # 100 ms lukuvälillä 5 näytettä = noin 0,5 s pehmennys.
+        self.average_samples = deque(maxlen=5)
 
         self.init_sensor()
 
@@ -44,6 +54,15 @@ class DFR0558Handler(QObject):
         except Exception as e:
             self.connected = False
             print(f"DFR0558 yhteyden muodostus epäonnistui: {e}")
+
+    def emit_averaged_temperature(self, temperature):
+        """Lähettää hyväksytyn lämpötilan liukuvana keskiarvona."""
+        self.average_samples.append(temperature)
+        averaged = sum(self.average_samples) / len(self.average_samples)
+
+        self.sensor_data_ready.emit({
+            "part_temperature": round(averaged, 1)
+        })
 
     def read_temperature(self):
         """Lukee termoparin lämpötilan Celsius-asteina."""
@@ -80,9 +99,7 @@ class DFR0558Handler(QObject):
             # Ensimmäinen hyväksytty lukema
             if self.last_valid_temperature is None:
                 self.last_valid_temperature = temperature
-                self.sensor_data_ready.emit({
-                    "part_temperature": round(temperature, 1)
-                })
+                self.emit_averaged_temperature(temperature)
                 return
 
             diff = abs(temperature - self.last_valid_temperature)
@@ -92,9 +109,7 @@ class DFR0558Handler(QObject):
                 self.last_valid_temperature = temperature
                 self.pending_temperature = None
                 self.pending_count = 0
-                self.sensor_data_ready.emit({
-                    "part_temperature": round(temperature, 1)
-                })
+                self.emit_averaged_temperature(temperature)
                 return
 
             # Iso muutos: hyväksytään vasta jos se toistuu useamman kerran
@@ -119,9 +134,12 @@ class DFR0558Handler(QObject):
                 self.last_valid_temperature = temperature
                 self.pending_temperature = None
                 self.pending_count = 0
-                self.sensor_data_ready.emit({
-                    "part_temperature": round(temperature, 1)
-                })
+
+                # Kun iso muutos hyväksytään uudeksi tasoksi, tyhjennetään vanha keskiarvopuskuri.
+                # Muuten vanhat lukemat hidastaisivat uuden tason näkymistä.
+                self.average_samples.clear()
+
+                self.emit_averaged_temperature(temperature)
 
         except Exception as e:
             self.connected = False

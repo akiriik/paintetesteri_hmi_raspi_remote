@@ -21,7 +21,7 @@ from utils.dfr0558_handler import DFR0558Manager
 
 DEV_MODE_FORTEST = True   # True = ForTest DEV mode / ei oikeaa ForTest-yhteyttä
 DEV_MODE_MODBUS = True     # pää-Modbus pois
-DEV_MODE_GPIO = False       # GPIO pois
+DEV_MODE_GPIO = True       # GPIO pois
 
 class MainWindow(QWidget):
     def __init__(self, parent=None):
