@@ -1,6 +1,6 @@
 # ui/main_window.py
 from PyQt5.QtWidgets import QWidget, QApplication
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeyEvent
 
 from ui.screens.main_screen import MainScreen
@@ -19,6 +19,7 @@ from controllers.emergency_stop_controller import EmergencyStopController
 from controllers.button_input_controller import ButtonInputController
 from controllers.modbus_result_controller import ModbusResultController
 from controllers.fortest_result_controller import ForTestResultController
+from controllers.top_bar_controller import TopBarController
 
 
 DEV_MODE_FORTEST = True
@@ -140,51 +141,32 @@ class MainWindow(QWidget):
             station_controllers=self.station_controllers,
         )
 
-        self.top_bar_timer = QTimer(self)
-        self.top_bar_timer.timeout.connect(self.update_top_bar_status)
-        self.top_bar_timer.start(1000)
-
-        self.update_top_bar_status()
+        self.top_bar_controller = TopBarController(
+            main_screen=self.main_screen,
+            environment_status_bar=self.environment_status_bar,
+            hardware_service=self.hardware_service,
+            fortest_service=self.fortest_service,
+            dev_mode_fortest=DEV_MODE_FORTEST,
+            parent=self,
+        )
 
     def update_environment_sensors(self):
-        self.hardware_service.update_environment_sensors()
+        """
+        Vanha yhteensopivuusrajapinta sensoripäivityksille.
+        Varsinainen logiikka on TopBarControllerissa.
+        """
+
+        if hasattr(self, "top_bar_controller") and self.top_bar_controller:
+            self.top_bar_controller.update_environment_sensors()
 
     def update_top_bar_status(self):
-        if not hasattr(self, "main_screen"):
-            return
+        """
+        Vanha yhteensopivuusrajapinta yläpalkin päivitykselle.
+        Varsinainen logiikka on TopBarControllerissa.
+        """
 
-        if not hasattr(self.main_screen, "environment_bar"):
-            return
-
-        environment_bar = self.main_screen.environment_bar
-
-        if hasattr(self, "hardware_service") and self.hardware_service:
-            environment_bar.update_hardware_status(
-                self.hardware_service.get_connection_status_text()
-            )
-
-        fortest_status_text = self.get_fortest_status_text()
-        environment_bar.update_fortest_status(fortest_status_text)
-
-        if hasattr(self, "environment_status_bar") and self.environment_status_bar:
-            self.environment_status_bar.update_main_environment_bar()
-
-    def get_fortest_status_text(self):
-        if self.DEV_MODE_FORTEST:
-            return "FORTEST 1: DEV    FORTEST 2: DEV"
-
-        f1_ok = self.fortest_service.is_connected(1)
-        f2_ok = self.fortest_service.is_connected(2)
-
-        f1_text = "FORTEST 1: OK" if f1_ok else "FORTEST 1: EI YHTEYTTÄ"
-
-        station2_port = self.fortest_service.station_ports.get(2)
-        if not station2_port:
-            f2_text = "FORTEST 2: EI MÄÄRITETTY"
-        else:
-            f2_text = "FORTEST 2: OK" if f2_ok else "FORTEST 2: EI YHTEYTTÄ"
-
-        return f"{f1_text}    {f2_text}"
+        if hasattr(self, "top_bar_controller") and self.top_bar_controller:
+            self.top_bar_controller.update_status()
 
     def handle_button_press(self, button_name, is_pressed):
         """
@@ -251,8 +233,8 @@ class MainWindow(QWidget):
 
     def closeEvent(self, event):
         try:
-            if hasattr(self, "top_bar_timer") and self.top_bar_timer:
-                self.top_bar_timer.stop()
+            if hasattr(self, "top_bar_controller") and self.top_bar_controller:
+                self.top_bar_controller.cleanup()
 
             if hasattr(self, "fortest_result_controller") and self.fortest_result_controller:
                 self.fortest_result_controller.cleanup()
