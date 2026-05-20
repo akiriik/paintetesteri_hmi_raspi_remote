@@ -18,6 +18,7 @@ from controllers.program_selection_controller import ProgramSelectionController
 from controllers.emergency_stop_controller import EmergencyStopController
 from controllers.button_input_controller import ButtonInputController
 from controllers.modbus_result_controller import ModbusResultController
+from controllers.fortest_result_controller import ForTestResultController
 
 
 DEV_MODE_FORTEST = True
@@ -135,6 +136,10 @@ class MainWindow(QWidget):
             emergency_stop_controller=self.emergency_stop_controller,
         )
 
+        self.fortest_result_controller = ForTestResultController(
+            station_controllers=self.station_controllers,
+        )
+
         self.top_bar_timer = QTimer(self)
         self.top_bar_timer.timeout.connect(self.update_top_bar_status)
         self.top_bar_timer.start(1000)
@@ -200,32 +205,18 @@ class MainWindow(QWidget):
             self.modbus_result_controller.handle_result(result, op_code, error_msg)
 
     def handle_fortest_result(self, station_id, result, op_code, error_msg):
-        station = self.station_controllers.get(station_id)
+        """
+        Vanha yhteensopivuusrajapinta ForTestService / ForTestManagerille.
+        Varsinainen logiikka on ForTestResultControllerissa.
+        """
 
-        if not station:
-            return
-
-        if op_code != 3 and op_code != 4:
-            print(f"ForTest {station_id}: op_code={op_code}, error_msg={error_msg}")
-
-        if op_code == 999:
-            station.update_status(error_msg, "WARNING")
-            return
-
-        if error_msg:
-            station.update_status(error_msg, "ERROR")
-            return
-
-        if result:
-            if op_code == 1:
-                station.update_status("TESTI KÄYNNISTETTY ONNISTUNEESTI", "SUCCESS")
-            elif op_code == 2:
-                station.update_status("TESTI PYSÄYTETTY", "INFO")
-
-        if op_code == 3:
-            station.update_status_from_fortest(result)
-        elif op_code == 4:
-            station.update_test_results(result)
+        if hasattr(self, "fortest_result_controller") and self.fortest_result_controller:
+            self.fortest_result_controller.handle_result(
+                station_id,
+                result,
+                op_code,
+                error_msg,
+            )
 
     def show_testing(self):
         self.environment_status_bar.hide()
@@ -262,6 +253,9 @@ class MainWindow(QWidget):
         try:
             if hasattr(self, "top_bar_timer") and self.top_bar_timer:
                 self.top_bar_timer.stop()
+
+            if hasattr(self, "fortest_result_controller") and self.fortest_result_controller:
+                self.fortest_result_controller.cleanup()
 
             if hasattr(self, "modbus_result_controller") and self.modbus_result_controller:
                 self.modbus_result_controller.cleanup()
