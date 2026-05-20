@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QApplication
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QKeyEvent
 
-from ui.screens.testing_screen import TestingScreen
+from ui.screens.main_screen import MainScreen
 from ui.screens.manual_screen import ManualScreen
 from ui.screens.program_selection_screen import ProgramSelectionScreen
 from ui.components.emergency_stop_dialog import EmergencyStopDialog
@@ -49,9 +49,8 @@ class MainWindow(QWidget):
         self.DEV_MODE_FORTEST = DEV_MODE_FORTEST
 
         # Näytöt - luodaan suoraan MainWindowiin
-        self.testing_screen = TestingScreen(self)
-        self.testing_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
-        self.testing_screen.program_selection_requested.connect(self.show_program_selection)
+        self.main_screen = MainScreen(self)
+        self.main_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
 
         self.manual_screen = ManualScreen(self)
         self.manual_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
