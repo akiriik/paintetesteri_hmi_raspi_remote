@@ -288,24 +288,23 @@ class MainWindow(QWidget):
         self.show_testing()
 
     def show_testing(self):
-        """Näyttää testaussivun"""
+        """Näyttää päänäkymän"""
         self.environment_status_bar.hide()
         self.manual_screen.hide()
         self.program_selection_screen.hide()
-        self.testing_screen.show()
+        self.main_screen.show()
+
     def show_manual(self):
         """Näyttää käsikäyttösivun"""
-        self.testing_screen.hide()
+        self.main_screen.hide()
         self.environment_status_bar.hide()
         self.program_selection_screen.hide()
         self.manual_screen.show()
 
     def show_program_selection(self, test_number=None):
         """Näyttää ohjelman valintasivun"""
-        if test_number is not None:
-            self.testing_screen.current_test_panel = test_number
         self.environment_status_bar.hide()
-        self.testing_screen.hide()
+        self.main_screen.hide()
         self.manual_screen.hide()
         self.program_selection_screen.show()
 
@@ -338,8 +337,9 @@ class MainWindow(QWidget):
             if hasattr(self, 'gpio_input_handler') and self.gpio_input_handler:
                 self.gpio_input_handler.cleanup()
                 
-            if hasattr(self, 'testing_screen') and self.testing_screen:
-                self.testing_screen.cleanup()
+            if hasattr(self, 'main_screen') and self.main_screen:
+                if hasattr(self.main_screen, 'cleanup'):
+                    self.main_screen.cleanup()
 
             if hasattr(self, 'manual_screen') and self.manual_screen:
                 self.manual_screen.cleanup()
