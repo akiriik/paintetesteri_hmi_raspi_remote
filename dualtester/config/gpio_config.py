@@ -72,9 +72,6 @@ STATION_BUTTON_MAP = {
     "STATION1_START": 1,
     "STATION2_START": 2,
 
-    # Vanhojen nimien yhteensopivuus
-    "START": 1,
-    "STOP": 1,
 }
 
 
