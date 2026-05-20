@@ -158,9 +158,6 @@ class MainWindow(QWidget):
             hardware_service=self.hardware_service,
         )
 
-        # Vanha nimi pidetään varmuuden vuoksi aliaksena,
-        # jos jokin vanha kohta tarkistaa vielä button_input_controlleria.
-        self.button_input_controller = self.physical_button_controller
 
         self.modbus_result_controller = ModbusResultController(
             station_controllers=self.station_controllers,
