@@ -54,10 +54,6 @@ class EnvironmentStatusBar(QWidget):
 
         self.part_temperature = None
 
-        self.update_timer = QTimer(self)
-        self.update_timer.timeout.connect(self.request_sensor_update)
-        self.update_timer.start(100)
-
     def update_sensor_data(self, data):
         """
         Vanhan SHT20/SHT-tyyppisen datan vastaanotto.
@@ -185,8 +181,7 @@ class EnvironmentStatusBar(QWidget):
         self.update_display()
 
     def request_sensor_update(self):
-        if hasattr(self.parent(), "update_environment_sensors"):
-            self.parent().update_environment_sensors()
+        pass
 
     def cleanup(self):
         if hasattr(self, "update_timer") and self.update_timer:
