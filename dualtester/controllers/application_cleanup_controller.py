@@ -24,7 +24,7 @@ class ApplicationCleanupController:
                 "navigation_controller",
                 "fortest_result_controller",
                 "modbus_result_controller",
-                "button_input_controller",
+                "physical_button_controller",
                 "emergency_stop_controller",
             ]
 

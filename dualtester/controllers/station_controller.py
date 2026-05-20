@@ -13,10 +13,9 @@ class StationController(QObject):
     - ohjelman valinnasta
     - start/stop-ohjauksesta
     - ajastimista
-    - GPIO-valojen ohjauksesta
     - status- ja result-handlerien kutsumisesta
 
-    Tämä ei sisällä UI-layouttia.
+    Fyysiset napit ja niiden valot hoidetaan PhysicalButtonControllerissa.
     """
 
     def __init__(
@@ -111,6 +110,7 @@ class StationController(QObject):
         )
 
         self.update_status("OHJELMA VALITTU", "SUCCESS")
+        self._update_physical_button_light()
 
     def check_ready_to_start(self):
         if self.program_number <= 0:
@@ -124,10 +124,12 @@ class StationController(QObject):
     def start_test(self):
         if self.program_number <= 0:
             self.update_status("VIRHE: VALITSE OHJELMA", "ERROR")
+            self._update_physical_button_light()
             return
 
         if not self.dev_mode_fortest and not self.fortest_service.is_connected(self.station_id):
             self.update_status("FORTEST-YHTEYTTÄ EI SAATAVILLA", "ERROR")
+            self._update_physical_button_light()
             return
 
         if self.dev_mode_fortest:
@@ -141,6 +143,7 @@ class StationController(QObject):
             QTimer.singleShot(1000, self._continue_start_test)
         else:
             self.update_status("OHJELMAN VAIHTO EPÄONNISTUI", "ERROR")
+            self._update_physical_button_light()
 
     def _continue_start_test(self):
         self.results_started = True
@@ -152,7 +155,7 @@ class StationController(QObject):
         if not self.dev_mode_fortest:
             self.fortest_service.start_test(self.station_id)
 
-        self._update_gpio_run_state()
+        self._update_physical_button_light()
 
     def stop_test(self):
         self.is_running = False
@@ -164,12 +167,13 @@ class StationController(QObject):
         if not self.dev_mode_fortest:
             self.fortest_service.abort_test(self.station_id)
 
-        self._update_gpio_run_state()
+        self._update_physical_button_light()
 
     def update_fortest_data(self):
         if self.dev_mode_fortest:
             ready = self.check_ready_to_start()
             self.station_widget.update_running_state(self.is_running, ready)
+            self._update_physical_button_light()
             return
 
         self.fortest_service.read_status(self.station_id)
@@ -186,13 +190,15 @@ class StationController(QObject):
             ready = self.check_ready_to_start()
 
         self.station_widget.update_running_state(self.is_running, ready)
-        self._update_gpio_run_state()
+        self._update_physical_button_light()
 
     def update_status_from_fortest(self, result):
         self.status_handler.update_status_from_fortest(result)
+        self._update_physical_button_light()
 
     def update_test_results(self, result):
         self.result_handler.update_test_results(result)
+        self._update_physical_button_light()
 
     def show_dev_fortest_result(self):
         self.result_handler.create_dev_result()
@@ -200,27 +206,21 @@ class StationController(QObject):
     def update_status(self, message, level="INFO"):
         self.station_widget.update_status(message, level)
 
-    def _update_gpio_run_state(self):
-        """
-        Säilyttää vanhan yhden testerin GPIO-valologiikan asema 1:lle:
-        GPIO 23 = vihreä, GPIO 24 = punainen vanhan koodin set_output(4/5)-kartalla.
-
-        Asema 2:n fyysiset GPIO-valot pitää määrittää erikseen ennen käyttöönottoa.
-        """
-        if self.station_id != 1:
-            return
-
+    def _update_physical_button_light(self):
         ready = self.check_ready_to_start()
 
-        if self.is_running:
-            self.hardware_service.set_output(4, False)
-            self.hardware_service.set_output(5, True)
-        elif ready:
-            self.hardware_service.set_output(4, True)
-            self.hardware_service.set_output(5, False)
-        else:
-            self.hardware_service.set_output(4, False)
-            self.hardware_service.set_output(5, False)
+        physical_button_controller = getattr(
+            self.main_window,
+            "physical_button_controller",
+            None,
+        )
+
+        if physical_button_controller:
+            physical_button_controller.update_station_light_state(
+                station_id=self.station_id,
+                is_running=self.is_running,
+                ready=ready,
+            )
 
     def cleanup(self):
         if self.fortest_timer:

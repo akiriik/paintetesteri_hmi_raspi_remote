@@ -15,7 +15,7 @@ from services.fortest_service import ForTestService
 from controllers.station_controller import StationController
 from controllers.program_selection_controller import ProgramSelectionController
 from controllers.emergency_stop_controller import EmergencyStopController
-from controllers.button_input_controller import ButtonInputController
+from controllers.physical_button_controller import PhysicalButtonController
 from controllers.modbus_result_controller import ModbusResultController
 from controllers.fortest_result_controller import ForTestResultController
 from controllers.top_bar_controller import TopBarController
@@ -153,9 +153,14 @@ class MainWindow(QWidget):
             modbus_manager=self.modbus_manager,
         )
 
-        self.button_input_controller = ButtonInputController(
+        self.physical_button_controller = PhysicalButtonController(
             station_controllers=self.station_controllers,
+            hardware_service=self.hardware_service,
         )
+
+        # Vanha nimi pidetään varmuuden vuoksi aliaksena,
+        # jos jokin vanha kohta tarkistaa vielä button_input_controlleria.
+        self.button_input_controller = self.physical_button_controller
 
         self.modbus_result_controller = ModbusResultController(
             station_controllers=self.station_controllers,
@@ -200,11 +205,11 @@ class MainWindow(QWidget):
     def handle_button_press(self, button_name, is_pressed):
         """
         Vanha yhteensopivuusrajapinta GPIOInputHandlerille.
-        Varsinainen logiikka on ButtonInputControllerissa.
+        Varsinainen logiikka on PhysicalButtonControllerissa.
         """
 
-        if hasattr(self, "button_input_controller") and self.button_input_controller:
-            self.button_input_controller.handle_button_press(button_name, is_pressed)
+        if hasattr(self, "physical_button_controller") and self.physical_button_controller:
+            self.physical_button_controller.handle_button_press(button_name, is_pressed)
 
     def handle_modbus_result(self, result, op_code, error_msg):
         """
