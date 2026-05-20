@@ -1,5 +1,11 @@
 # controllers/physical_button_controller.py
 
+from config.gpio_config import (
+    STATION_BUTTON_MAP,
+    STATION_LIGHT_OUTPUTS,
+    SPARE_BUTTONS,
+)
+
 
 class PhysicalButtonController:
     """
@@ -12,8 +18,7 @@ class PhysicalButtonController:
     - SPARE1-4: varalla, ei toimintoa
 
     Nappivalot:
-    - station 1 valo: HardwareService output 4
-    - station 2 valo: HardwareService output 5
+    - määritellään config/gpio_config.py tiedostossa
 
     Huom:
     Tämä ei korvaa oikeaa hätäseis-turvapiiriä.
@@ -23,26 +28,9 @@ class PhysicalButtonController:
         self.station_controllers = station_controllers
         self.hardware_service = hardware_service
 
-        self.station_button_map = {
-            "STATION1_START": 1,
-            "STATION2_START": 2,
-
-            # Vanhojen nimien yhteensopivuus:
-            "START": 1,
-            "STOP": 1,
-        }
-
-        self.station_light_outputs = {
-            1: 4,
-            2: 5,
-        }
-
-        self.spare_buttons = {
-            "SPARE1",
-            "SPARE2",
-            "SPARE3",
-            "SPARE4",
-        }
+        self.station_button_map = STATION_BUTTON_MAP
+        self.station_light_outputs = STATION_LIGHT_OUTPUTS
+        self.spare_buttons = SPARE_BUTTONS
 
     def handle_button_press(self, button_name, is_pressed):
         if not is_pressed:
