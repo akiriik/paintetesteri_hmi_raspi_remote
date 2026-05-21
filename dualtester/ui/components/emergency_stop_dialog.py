@@ -96,18 +96,8 @@ class EmergencyStopDialog(QDialog):
         if not self.hardware_service:
             return
 
-        try:
-            self.hardware_service.write_register(19099, 1)
-
-            QTimer.singleShot(
-                300,
-                lambda: self.hardware_service.write_register(19099, 0),
-            )
-
-            QTimer.singleShot(500, self.check_status_after_reset)
-
-        except Exception as e:
-            print(f"Hätäseis-kuittaus epäonnistui: {e}")
+        self.hardware_service.reset_emergency_stop()
+        QTimer.singleShot(500, self.check_status_after_reset)
 
     def check_status_after_reset(self):
         if not self.hardware_service:

@@ -1,5 +1,5 @@
 # services/hardware_service.py
-from PyQt5.QtCore import QObject
+from PyQt5.QtCore import QObject, QTimer
 
 from utils.modbus_manager import ModbusManager
 from utils.gpio_handler import GPIOHandler
@@ -17,6 +17,9 @@ class HardwareService(QObject):
 
     Tämä luokka ei sisällä UI-layouttia.
     """
+
+    SHUTDOWN_REQUEST_REGISTER = 17999
+    EMERGENCY_RESET_REGISTER = 19099
 
     def __init__(
         self,
@@ -41,6 +44,7 @@ class HardwareService(QObject):
         self.dfr0558_manager = None
 
         self.dev_relay_states = [False] * 8
+        self.dev_emergency_stop_status = None
 
         self._init_modbus(modbus_port, modbus_baudrate)
         self._init_gpio_outputs()
@@ -127,8 +131,8 @@ class HardwareService(QObject):
 
     def write_register(self, address, value):
         """
-        Suora Modbus-rekisterikirjoitus.
-        Käytetään vain yhteisiin järjestelmätoimintoihin, esim. shutdown-rekisteri.
+        Matala Modbus-rekisterikirjoitus HardwareServicen sisäiseen käyttöön
+        ja yksittäisiin yhteisiin järjestelmätoimintoihin.
         """
         if self.dev_mode_modbus:
             return True
@@ -137,6 +141,39 @@ class HardwareService(QObject):
             return None
 
         return self.modbus_manager.write_register(address, value)
+
+    def request_system_shutdown(self):
+        """
+        Lähettää järjestelmän sammutuspyynnön ulkoiselle ohjaukselle.
+        Rekisteriosoite pidetään HardwareServicen sisällä.
+        """
+        try:
+            return self.write_register(self.SHUTDOWN_REQUEST_REGISTER, 1)
+        except Exception as e:
+            print(f"Varoitus: sammutusrekisterin kirjoitus epäonnistui: {e}")
+            return None
+
+    def reset_emergency_stop(self):
+        """
+        Kuittaa ohjelmallisen hätäseistilan pulssittamalla kuittausrekisteriä.
+
+        Kirjoitus:
+        - 19099 = 1
+        - 300 ms jälkeen 19099 = 0
+        """
+        try:
+            result = self.write_register(self.EMERGENCY_RESET_REGISTER, 1)
+
+            QTimer.singleShot(
+                300,
+                lambda: self.write_register(self.EMERGENCY_RESET_REGISTER, 0),
+            )
+
+            return result
+
+        except Exception as e:
+            print(f"Hätäseis-kuittaus epäonnistui: {e}")
+            return None
 
     def control_relay(self, relay_num, state):
         """
@@ -177,7 +214,7 @@ class HardwareService(QObject):
 
     def read_emergency_stop_status(self):
         if self.dev_mode_modbus:
-            return None
+            return self.dev_emergency_stop_status
 
         if self.modbus_manager:
             return self.modbus_manager.read_emergency_stop_status()

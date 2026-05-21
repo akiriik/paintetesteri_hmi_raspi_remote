@@ -260,10 +260,7 @@ class ShutdownController:
         if not main_window or not hasattr(main_window, "hardware_service"):
             return
 
-        try:
-            main_window.hardware_service.write_register(17999, 1)
-        except Exception as e:
-            print(f"Varoitus: sammutusrekisterin kirjoitus epäonnistui: {e}")
+        main_window.hardware_service.request_system_shutdown()
 
     @staticmethod
     def _shutdown_raspberry():
