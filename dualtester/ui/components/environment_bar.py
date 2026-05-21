@@ -39,25 +39,25 @@ class EnvironmentBar(QFrame):
         """)
 
         # Koordinaatit
-        title_x = 20
-        title_y = 10
-        title_w = 420
-        title_h = 60
+ #       title_x = 10
+ #       title_y = 10
+ #       title_w = 420
+ #       title_h = 60
 
-        env_x = 460
+        env_x = 10
         env_y = 6
-        env_w = 760
+        env_w = 850
         env_h = 32
 
-        hw_x = 460
+        hw_x = 10
         hw_y = 40
         hw_w = 760
         hw_h = 30
 
-        ft_x = 1240
-        ft_y = 10
+        ft_x = 720
+        ft_y = 40
         ft_w = 390
-        ft_h = 60
+        ft_h = 30
 
         manual_x = 1450
         manual_y = 10
@@ -69,11 +69,11 @@ class EnvironmentBar(QFrame):
         shutdown_w = 210
         shutdown_h = 60
 
-        self.title_label = QLabel("PAINETESTAUS  |  2x FORTEST", self)
-        self.title_label.setGeometry(title_x, title_y, title_w, title_h)
-        self.title_label.setFont(QFont("Consolas", 22, QFont.Bold))
-        self.title_label.setStyleSheet("color: white; background: transparent; border: none;")
-        self.title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+#        self.title_label = QLabel("TEST", self)
+#        self.title_label.setGeometry(title_x, title_y, title_w, title_h)
+#        self.title_label.setFont(QFont("Consolas", 22, QFont.Bold))
+#        self.title_label.setStyleSheet("color: white; background: transparent; border: none;")
+#        self.title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         self.environment_label = QLabel("", self)
         self.environment_label.setGeometry(env_x, env_y, env_w, env_h)
