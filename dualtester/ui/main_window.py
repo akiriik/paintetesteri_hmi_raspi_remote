@@ -23,9 +23,44 @@ from controllers.application_cleanup_controller import ApplicationCleanupControl
 from controllers.navigation_controller import NavigationController
 
 
+# ------------------------------------------------------------
+# DEV-asetukset
+# ------------------------------------------------------------
+
 DEV_MODE_FORTEST = True
 DEV_MODE_MODBUS = True
 DEV_MODE_GPIO = True
+
+
+# ------------------------------------------------------------
+# Fyysiset väylät
+# ------------------------------------------------------------
+#
+# Lopullinen rakenne:
+#
+# - Arduino Opta / yhteinen RS485 Modbus RTU:
+#   OPTA_MODBUS_PORT
+#
+# - ForTest 1:
+#   FORTEST_1_PORT
+#
+# - ForTest 2:
+#   FORTEST_2_PORT
+#
+# - Raspberry Pi:n suorat GPIO:t:
+#   eivät käytä sarjaporttia, vaan HardwareServicen GPIO-handlereita.
+#
+# Huom:
+# DEV_MODE-asetukset määräävät, avataanko fyysisiä väyliä.
+# Porttinimet voivat muuttua myöhemmin udev-säännöillä pysyviksi nimiksi.
+# ------------------------------------------------------------
+
+OPTA_MODBUS_PORT = "/dev/ttyUSB0"
+OPTA_MODBUS_BAUDRATE = 19200
+
+FORTEST_1_PORT = "/dev/ttyUSB1"
+FORTEST_2_PORT = None
+FORTEST_BAUDRATE = 19200
 
 
 class MainWindow(QWidget):
@@ -79,22 +114,34 @@ class MainWindow(QWidget):
         self.environment_status_bar.hide()
 
     def create_services(self):
+        """
+        Luo fyysisiin rajapintoihin liittyvät servicet.
+
+        HardwareService:
+        - Arduino Opta / yhteinen RS485 Modbus RTU
+        - Raspberry Pi:n suorat GPIO:t
+        - paikalliset anturit
+
+        ForTestService:
+        - ForTest 1 oma väylä
+        - ForTest 2 oma väylä
+        """
         self.hardware_service = HardwareService(
             parent=self,
             dev_mode_modbus=DEV_MODE_MODBUS,
             dev_mode_gpio=DEV_MODE_GPIO,
-            modbus_port="/dev/ttyUSB0",
-            modbus_baudrate=19200,
+            modbus_port=OPTA_MODBUS_PORT,
+            modbus_baudrate=OPTA_MODBUS_BAUDRATE,
         )
 
         self.fortest_service = ForTestService(
             parent=self,
             dev_mode_fortest=DEV_MODE_FORTEST,
             station_ports={
-                1: "/dev/ttyUSB1",
-                2: None,
+                1: FORTEST_1_PORT,
+                2: FORTEST_2_PORT,
             },
-            baudrate=19200,
+            baudrate=FORTEST_BAUDRATE,
         )
 
     def create_station_controllers(self):
@@ -188,7 +235,7 @@ class MainWindow(QWidget):
 
     def handle_button_press(self, button_name, is_pressed):
         """
-        GPIOInputHandlerin signaalirajapinta.
+        Raspberry GPIOInputHandlerin signaalirajapinta.
         Varsinainen logiikka on PhysicalButtonControllerissa.
         """
 
@@ -197,7 +244,7 @@ class MainWindow(QWidget):
 
     def handle_modbus_result(self, result, op_code, error_msg):
         """
-        ModbusManagerin signaalirajapinta.
+        Arduino Optan ModbusManagerin signaalirajapinta.
         Varsinainen logiikka on ModbusResultControllerissa.
         """
 

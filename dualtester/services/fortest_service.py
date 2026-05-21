@@ -7,15 +7,18 @@ from utils.fortest_manager import ForTestManager
 
 class ForTestService(QObject):
     """
-    ForTest-laitteiden hallinta.
+    ForTest 1 ja ForTest 2 -laitteiden hallinta.
 
     Vastuu:
     - luo station-kohtaiset ForTestManagerit
-    - reitittää managerien tulokset MainWindowille station_id:n kanssa
+    - reitittää ForTest-managerien tulokset MainWindowille station_id:n kanssa
     - tarjoaa station-kohtaiset start/stop/status/result-metodit
+    - hoitaa ForTest-ohjelmanvaihdon ForTestin omalla väylällä
 
-    Tämä luokka ei päätä aseman ajotilaa eikä päivitä UI:ta.
-    Aseman tila kuuluu StationControllerille.
+    Tämä service ei käytä Arduino Optan Modbus-väylää.
+    Tämä service ei ohjaa Raspberry Pi:n GPIO:ta.
+
+    Aseman ajotila kuuluu StationControllerille.
     """
 
     def __init__(
@@ -29,36 +32,36 @@ class ForTestService(QObject):
 
         self.parent_window = parent
         self.dev_mode_fortest = dev_mode_fortest
-        self.baudrate = baudrate
+        self.fortest_baudrate = baudrate
 
         if station_ports is None:
-            station_ports = {
-                1: "/dev/ttyUSB1",
-                2: None,
-            }
+            station_ports = {}
 
-        self.station_ports = station_ports
-        self.managers = {}
+        self.fortest_station_ports = station_ports
+        self.fortest_managers = {}
 
-        self._init_managers()
+        self._init_fortest_managers()
 
     # ------------------------------------------------------------
     # Alustus
     # ------------------------------------------------------------
 
-    def _init_managers(self):
+    def _init_fortest_managers(self):
         if self.dev_mode_fortest:
             return
 
-        for station_id, port in self.station_ports.items():
-            if not port:
+        for station_id, fortest_port in self.fortest_station_ports.items():
+            if not fortest_port:
                 continue
 
             try:
-                manager = ForTestManager(port=port, baudrate=self.baudrate)
+                fortest_manager = ForTestManager(
+                    port=fortest_port,
+                    baudrate=self.fortest_baudrate,
+                )
 
                 if self.parent_window and hasattr(self.parent_window, "handle_fortest_result"):
-                    manager.resultReady.connect(
+                    fortest_manager.resultReady.connect(
                         lambda result, op_code, error_msg, sid=station_id:
                             self.parent_window.handle_fortest_result(
                                 sid,
@@ -68,23 +71,28 @@ class ForTestService(QObject):
                             )
                     )
 
-                self.managers[station_id] = manager
+                self.fortest_managers[station_id] = fortest_manager
 
             except Exception as e:
-                print(f"Varoitus: ForTest {station_id} alustus epäonnistui portissa {port}: {e}")
+                print(f"Varoitus: ForTest {station_id} alustus epäonnistui portissa {fortest_port}: {e}")
 
     # ------------------------------------------------------------
-    # Managerien haku
+    # ForTest-managerien haku
     # ------------------------------------------------------------
 
     def get_manager(self, station_id):
-        return self.managers.get(station_id)
+        """
+        Palauttaa station_id:tä vastaavan ForTestManagerin.
 
-    def _get_manager_or_warn(self, station_id, operation_name):
-        manager = self.get_manager(station_id)
+        Julkinen metodinimi pidetään ennallaan yhteensopivuuden vuoksi.
+        """
+        return self.fortest_managers.get(station_id)
 
-        if manager:
-            return manager
+    def _get_fortest_manager_or_warn(self, station_id, operation_name):
+        fortest_manager = self.get_manager(station_id)
+
+        if fortest_manager:
+            return fortest_manager
 
         if not self.dev_mode_fortest:
             print(f"ForTest {station_id}: ei manageria operaatiolle {operation_name}")
@@ -92,89 +100,94 @@ class ForTestService(QObject):
         return None
 
     def _get_fortest_modbus_or_none(self, station_id, operation_name):
-        manager = self._get_manager_or_warn(station_id, operation_name)
+        """
+        Palauttaa ForTest-laitteen oman Modbus-rajapinnan.
 
-        if not manager:
+        Tämä ei ole Arduino Optan Modbus-väylä.
+        """
+        fortest_manager = self._get_fortest_manager_or_warn(station_id, operation_name)
+
+        if not fortest_manager:
             return None
 
         try:
-            return manager.worker.fortest.modbus
+            return fortest_manager.worker.fortest.modbus
         except Exception as e:
-            print(f"ForTest {station_id}: Modbus-rajapintaa ei saatu operaatiolle {operation_name}: {e}")
+            print(f"ForTest {station_id}: ForTest Modbus -rajapintaa ei saatu operaatiolle {operation_name}: {e}")
             return None
 
     # ------------------------------------------------------------
-    # Tila
+    # ForTest-yhteystila
     # ------------------------------------------------------------
 
     def is_connected(self, station_id):
-        manager = self.get_manager(station_id)
+        fortest_manager = self.get_manager(station_id)
 
-        if not manager:
+        if not fortest_manager:
             return False
 
         try:
             return (
-                hasattr(manager, "worker")
-                and hasattr(manager.worker, "fortest")
-                and hasattr(manager.worker.fortest, "modbus")
-                and manager.worker.fortest.modbus.connected
+                hasattr(fortest_manager, "worker")
+                and hasattr(fortest_manager.worker, "fortest")
+                and hasattr(fortest_manager.worker.fortest, "modbus")
+                and fortest_manager.worker.fortest.modbus.connected
             )
         except Exception:
             return False
 
     # ------------------------------------------------------------
-    # Ohjelma
+    # ForTest-ohjelma
     # ------------------------------------------------------------
 
     def write_program(self, station_id, program_number):
-        modbus = self._get_fortest_modbus_or_none(station_id, "write_program")
+        fortest_modbus = self._get_fortest_modbus_or_none(station_id, "write_program")
 
-        if not modbus:
+        if not fortest_modbus:
             return None
 
         try:
-            return modbus.write_register(FORTEST_PROGRAM_REGISTER, program_number)
+            return fortest_modbus.write_register(FORTEST_PROGRAM_REGISTER, program_number)
         except Exception as e:
             print(f"Virhe ForTest {station_id} ohjelmanvaihdossa: {e}")
             return None
 
     # ------------------------------------------------------------
-    # Testin ohjaus
+    # ForTest-testin ohjaus
     # ------------------------------------------------------------
 
     def start_test(self, station_id):
-        manager = self._get_manager_or_warn(station_id, "start_test")
+        fortest_manager = self._get_fortest_manager_or_warn(station_id, "start_test")
 
-        if manager:
-            manager.start_test()
+        if fortest_manager:
+            fortest_manager.start_test()
 
     def abort_test(self, station_id):
-        manager = self._get_manager_or_warn(station_id, "abort_test")
+        fortest_manager = self._get_fortest_manager_or_warn(station_id, "abort_test")
 
-        if manager:
-            manager.abort_test()
+        if fortest_manager:
+            fortest_manager.abort_test()
 
     # ------------------------------------------------------------
-    # Luennat
+    # ForTest-luennat
     # ------------------------------------------------------------
 
     def read_status(self, station_id):
-        manager = self._get_manager_or_warn(station_id, "read_status")
+        fortest_manager = self._get_fortest_manager_or_warn(station_id, "read_status")
 
-        if manager:
-            manager.read_status()
+        if fortest_manager:
+            fortest_manager.read_status()
 
     def read_results(self, station_id):
-        manager = self._get_manager_or_warn(station_id, "read_results")
+        fortest_manager = self._get_fortest_manager_or_warn(station_id, "read_results")
 
-        if manager:
-            manager.read_results()
+        if fortest_manager:
+            fortest_manager.read_results()
 
     # ------------------------------------------------------------
     # Sulkeminen
     # ------------------------------------------------------------
 
     def cleanup(self):
-        for manager in self.managers.values():
-            manager.cleanup()
+        for fortest_manager in self.fortest_managers.values():
+            fortest_manager.cleanup()

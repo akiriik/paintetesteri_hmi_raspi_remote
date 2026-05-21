@@ -39,7 +39,7 @@ class HardwareService(QObject):
         parent=None,
         dev_mode_modbus=True,
         dev_mode_gpio=True,
-        modbus_port="/dev/ttyUSB0",
+        modbus_port=None,
         modbus_baudrate=19200,
     ):
         super().__init__(parent)
@@ -48,6 +48,9 @@ class HardwareService(QObject):
 
         self.dev_mode_modbus = dev_mode_modbus
         self.dev_mode_gpio = dev_mode_gpio
+
+        if not dev_mode_modbus and not modbus_port:
+            raise ValueError("Opta Modbus -portti puuttuu, kun DEV_MODE_MODBUS=False")
 
         # Arduino Optan RS485 / Modbus RTU -väylä
         self.opta_modbus_port = modbus_port
