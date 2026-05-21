@@ -157,11 +157,15 @@ class MainWindow(QWidget):
             program_selection_controller=self.program_selection_controller,
         )
 
-        self.emergency_stop_controller = EmergencyStopController(
-            main_window=self,
-            hardware_service=self.hardware_service,
-            station_controllers=self.station_controllers,
-        )
+        self.emergency_stop_controller = None
+
+        # Hätäseis-pollaus pois käytöstä Opta-testin ajaksi.
+        # Otetaan takaisin käyttöön vasta kun Optan hätäseisrekisterit on toteutettu varmasti.
+        # self.emergency_stop_controller = EmergencyStopController(
+        #     main_window=self,
+        #     hardware_service=self.hardware_service,
+        #     station_controllers=self.station_controllers,
+        # )
 
         self.physical_button_controller = PhysicalButtonController(
             station_controllers=self.station_controllers,
