@@ -26,5 +26,5 @@ OPTA_MODBUS_BAUDRATE = 19200
 # ------------------------------------------------------------
 
 FORTEST_1_PORT = "/dev/ttyUSB1"
-FORTEST_2_PORT = None
+FORTEST_2_PORT = "/dev/ttyUSB2"
 FORTEST_BAUDRATE = 19200
