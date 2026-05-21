@@ -17,7 +17,7 @@ Huom:
 # Arduino Opta / yhteinen RS485 Modbus RTU
 # ------------------------------------------------------------
 
-OPTA_MODBUS_PORT = "/dev/ttyUSB0"
+OPTA_MODBUS_PORT = "/dev/opta"
 OPTA_MODBUS_BAUDRATE = 19200
 
 

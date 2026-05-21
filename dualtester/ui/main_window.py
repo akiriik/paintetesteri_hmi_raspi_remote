@@ -34,7 +34,7 @@ from config.port_config import (
 # DEV-asetukset
 # ------------------------------------------------------------
 
-DEV_MODE_FORTEST = False
+DEV_MODE_FORTEST = True
 DEV_MODE_MODBUS = True
 DEV_MODE_GPIO = True
 
