@@ -10,7 +10,7 @@ class ProgramSelectionScreen(BaseScreen):
     def __init__(self, parent=None, program_manager=None):
         self.program_manager = program_manager
         self.current_page = 0
-        self.items_per_page = 12  # 3 riviä, 4 saraketta
+        self.items_per_page = 9  # 3 riviä, 3 saraketta
         self.max_pages = 0
         super().__init__(parent)
         
@@ -174,7 +174,7 @@ class ProgramSelectionScreen(BaseScreen):
             
             # Luo painike, jossa on sekä ID että nimi
             button = QPushButton(self.grid_container)
-            button.setFixedSize(300, 135)
+            button.setFixedSize(200, 135)
             
             # Luo selkeä layout painikkeelle
             button_layout = QVBoxLayout(button)
@@ -221,8 +221,8 @@ class ProgramSelectionScreen(BaseScreen):
             """)
                         
             # Paikkaindeksi: 3 riviä, 4 nappia per rivi
-            row = i // 4
-            col = i % 4
+            row = i // 3
+            col = i % 3
             
             # Yhdistä painallus signaaliin (käytä ID:tä ja nimeä)
             button.clicked.connect(lambda checked, prog=program_data:

@@ -34,9 +34,15 @@ class ProgramSelectionController:
 
         self.active_station_id = station_id
 
-        self.main_window.environment_status_bar.hide()
-        self.main_window.main_screen.hide()
         self.main_window.manual_screen.hide()
+        self.main_window.main_screen.show()
+
+        if station_id == 1:
+            self.main_window.program_selection_screen.setGeometry(0, 85, 960, 995)
+        elif station_id == 2:
+            self.main_window.program_selection_screen.setGeometry(960, 85, 960, 995)
+
+        self.main_window.program_selection_screen.raise_()
         self.main_window.program_selection_screen.show()
 
     def on_program_selected(self, program_data):
