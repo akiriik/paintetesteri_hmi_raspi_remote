@@ -36,7 +36,6 @@ class MainWindow(QWidget):
         self.create_managers()
         self.create_screens()
         self.create_services()
-        self.create_compatibility_refs()
         self.create_station_controllers()
         self.create_controllers()
 
@@ -98,13 +97,6 @@ class MainWindow(QWidget):
             baudrate=19200,
         )
 
-    def create_compatibility_refs(self):
-        # Vanhojen komponenttien yhteensopivuus.
-        self.modbus_manager = self.hardware_service.modbus_manager
-        self.gpio_handler = self.hardware_service.gpio_handler
-        self.gpio_input_handler = self.hardware_service.gpio_input_handler
-        self.dfr0558_manager = self.hardware_service.dfr0558_manager
-
     def create_station_controllers(self):
         self.station_controllers = {
             1: StationController(
@@ -147,14 +139,12 @@ class MainWindow(QWidget):
             main_window=self,
             hardware_service=self.hardware_service,
             station_controllers=self.station_controllers,
-            modbus_manager=self.modbus_manager,
         )
 
         self.physical_button_controller = PhysicalButtonController(
             station_controllers=self.station_controllers,
             hardware_service=self.hardware_service,
         )
-
 
         self.modbus_result_controller = ModbusResultController(
             station_controllers=self.station_controllers,
@@ -180,7 +170,7 @@ class MainWindow(QWidget):
 
     def update_environment_sensors(self):
         """
-        Vanha yhteensopivuusrajapinta sensoripäivityksille.
+        Yhteensopivuusrajapinta sensoripäivityksille.
         Varsinainen logiikka on TopBarControllerissa.
         """
 
@@ -189,7 +179,7 @@ class MainWindow(QWidget):
 
     def update_top_bar_status(self):
         """
-        Vanha yhteensopivuusrajapinta yläpalkin päivitykselle.
+        Yhteensopivuusrajapinta yläpalkin päivitykselle.
         Varsinainen logiikka on TopBarControllerissa.
         """
 
@@ -198,7 +188,7 @@ class MainWindow(QWidget):
 
     def handle_button_press(self, button_name, is_pressed):
         """
-        Vanha yhteensopivuusrajapinta GPIOInputHandlerille.
+        GPIOInputHandlerin signaalirajapinta.
         Varsinainen logiikka on PhysicalButtonControllerissa.
         """
 
@@ -207,7 +197,7 @@ class MainWindow(QWidget):
 
     def handle_modbus_result(self, result, op_code, error_msg):
         """
-        Vanha yhteensopivuusrajapinta ModbusManagerille.
+        ModbusManagerin signaalirajapinta.
         Varsinainen logiikka on ModbusResultControllerissa.
         """
 
@@ -216,7 +206,7 @@ class MainWindow(QWidget):
 
     def handle_fortest_result(self, station_id, result, op_code, error_msg):
         """
-        Vanha yhteensopivuusrajapinta ForTestService / ForTestManagerille.
+        ForTestServicen signaalirajapinta.
         Varsinainen logiikka on ForTestResultControllerissa.
         """
 
@@ -230,7 +220,7 @@ class MainWindow(QWidget):
 
     def show_testing(self):
         """
-        Vanha yhteensopivuusrajapinta päänäkymään palaamiselle.
+        Päänäkymään palaaminen.
         Varsinainen logiikka on NavigationControllerissa.
         """
 
@@ -239,7 +229,7 @@ class MainWindow(QWidget):
 
     def show_manual(self):
         """
-        Vanha yhteensopivuusrajapinta käsikäytön avaamiselle.
+        Käsikäytön avaaminen.
         Varsinainen logiikka on NavigationControllerissa.
         """
 
@@ -248,7 +238,7 @@ class MainWindow(QWidget):
 
     def show_program_selection(self, station_id=None):
         """
-        Vanha yhteensopivuusrajapinta ohjelmanvalinnan avaamiselle.
+        Ohjelmanvalinnan avaaminen.
         Varsinainen logiikka on NavigationControllerissa.
         """
 

@@ -12,9 +12,13 @@ class EmergencyStopController:
     Tehtävät:
     - lukee hätäseistilan HardwareServicen kautta
     - avaa hätäseisdialogin
-    - pysäyttää station 1 testin hätäseisissä
+    - pysäyttää kaikki asemat hätäseisissä
     - kuittaa tilan dialogin sulkeutuessa
     - pitää MainWindowin puhtaampana
+
+    Huom:
+    Tämä on ohjelmallinen hätäseis-/tilatietologiikka.
+    Tämä ei korvaa oikeaa turvapiiriä.
     """
 
     def __init__(
@@ -22,13 +26,11 @@ class EmergencyStopController:
         main_window,
         hardware_service,
         station_controllers,
-        modbus_manager,
         poll_interval_ms=1000,
     ):
         self.main_window = main_window
         self.hardware_service = hardware_service
         self.station_controllers = station_controllers
-        self.modbus_manager = modbus_manager
 
         self.emergency_dialog_open = False
         self._emergency_dialog = None
@@ -62,9 +64,22 @@ class EmergencyStopController:
             self.stop()
 
     def open_emergency_dialog(self):
-        station = self.station_controllers.get(1)
+        self.stop_all_stations()
 
-        if station:
+        self.emergency_dialog_open = True
+        self._emergency_dialog = EmergencyStopDialog(
+            self.main_window,
+            self.hardware_service.modbus_manager,
+        )
+        self._emergency_dialog._is_emergency_stop_dialog = True
+        self._emergency_dialog.finished.connect(self.on_emergency_dialog_closed)
+        self._emergency_dialog.exec_()
+
+    def stop_all_stations(self):
+        for station_id, station in self.station_controllers.items():
+            if not station:
+                continue
+
             try:
                 station.stop_test()
                 station.update_status(
@@ -72,16 +87,7 @@ class EmergencyStopController:
                     "ERROR",
                 )
             except Exception as e:
-                print(f"Virhe testin pysäytyksessä: {e}")
-
-        self.emergency_dialog_open = True
-        self._emergency_dialog = EmergencyStopDialog(
-            self.main_window,
-            self.modbus_manager,
-        )
-        self._emergency_dialog._is_emergency_stop_dialog = True
-        self._emergency_dialog.finished.connect(self.on_emergency_dialog_closed)
-        self._emergency_dialog.exec_()
+                print(f"Virhe testin pysäytyksessä asemalla {station_id}: {e}")
 
     def close_emergency_dialog(self):
         if self._emergency_dialog is not None:
@@ -93,10 +99,11 @@ class EmergencyStopController:
     def on_emergency_dialog_closed(self, result):
         self.emergency_dialog_open = False
 
-        station = self.station_controllers.get(1)
-
-        if result == 1 and station:
-            station.update_status("HÄTÄSEIS KUITATTU", "INFO")
+        if result == 1:
+            for station in self.station_controllers.values():
+                if station:
+                    station.update_status("HÄTÄSEIS KUITATTU", "INFO")
+                    station.refresh_station_state()
 
         self._emergency_dialog = None
 

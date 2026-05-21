@@ -169,7 +169,7 @@ class ShutdownOptionsDialog(QDialog):
             self.raspberry_button,
             self.restart_button,
             self.close_button,
-            self.cancel_button
+            self.cancel_button,
         ]
 
         for button in buttons:
@@ -210,7 +210,7 @@ class ShutdownController:
 
         dialog.move(
             parent.width() // 2 - dialog.width() // 2,
-            parent.height() // 2 - dialog.height() // 2
+            parent.height() // 2 - dialog.height() // 2,
         )
 
         dialog.exec_()
@@ -226,7 +226,7 @@ class ShutdownController:
 
         dialog.move(
             parent.width() // 2 - dialog.width() // 2,
-            parent.height() // 2 - dialog.height() // 2
+            parent.height() // 2 - dialog.height() // 2,
         )
 
         dialog.exec_()
@@ -240,15 +240,30 @@ class ShutdownController:
 
     @staticmethod
     def shutdown_system(parent):
-        main_window = parent.parent() if parent else None
-
-        if hasattr(main_window, "modbus_manager") and main_window.modbus_manager:
-            try:
-                main_window.modbus_manager.write_register(17999, 1)
-            except Exception as e:
-                print(f"Varoitus: sammutusrekisterin kirjoitus epäonnistui: {e}")
+        main_window = ShutdownController._get_main_window(parent)
+        ShutdownController._write_shutdown_register(main_window)
 
         QTimer.singleShot(2000, ShutdownController._shutdown_raspberry)
+
+    @staticmethod
+    def _get_main_window(parent):
+        if parent is None:
+            return None
+
+        if hasattr(parent, "hardware_service"):
+            return parent
+
+        return parent.parent()
+
+    @staticmethod
+    def _write_shutdown_register(main_window):
+        if not main_window or not hasattr(main_window, "hardware_service"):
+            return
+
+        try:
+            main_window.hardware_service.write_register(17999, 1)
+        except Exception as e:
+            print(f"Varoitus: sammutusrekisterin kirjoitus epäonnistui: {e}")
 
     @staticmethod
     def _shutdown_raspberry():
@@ -256,7 +271,7 @@ class ShutdownController:
 
     @staticmethod
     def restart_application(parent):
-        main_window = parent.parent() if parent else None
+        main_window = ShutdownController._get_main_window(parent)
 
         if main_window:
             main_window.close()
@@ -265,7 +280,7 @@ class ShutdownController:
 
     @staticmethod
     def close_application(parent):
-        main_window = parent.parent() if parent else None
+        main_window = ShutdownController._get_main_window(parent)
 
         if main_window:
             main_window.close()
