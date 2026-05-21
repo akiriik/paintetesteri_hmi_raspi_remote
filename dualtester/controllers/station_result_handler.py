@@ -175,6 +175,7 @@ class StationResultHandler:
 
         if controller.program_number <= 0:
             controller.update_status("VIRHE: VALITSE OHJELMA ENNEN DEV-TULOSTA", "ERROR")
+            controller.refresh_station_state()
             return
 
         controller.results_started = True
@@ -218,4 +219,7 @@ class StationResultHandler:
         )
 
         self.update_test_results(fake_result)
+
+        controller.is_running = False
         controller.update_status("DEV: EMULOITU TULOS LISÄTTY", "INFO")
+        controller.refresh_station_state()

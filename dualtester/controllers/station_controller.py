@@ -14,6 +14,7 @@ class StationController(QObject):
     - start/stop-ohjauksesta
     - ajastimista
     - status- ja result-handlerien kutsumisesta
+    - aseman käyttötilan päivittämisestä UI:lle
 
     Fyysiset napit ja niiden valot hoidetaan PhysicalButtonControllerissa.
     """
@@ -51,6 +52,8 @@ class StationController(QObject):
         self.fortest_timer = QTimer(self)
         self.fortest_timer.timeout.connect(self.update_fortest_data)
         self.fortest_timer.start(1000)
+
+        self.refresh_station_state()
 
     def _connect_ui(self):
         self.station_widget.select_program_button.clicked.connect(self.request_program_selection)
@@ -110,10 +113,16 @@ class StationController(QObject):
         )
 
         self.update_status("OHJELMA VALITTU", "SUCCESS")
-        self._update_physical_button_light()
+        self.refresh_station_state()
+
+    def has_selected_program(self):
+        return self.program_number > 0 and self.selected_program is not None
 
     def check_ready_to_start(self):
-        if self.program_number <= 0:
+        if not self.has_selected_program():
+            return False
+
+        if self.is_running:
             return False
 
         if self.dev_mode_fortest:
@@ -122,14 +131,17 @@ class StationController(QObject):
         return self.fortest_service.is_connected(self.station_id)
 
     def start_test(self):
-        if self.program_number <= 0:
+        if self.is_running:
+            return
+
+        if not self.has_selected_program():
             self.update_status("VIRHE: VALITSE OHJELMA", "ERROR")
-            self._update_physical_button_light()
+            self.refresh_station_state()
             return
 
         if not self.dev_mode_fortest and not self.fortest_service.is_connected(self.station_id):
             self.update_status("FORTEST-YHTEYTTÄ EI SAATAVILLA", "ERROR")
-            self._update_physical_button_light()
+            self.refresh_station_state()
             return
 
         if self.dev_mode_fortest:
@@ -143,37 +155,43 @@ class StationController(QObject):
             QTimer.singleShot(1000, self._continue_start_test)
         else:
             self.update_status("OHJELMAN VAIHTO EPÄONNISTUI", "ERROR")
-            self._update_physical_button_light()
+            self.refresh_station_state()
 
     def _continue_start_test(self):
         self.results_started = True
         self.is_running = True
 
-        self.station_widget.update_running_state(is_running=True, ready=False)
         self.update_status("TESTI KÄYNNISTETTY", "INFO")
 
         if not self.dev_mode_fortest:
             self.fortest_service.start_test(self.station_id)
 
-        self._update_physical_button_light()
+        self.refresh_station_state()
 
     def stop_test(self):
-        self.is_running = False
-        ready = self.check_ready_to_start()
+        if not self.is_running:
+            self.refresh_station_state()
+            return
 
-        self.station_widget.update_running_state(is_running=False, ready=ready)
+        self.is_running = False
         self.update_status("TESTI PYSÄYTETTY", "INFO")
 
         if not self.dev_mode_fortest:
             self.fortest_service.abort_test(self.station_id)
 
-        self._update_physical_button_light()
+        self.refresh_station_state()
+
+    def finish_test(self, status_message=None, level="INFO"):
+        self.is_running = False
+
+        if status_message:
+            self.update_status(status_message, level)
+
+        self.refresh_station_state()
 
     def update_fortest_data(self):
         if self.dev_mode_fortest:
-            ready = self.check_ready_to_start()
-            self.station_widget.update_running_state(self.is_running, ready)
-            self._update_physical_button_light()
+            self.refresh_station_state()
             return
 
         self.fortest_service.read_status(self.station_id)
@@ -184,30 +202,36 @@ class StationController(QObject):
             self.fortest_service.read_results(self.station_id)
             self.results_read_counter = 0
 
-        ready = False
-
-        if not self.is_running:
-            ready = self.check_ready_to_start()
-
-        self.station_widget.update_running_state(self.is_running, ready)
-        self._update_physical_button_light()
+        self.refresh_station_state()
 
     def update_status_from_fortest(self, result):
         self.status_handler.update_status_from_fortest(result)
-        self._update_physical_button_light()
+        self.refresh_station_state()
 
     def update_test_results(self, result):
         self.result_handler.update_test_results(result)
-        self._update_physical_button_light()
+        self.refresh_station_state()
 
     def show_dev_fortest_result(self):
         self.result_handler.create_dev_result()
+        self.refresh_station_state()
 
     def update_status(self, message, level="INFO"):
         self.station_widget.update_status(message, level)
 
-    def _update_physical_button_light(self):
+    def refresh_station_state(self):
         ready = self.check_ready_to_start()
+
+        self.station_widget.update_running_state(
+            is_running=self.is_running,
+            ready=ready,
+        )
+
+        self._update_physical_button_light(ready)
+
+    def _update_physical_button_light(self, ready=None):
+        if ready is None:
+            ready = self.check_ready_to_start()
 
         physical_button_controller = getattr(
             self.main_window,

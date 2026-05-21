@@ -33,10 +33,7 @@ class StationStatusHandler:
         if status_value == 0 and self.last_status in [1, 2, 3]:
             controller.is_running = False
             controller.fortest_service.read_results(controller.station_id)
-
-            ready = controller.check_ready_to_start()
-            controller.station_widget.update_running_state(False, ready)
-            controller._update_gpio_run_state()
+            controller.refresh_station_state()
 
         self.last_status = status_value
 
