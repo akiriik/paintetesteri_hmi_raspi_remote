@@ -194,6 +194,10 @@ class StationController(QObject):
             self.refresh_station_state()
             return
 
+        if not self.fortest_service or not self.fortest_service.has_station_port(self.station_id):
+            self.refresh_station_state()
+            return
+
         self.fortest_service.read_status(self.station_id)
 
         self.results_read_counter += 1

@@ -64,12 +64,17 @@ class TopBarController:
         if self.dev_mode_fortest:
             return "FORTEST 1: DEV    FORTEST 2: DEV"
 
+        if not self.fortest_service:
+            return "FORTEST 1: EI PALVELUA    FORTEST 2: EI PALVELUA"
+
         f1_ok = self.fortest_service.is_connected(1)
         f2_ok = self.fortest_service.is_connected(2)
 
         f1_text = "FORTEST 1: OK" if f1_ok else "FORTEST 1: EI YHTEYTTÄ"
 
-        station2_port = self.fortest_service.station_ports.get(2)
+        station_ports = getattr(self.fortest_service, "fortest_station_ports", {})
+        station2_port = station_ports.get(2)
+
         if not station2_port:
             f2_text = "FORTEST 2: EI MÄÄRITETTY"
         else:

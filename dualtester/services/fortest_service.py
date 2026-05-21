@@ -116,6 +116,9 @@ class ForTestService(QObject):
             print(f"ForTest {station_id}: ForTest Modbus -rajapintaa ei saatu operaatiolle {operation_name}: {e}")
             return None
 
+    def has_station_port(self, station_id):
+        return bool(self.fortest_station_ports.get(station_id))
+
     # ------------------------------------------------------------
     # ForTest-yhteystila
     # ------------------------------------------------------------
