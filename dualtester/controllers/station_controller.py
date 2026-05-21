@@ -11,6 +11,7 @@ class StationController(QObject):
 
     Tämä luokka vastaa:
     - ohjelman valinnasta
+    - ohjelman kirjoittamisesta ForTestille ohjelman valinnan yhteydessä
     - start/stop-ohjauksesta
     - ajastimista
     - status- ja result-handlerien kutsumisesta
@@ -40,6 +41,8 @@ class StationController(QObject):
 
         self.selected_program = None
         self.program_number = 0
+        self.program_written_to_fortest = False
+
         self.is_running = False
         self.results_started = False
         self.results_read_counter = 0
@@ -72,13 +75,48 @@ class StationController(QObject):
         if not program_data:
             return
 
-        self.selected_program = program_data
-
         program_id = program_data.get("id", 0)
+        program_number = int(program_id) if program_id else 0
+
+        if program_number <= 0:
+            self.selected_program = None
+            self.program_number = 0
+            self.program_written_to_fortest = False
+            self.update_status("VIRHE: OHJELMAN ID PUUTTUU", "ERROR")
+            self.refresh_station_state()
+            return
+
+        self.program_written_to_fortest = False
+
+        if not self.dev_mode_fortest:
+            if not self.fortest_service or not self.fortest_service.is_connected(self.station_id):
+                self.selected_program = None
+                self.program_number = 0
+                self.update_status("FORTEST-YHTEYTTÄ EI SAATAVILLA", "ERROR")
+                self.refresh_station_state()
+                return
+
+            self.update_status(f"VAIHDETAAN OHJELMAAN {program_number}...", "INFO")
+
+            result = self.fortest_service.write_program(self.station_id, program_number)
+
+            if not result:
+                self.selected_program = None
+                self.program_number = 0
+                self.program_written_to_fortest = False
+                self.update_status("OHJELMAN VAIHTO EPÄONNISTUI", "ERROR")
+                self.refresh_station_state()
+                return
+
+            self.program_written_to_fortest = True
+        else:
+            self.program_written_to_fortest = True
+
+        self.selected_program = program_data
+        self.program_number = program_number
+
         program_name = program_data.get("name", f"Ohjelma {program_id}")
         description = program_data.get("description", "")
-
-        self.program_number = int(program_id) if program_id else 0
 
         pressure = program_data.get("pressure_mbar", "--")
         fill_time = program_data.get("fill_time_s", "--")
@@ -116,7 +154,11 @@ class StationController(QObject):
         self.refresh_station_state()
 
     def has_selected_program(self):
-        return self.program_number > 0 and self.selected_program is not None
+        return (
+            self.program_number > 0
+            and self.selected_program is not None
+            and self.program_written_to_fortest
+        )
 
     def check_ready_to_start(self):
         if not self.has_selected_program():
@@ -144,18 +186,7 @@ class StationController(QObject):
             self.refresh_station_state()
             return
 
-        if self.dev_mode_fortest:
-            self._continue_start_test()
-            return
-
-        result = self.fortest_service.write_program(self.station_id, self.program_number)
-        self.update_status(f"VAIHDETAAN OHJELMAAN {self.program_number}...", "INFO")
-
-        if result:
-            QTimer.singleShot(1000, self._continue_start_test)
-        else:
-            self.update_status("OHJELMAN VAIHTO EPÄONNISTUI", "ERROR")
-            self.refresh_station_state()
+        self._continue_start_test()
 
     def _continue_start_test(self):
         self.results_started = True
