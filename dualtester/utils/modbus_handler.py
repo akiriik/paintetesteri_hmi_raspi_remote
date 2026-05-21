@@ -1,19 +1,17 @@
 # utils/modbus_handler.py
 from pymodbus.client import ModbusSerialClient
 
-from config.modbus_config import (
-    EMERGENCY_STATUS_REGISTER,
-    EMERGENCY_STATUS_REGISTER_COUNT,
-    OPTA_RELAY_REGISTER_BASE,
-)
-
 
 class ModbusHandler:
     """
-    Matalan tason Modbus RTU -käsittelijä.
+    Yleinen matalan tason Modbus RTU -käsittelijä.
 
-    Tätä käytetään sekä Optan että ForTestin Modbus-yhteyksissä.
-    Siksi tänne ei pidä laittaa laitekohtaisia fyysisiä portteja.
+    Tämä luokka ei tunne Optaa, ForTestiä, rekisterikarttoja,
+    releitä, hätäseisejä tai muita laitekohtaisia asioita.
+
+    Laitekohtaiset osoitteet ja komennot kuuluvat ylemmille tasoille:
+    - Opta: ModbusManager / HardwareService / config/modbus_config.py
+    - ForTest: ForTestHandler / ForTestService / config/fortest_config.py
     """
 
     def __init__(self, port=None, baudrate=19200):
@@ -45,35 +43,12 @@ class ModbusHandler:
             self.connected = False
             print(f"Modbus-virhe: {e}")
 
-    def read_emergency_stop_status(self):
-        """
-        Lue hätäseispiirin tila Optan rekisteristä.
-
-        Huom:
-        Tämä metodi on Opta-kohtainen yhteensopivuusmetodi.
-        Uusi ylempi koodi lukee tämän yleensä ModbusManagerin kautta.
-        """
-        if not self.connected:
-            return None
-
-        try:
-            result = self.client.read_holding_registers(
-                address=EMERGENCY_STATUS_REGISTER,
-                count=EMERGENCY_STATUS_REGISTER_COUNT,
-            )
-
-            if result and hasattr(result, "registers") and len(result.registers) > 0:
-                return result.registers[0]
-
-            return None
-
-        except Exception as e:
-            print(f"Hätäseispiirin lukuvirhe: {e}")
-            return None
-
     def write_register(self, address, value):
         """
-        Kirjoita arvo rekisteriin.
+        Kirjoita arvo Modbus holding registeriin.
+
+        Palauttaa pymodbus-vastausobjektin tai False.
+        Ylempi taso päättää, mitä osoite tarkoittaa.
         """
         if not self.connected:
             return False
@@ -84,38 +59,18 @@ class ModbusHandler:
                 value=value,
             )
 
-            return result.isError() == False if hasattr(result, "isError") else bool(result)
+            return result
 
         except Exception as e:
             print(f"Rekisterin kirjoitusvirhe: {e}")
             return False
 
-    def toggle_relay(self, relay_num, state):
-        """
-        Optan releohjaus.
-
-        relay_num = 1...8
-        """
-        if not self.connected:
-            return False
-
-        try:
-            register = OPTA_RELAY_REGISTER_BASE + relay_num
-
-            print(f"Ohjataan relettä {relay_num}, rekisteri {register}, tila {state}")
-
-            result = self.client.write_register(
-                address=register,
-                value=state,
-            )
-
-            return result.isError() == False if hasattr(result, "isError") else bool(result)
-
-        except Exception as e:
-            print(f"Releen ohjausvirhe: {e}")
-            return False
-
     def read_holding_registers(self, address, count):
+        """
+        Lue Modbus holding register -alue.
+
+        Ylempi taso päättää, mitä osoite ja lukumäärä tarkoittavat.
+        """
         if not self.connected:
             return None
 
@@ -132,6 +87,12 @@ class ModbusHandler:
             return None
 
     def write_coil(self, address, value):
+        """
+        Kirjoita Modbus coil.
+
+        Säilytetty vanhan toimivan version mukainen True/False-arvon
+        muunnos 0xFF00 / 0x0000 -arvoksi.
+        """
         if not self.connected:
             print(f"Modbus ei yhteydessä. Ei voida kirjoittaa coiliin {address}")
             return False
@@ -139,7 +100,6 @@ class ModbusHandler:
         try:
             print(f"write_coil - Address: {address}, Value: {value}")
 
-            # ForTest manuaalin mukaan coil-komennossa pitää käyttää arvoa 0xFF00 (True)
             if value:
                 value_to_write = 0xFF00
             else:
