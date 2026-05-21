@@ -56,7 +56,7 @@ class EnvironmentBar(QFrame):
 
         ft_x = 720
         ft_y = 40
-        ft_w = 390
+        ft_w = 600
         ft_h = 30
 
         manual_x = 1450
