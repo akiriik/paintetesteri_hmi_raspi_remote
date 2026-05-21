@@ -1,6 +1,6 @@
 # controllers/modbus_result_controller.py
 
-from services.hardware_service import HardwareService
+from config.modbus_config import EMERGENCY_RESET_REGISTER
 
 
 class ModbusResultController:
@@ -49,7 +49,7 @@ class ModbusResultController:
         return (
             op_code == 2
             and hasattr(result, "address")
-            and result.address == HardwareService.EMERGENCY_RESET_REGISTER
+            and result.address == EMERGENCY_RESET_REGISTER
         )
 
     def _should_ignore_during_emergency_dialog(self, op_code):

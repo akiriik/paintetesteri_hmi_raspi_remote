@@ -1,6 +1,11 @@
 # services/hardware_service.py
 from PyQt5.QtCore import QObject, QTimer
 
+from config.modbus_config import (
+    SHUTDOWN_REQUEST_REGISTER,
+    EMERGENCY_RESET_REGISTER,
+)
+
 from utils.modbus_manager import ModbusManager
 from utils.gpio_handler import GPIOHandler
 from utils.gpio_input_handler import GPIOInputHandler
@@ -17,9 +22,6 @@ class HardwareService(QObject):
 
     Tämä luokka ei sisällä UI-layouttia.
     """
-
-    SHUTDOWN_REQUEST_REGISTER = 17999
-    EMERGENCY_RESET_REGISTER = 19099
 
     def __init__(
         self,
@@ -108,6 +110,12 @@ class HardwareService(QObject):
             print(f"Varoitus: DFR0558-anturin alustus epäonnistui: {e}")
             self.dfr0558_manager = None
 
+    def _get_modbus_manager_or_none(self):
+        if self.dev_mode_modbus:
+            return None
+
+        return self.modbus_manager
+
     def update_environment_sensors(self):
         if self.dfr0558_manager:
             self.dfr0558_manager.read_once()
@@ -137,18 +145,20 @@ class HardwareService(QObject):
         if self.dev_mode_modbus:
             return True
 
-        if not self.modbus_manager:
+        modbus_manager = self._get_modbus_manager_or_none()
+
+        if not modbus_manager:
             return None
 
-        return self.modbus_manager.write_register(address, value)
+        return modbus_manager.write_register(address, value)
 
     def request_system_shutdown(self):
         """
         Lähettää järjestelmän sammutuspyynnön ulkoiselle ohjaukselle.
-        Rekisteriosoite pidetään HardwareServicen sisällä.
+        Rekisteriosoite haetaan modbus_config.py:stä.
         """
         try:
-            return self.write_register(self.SHUTDOWN_REQUEST_REGISTER, 1)
+            return self.write_register(SHUTDOWN_REQUEST_REGISTER, 1)
         except Exception as e:
             print(f"Varoitus: sammutusrekisterin kirjoitus epäonnistui: {e}")
             return None
@@ -158,15 +168,15 @@ class HardwareService(QObject):
         Kuittaa ohjelmallisen hätäseistilan pulssittamalla kuittausrekisteriä.
 
         Kirjoitus:
-        - 19099 = 1
-        - 300 ms jälkeen 19099 = 0
+        - EMERGENCY_RESET_REGISTER = 1
+        - 300 ms jälkeen EMERGENCY_RESET_REGISTER = 0
         """
         try:
-            result = self.write_register(self.EMERGENCY_RESET_REGISTER, 1)
+            result = self.write_register(EMERGENCY_RESET_REGISTER, 1)
 
             QTimer.singleShot(
                 300,
-                lambda: self.write_register(self.EMERGENCY_RESET_REGISTER, 0),
+                lambda: self.write_register(EMERGENCY_RESET_REGISTER, 0),
             )
 
             return result
@@ -195,11 +205,13 @@ class HardwareService(QObject):
             self.dev_relay_states[relay_num - 1] = state_bool
             return True, f"DEV MODBUS: RELE {relay_num} {'PÄÄLLÄ' if state_bool else 'POIS'}"
 
-        if not self.modbus_manager:
+        modbus_manager = self._get_modbus_manager_or_none()
+
+        if not modbus_manager:
             return False, "ModbusManager ei ole käytössä"
 
         try:
-            self.modbus_manager.toggle_relay(relay_num, state_int)
+            modbus_manager.toggle_relay(relay_num, state_int)
             return True, f"RELE {relay_num} {'PÄÄLLÄ' if state_bool else 'POIS'}"
         except Exception as e:
             return False, f"Releen {relay_num} ohjaus epäonnistui: {e}"
@@ -216,8 +228,10 @@ class HardwareService(QObject):
         if self.dev_mode_modbus:
             return self.dev_emergency_stop_status
 
-        if self.modbus_manager:
-            return self.modbus_manager.read_emergency_stop_status()
+        modbus_manager = self._get_modbus_manager_or_none()
+
+        if modbus_manager:
+            return modbus_manager.read_emergency_stop_status()
 
         return None
 
@@ -225,11 +239,13 @@ class HardwareService(QObject):
         if self.dev_mode_modbus:
             return False
 
-        if not self.modbus_manager:
+        modbus_manager = self._get_modbus_manager_or_none()
+
+        if not modbus_manager:
             return False
 
-        if hasattr(self.modbus_manager, "is_connected"):
-            return self.modbus_manager.is_connected()
+        if hasattr(modbus_manager, "is_connected"):
+            return modbus_manager.is_connected()
 
         return False
 
