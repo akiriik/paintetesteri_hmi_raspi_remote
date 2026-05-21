@@ -15,6 +15,7 @@ from utils.dfr0558_handler import DFR0558Manager
 class HardwareService(QObject):
     """
     Yhteiset fyysiset I/O-rajapinnat:
+
     - Opta / Modbus RTU
     - GPIO-outputit
     - GPIO-inputit
@@ -34,6 +35,7 @@ class HardwareService(QObject):
         super().__init__(parent)
 
         self.parent_window = parent
+
         self.dev_mode_modbus = dev_mode_modbus
         self.dev_mode_gpio = dev_mode_gpio
 
@@ -48,17 +50,24 @@ class HardwareService(QObject):
         self.dev_relay_states = [False] * 8
         self.dev_emergency_stop_status = None
 
-        self._init_modbus(modbus_port, modbus_baudrate)
+        self._init_modbus()
         self._init_gpio_outputs()
         self._init_gpio_inputs()
         self._init_part_temperature_sensor()
 
-    def _init_modbus(self, port, baudrate):
+    # ------------------------------------------------------------
+    # Alustus
+    # ------------------------------------------------------------
+
+    def _init_modbus(self):
         if self.dev_mode_modbus:
             return
 
         try:
-            self.modbus_manager = ModbusManager(port=port, baudrate=baudrate)
+            self.modbus_manager = ModbusManager(
+                port=self.modbus_port,
+                baudrate=self.modbus_baudrate,
+            )
 
             if self.parent_window and hasattr(self.parent_window, "handle_modbus_result"):
                 self.modbus_manager.resultReady.connect(self.parent_window.handle_modbus_result)
@@ -110,19 +119,32 @@ class HardwareService(QObject):
             print(f"Varoitus: DFR0558-anturin alustus epäonnistui: {e}")
             self.dfr0558_manager = None
 
+    # ------------------------------------------------------------
+    # Sisäiset apumetodit
+    # ------------------------------------------------------------
+
     def _get_modbus_manager_or_none(self):
         if self.dev_mode_modbus:
             return None
 
         return self.modbus_manager
 
+    # ------------------------------------------------------------
+    # Ympäristöanturit
+    # ------------------------------------------------------------
+
     def update_environment_sensors(self):
         if self.dfr0558_manager:
             self.dfr0558_manager.read_once()
 
+    # ------------------------------------------------------------
+    # GPIO-outputit
+    # ------------------------------------------------------------
+
     def set_output(self, output_number, state):
         """
         GPIO-outputin ohjaus.
+
         output_number käyttää samaa numerointia kuin vanha GPIOHandler.
         """
         if self.dev_mode_gpio:
@@ -136,6 +158,10 @@ class HardwareService(QObject):
             return True, ""
         except Exception as e:
             return False, f"GPIO-outputin {output_number} ohjaus epäonnistui: {e}"
+
+    # ------------------------------------------------------------
+    # Yhteinen Modbus-väylä / Opta
+    # ------------------------------------------------------------
 
     def write_register(self, address, value):
         """
@@ -155,7 +181,6 @@ class HardwareService(QObject):
     def request_system_shutdown(self):
         """
         Lähettää järjestelmän sammutuspyynnön ulkoiselle ohjaukselle.
-        Rekisteriosoite haetaan modbus_config.py:stä.
         """
         try:
             return self.write_register(SHUTDOWN_REQUEST_REGISTER, 1)
@@ -166,10 +191,6 @@ class HardwareService(QObject):
     def reset_emergency_stop(self):
         """
         Kuittaa ohjelmallisen hätäseistilan pulssittamalla kuittausrekisteriä.
-
-        Kirjoitus:
-        - EMERGENCY_RESET_REGISTER = 1
-        - 300 ms jälkeen EMERGENCY_RESET_REGISTER = 0
         """
         try:
             result = self.write_register(EMERGENCY_RESET_REGISTER, 1)
@@ -184,6 +205,21 @@ class HardwareService(QObject):
         except Exception as e:
             print(f"Hätäseis-kuittaus epäonnistui: {e}")
             return None
+
+    def read_emergency_stop_status(self):
+        if self.dev_mode_modbus:
+            return self.dev_emergency_stop_status
+
+        modbus_manager = self._get_modbus_manager_or_none()
+
+        if modbus_manager:
+            return modbus_manager.read_emergency_stop_status()
+
+        return None
+
+    # ------------------------------------------------------------
+    # Käsikäytön releohjaus
+    # ------------------------------------------------------------
 
     def control_relay(self, relay_num, state):
         """
@@ -224,16 +260,9 @@ class HardwareService(QObject):
         success, message = self.control_relay(relay_num, state)
         return success
 
-    def read_emergency_stop_status(self):
-        if self.dev_mode_modbus:
-            return self.dev_emergency_stop_status
-
-        modbus_manager = self._get_modbus_manager_or_none()
-
-        if modbus_manager:
-            return modbus_manager.read_emergency_stop_status()
-
-        return None
+    # ------------------------------------------------------------
+    # Yhteystilat
+    # ------------------------------------------------------------
 
     def is_modbus_connected(self):
         if self.dev_mode_modbus:
@@ -272,6 +301,10 @@ class HardwareService(QObject):
             sensor_text = "ANTURI: EI KÄYTÖSSÄ"
 
         return f"{modbus_text}    {gpio_text}    {sensor_text}"
+
+    # ------------------------------------------------------------
+    # Sulkeminen
+    # ------------------------------------------------------------
 
     def cleanup(self):
         if self.dfr0558_manager:

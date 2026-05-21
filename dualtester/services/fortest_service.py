@@ -1,6 +1,7 @@
 # services/fortest_service.py
 from PyQt5.QtCore import QObject
 
+from config.modbus_config import FORTEST_PROGRAM_REGISTER
 from utils.fortest_manager import ForTestManager
 
 
@@ -41,6 +42,10 @@ class ForTestService(QObject):
 
         self._init_managers()
 
+    # ------------------------------------------------------------
+    # Alustus
+    # ------------------------------------------------------------
+
     def _init_managers(self):
         if self.dev_mode_fortest:
             return
@@ -68,6 +73,10 @@ class ForTestService(QObject):
             except Exception as e:
                 print(f"Varoitus: ForTest {station_id} alustus epäonnistui portissa {port}: {e}")
 
+    # ------------------------------------------------------------
+    # Managerien haku
+    # ------------------------------------------------------------
+
     def get_manager(self, station_id):
         return self.managers.get(station_id)
 
@@ -81,6 +90,22 @@ class ForTestService(QObject):
             print(f"ForTest {station_id}: ei manageria operaatiolle {operation_name}")
 
         return None
+
+    def _get_fortest_modbus_or_none(self, station_id, operation_name):
+        manager = self._get_manager_or_warn(station_id, operation_name)
+
+        if not manager:
+            return None
+
+        try:
+            return manager.worker.fortest.modbus
+        except Exception as e:
+            print(f"ForTest {station_id}: Modbus-rajapintaa ei saatu operaatiolle {operation_name}: {e}")
+            return None
+
+    # ------------------------------------------------------------
+    # Tila
+    # ------------------------------------------------------------
 
     def is_connected(self, station_id):
         manager = self.get_manager(station_id)
@@ -98,18 +123,25 @@ class ForTestService(QObject):
         except Exception:
             return False
 
-    def write_program(self, station_id, program_number):
-        manager = self._get_manager_or_warn(station_id, "write_program")
+    # ------------------------------------------------------------
+    # Ohjelma
+    # ------------------------------------------------------------
 
-        if not manager:
+    def write_program(self, station_id, program_number):
+        modbus = self._get_fortest_modbus_or_none(station_id, "write_program")
+
+        if not modbus:
             return None
 
         try:
-            modbus = manager.worker.fortest.modbus
-            return modbus.write_register(0x0060, program_number)
+            return modbus.write_register(FORTEST_PROGRAM_REGISTER, program_number)
         except Exception as e:
             print(f"Virhe ForTest {station_id} ohjelmanvaihdossa: {e}")
             return None
+
+    # ------------------------------------------------------------
+    # Testin ohjaus
+    # ------------------------------------------------------------
 
     def start_test(self, station_id):
         manager = self._get_manager_or_warn(station_id, "start_test")
@@ -123,6 +155,10 @@ class ForTestService(QObject):
         if manager:
             manager.abort_test()
 
+    # ------------------------------------------------------------
+    # Luennat
+    # ------------------------------------------------------------
+
     def read_status(self, station_id):
         manager = self._get_manager_or_warn(station_id, "read_status")
 
@@ -134,6 +170,10 @@ class ForTestService(QObject):
 
         if manager:
             manager.read_results()
+
+    # ------------------------------------------------------------
+    # Sulkeminen
+    # ------------------------------------------------------------
 
     def cleanup(self):
         for manager in self.managers.values():
