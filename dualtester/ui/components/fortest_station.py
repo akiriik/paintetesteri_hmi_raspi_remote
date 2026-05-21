@@ -8,43 +8,48 @@ from PyQt5.QtGui import QFont
 # ForTestStation koordinaatit
 # ============================================================
 
-# Yläotsikko
-TITLE_X = 20
-TITLE_Y = 15
-TITLE_W = 300
-TITLE_H = 40
-
-STATUS_X = 150
-STATUS_Y = 15
-STATUS_W = 560
-STATUS_H = 40
-
 # Ohjelmatietolaatikko
 PROGRAM_BOX_X = 20
-PROGRAM_BOX_Y = 70
+PROGRAM_BOX_Y = 15
 PROGRAM_BOX_W = 880
-PROGRAM_BOX_H = 170
+PROGRAM_BOX_H = 200
+
+STATION_TITLE_X = 15
+STATION_TITLE_Y = 10
+STATION_TITLE_W = 850
+STATION_TITLE_H = 35
 
 PROGRAM_TITLE_X = 15
-PROGRAM_TITLE_Y = 10
+PROGRAM_TITLE_Y = 50
 PROGRAM_TITLE_W = 850
 PROGRAM_TITLE_H = 35
 
 PROGRAM_DESC_X = 15
-PROGRAM_DESC_Y = 45
+PROGRAM_DESC_Y = 85
 PROGRAM_DESC_W = 850
 PROGRAM_DESC_H = 28
 
 PROGRAM_INFO_X = 15
-PROGRAM_INFO_Y = 75
+PROGRAM_INFO_Y = 120
 PROGRAM_INFO_W = 850
-PROGRAM_INFO_H = 80
+PROGRAM_INFO_H = 65
+
+# Tilalaatikko
+STATUS_BOX_X = 20
+STATUS_BOX_Y = 230
+STATUS_BOX_W = 880
+STATUS_BOX_H = 65
+
+STATUS_VALUE_X = 15
+STATUS_VALUE_Y = 12
+STATUS_VALUE_W = 850
+STATUS_VALUE_H = 40
 
 # Tuloslaatikko
 RESULTS_BOX_X = 20
-RESULTS_BOX_Y = 255
+RESULTS_BOX_Y = 310
 RESULTS_BOX_W = 880
-RESULTS_BOX_H = 600
+RESULTS_BOX_H = 575
 
 # Alapainikkeet
 SELECT_PROGRAM_X = 20
@@ -68,8 +73,8 @@ DEV_RESULT_W = 160
 DEV_RESULT_H = 60
 
 # Fontit
-FONT_TITLE = ("Consolas", 16)
-FONT_STATUS = ("Consolas", 16)
+FONT_STATION_TITLE = ("Consolas", 18)
+FONT_STATUS = ("Consolas", 18)
 FONT_PROGRAM_TITLE = ("Consolas", 18)
 FONT_PROGRAM_DESC = ("Consolas", 13)
 FONT_PROGRAM_INFO = ("Consolas", 14)
@@ -103,18 +108,6 @@ class ForTestStation(QFrame):
             }
         """)
 
-        self.title_label = QLabel(f"FORTEST {self.station_id}", self)
-        self.title_label.setGeometry(TITLE_X, TITLE_Y, TITLE_W, TITLE_H)
-        self.title_label.setFont(QFont(FONT_TITLE[0], FONT_TITLE[1]))
-        self.title_label.setStyleSheet("color: white; background: transparent; border: none;")
-        self.title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.status_label = QLabel("VALITSE OHJELMA", self)
-        self.status_label.setGeometry(STATUS_X, STATUS_Y, STATUS_W, STATUS_H)
-        self.status_label.setFont(QFont(FONT_STATUS[0], FONT_STATUS[1]))
-        self.status_label.setStyleSheet("color: orange; background: transparent; border: none;")
-        self.status_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-
         self.program_box = QFrame(self)
         self.program_box.setGeometry(PROGRAM_BOX_X, PROGRAM_BOX_Y, PROGRAM_BOX_W, PROGRAM_BOX_H)
         self.program_box.setStyleSheet("""
@@ -125,24 +118,91 @@ class ForTestStation(QFrame):
             }
         """)
 
+        self.station_title_label = QLabel(f"FORTEST {self.station_id}", self.program_box)
+        self.station_title_label.setGeometry(
+            STATION_TITLE_X,
+            STATION_TITLE_Y,
+            STATION_TITLE_W,
+            STATION_TITLE_H
+        )
+        self.station_title_label.setFont(
+            QFont(FONT_STATION_TITLE[0], FONT_STATION_TITLE[1], QFont.Bold)
+        )
+        self.station_title_label.setStyleSheet(
+            "color: white; background: transparent; border: none;"
+        )
+        self.station_title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
         self.program_label = QLabel("OHJELMA: --", self.program_box)
-        self.program_label.setGeometry(PROGRAM_TITLE_X, PROGRAM_TITLE_Y, PROGRAM_TITLE_W, PROGRAM_TITLE_H)
-        self.program_label.setFont(QFont(FONT_PROGRAM_TITLE[0], FONT_PROGRAM_TITLE[1], QFont.Bold))
-        self.program_label.setStyleSheet("color: #33FF33; background: transparent; border: none;")
+        self.program_label.setGeometry(
+            PROGRAM_TITLE_X,
+            PROGRAM_TITLE_Y,
+            PROGRAM_TITLE_W,
+            PROGRAM_TITLE_H
+        )
+        self.program_label.setFont(
+            QFont(FONT_PROGRAM_TITLE[0], FONT_PROGRAM_TITLE[1], QFont.Bold)
+        )
+        self.program_label.setStyleSheet(
+            "color: #33FF33; background: transparent; border: none;"
+        )
 
         self.program_desc_label = QLabel("", self.program_box)
-        self.program_desc_label.setGeometry(PROGRAM_DESC_X, PROGRAM_DESC_Y, PROGRAM_DESC_W, PROGRAM_DESC_H)
-        self.program_desc_label.setFont(QFont(FONT_PROGRAM_DESC[0], FONT_PROGRAM_DESC[1]))
-        self.program_desc_label.setStyleSheet("color: #33FF33; background: transparent; border: none;")
+        self.program_desc_label.setGeometry(
+            PROGRAM_DESC_X,
+            PROGRAM_DESC_Y,
+            PROGRAM_DESC_W,
+            PROGRAM_DESC_H
+        )
+        self.program_desc_label.setFont(
+            QFont(FONT_PROGRAM_DESC[0], FONT_PROGRAM_DESC[1])
+        )
+        self.program_desc_label.setStyleSheet(
+            "color: #33FF33; background: transparent; border: none;"
+        )
 
         self.program_info_label = QLabel(
             "PAINE: --     TILAVUUS: --     TÄYTTÖ: --     TASAUS: --     TESTI: --     RAJA: --",
             self.program_box
         )
-        self.program_info_label.setGeometry(PROGRAM_INFO_X, PROGRAM_INFO_Y, PROGRAM_INFO_W, PROGRAM_INFO_H)
-        self.program_info_label.setFont(QFont(FONT_PROGRAM_INFO[0], FONT_PROGRAM_INFO[1]))
+        self.program_info_label.setGeometry(
+            PROGRAM_INFO_X,
+            PROGRAM_INFO_Y,
+            PROGRAM_INFO_W,
+            PROGRAM_INFO_H
+        )
+        self.program_info_label.setFont(
+            QFont(FONT_PROGRAM_INFO[0], FONT_PROGRAM_INFO[1])
+        )
         self.program_info_label.setWordWrap(True)
-        self.program_info_label.setStyleSheet("color: #33FF33; background: transparent; border: none;")
+        self.program_info_label.setStyleSheet(
+            "color: #33FF33; background: transparent; border: none;"
+        )
+
+        self.status_box = QFrame(self)
+        self.status_box.setGeometry(STATUS_BOX_X, STATUS_BOX_Y, STATUS_BOX_W, STATUS_BOX_H)
+        self.status_box.setStyleSheet("""
+            QFrame {
+                background-color: black;
+                border: 1px solid #333333;
+                border-radius: 10px;
+            }
+        """)
+
+        self.status_label = QLabel("VALITSE OHJELMA", self.status_box)
+        self.status_label.setGeometry(
+            STATUS_VALUE_X,
+            STATUS_VALUE_Y,
+            STATUS_VALUE_W,
+            STATUS_VALUE_H
+        )
+        self.status_label.setFont(
+            QFont(FONT_STATUS[0], FONT_STATUS[1], QFont.Bold)
+        )
+        self.status_label.setStyleSheet(
+            "color: orange; background: transparent; border: none;"
+        )
+        self.status_label.setAlignment(Qt.AlignCenter)
 
         self.results_box = QLabel("", self)
         self.results_box.setGeometry(RESULTS_BOX_X, RESULTS_BOX_Y, RESULTS_BOX_W, RESULTS_BOX_H)
@@ -167,7 +227,9 @@ class ForTestStation(QFrame):
             SELECT_PROGRAM_W,
             SELECT_PROGRAM_H
         )
-        self.select_program_button.setFont(QFont(FONT_BUTTON[0], FONT_BUTTON[1], QFont.Bold))
+        self.select_program_button.setFont(
+            QFont(FONT_BUTTON[0], FONT_BUTTON[1], QFont.Bold)
+        )
         self.select_program_button.setStyleSheet("""
             QPushButton {
                 background-color: #074678;
@@ -182,7 +244,9 @@ class ForTestStation(QFrame):
 
         self.start_button = QPushButton("START", self)
         self.start_button.setGeometry(START_X, START_Y, START_W, START_H)
-        self.start_button.setFont(QFont(FONT_START_STOP[0], FONT_START_STOP[1], QFont.Bold))
+        self.start_button.setFont(
+            QFont(FONT_START_STOP[0], FONT_START_STOP[1], QFont.Bold)
+        )
         self.start_button.setStyleSheet("""
             QPushButton {
                 background-color: #0B7A28;
@@ -198,7 +262,9 @@ class ForTestStation(QFrame):
 
         self.stop_button = QPushButton("STOP", self)
         self.stop_button.setGeometry(STOP_X, STOP_Y, STOP_W, STOP_H)
-        self.stop_button.setFont(QFont(FONT_START_STOP[0], FONT_START_STOP[1], QFont.Bold))
+        self.stop_button.setFont(
+            QFont(FONT_START_STOP[0], FONT_START_STOP[1], QFont.Bold)
+        )
         self.stop_button.setStyleSheet("""
             QPushButton {
                 background-color: #A00000;
@@ -213,8 +279,15 @@ class ForTestStation(QFrame):
         """)
 
         self.dev_result_button = QPushButton("DEV TULOS", self)
-        self.dev_result_button.setGeometry(DEV_RESULT_X, DEV_RESULT_Y, DEV_RESULT_W, DEV_RESULT_H)
-        self.dev_result_button.setFont(QFont(FONT_DEV_BUTTON[0], FONT_DEV_BUTTON[1], QFont.Bold))
+        self.dev_result_button.setGeometry(
+            DEV_RESULT_X,
+            DEV_RESULT_Y,
+            DEV_RESULT_W,
+            DEV_RESULT_H
+        )
+        self.dev_result_button.setFont(
+            QFont(FONT_DEV_BUTTON[0], FONT_DEV_BUTTON[1], QFont.Bold)
+        )
         self.dev_result_button.setStyleSheet("""
             QPushButton {
                 background-color: #555555;
@@ -262,6 +335,8 @@ class ForTestStation(QFrame):
             color = "orange"
         elif level == "SUCCESS":
             color = "#00FF00"
+        elif level == "INFO":
+            color = "#33CCFF"
 
         self.status_label.setStyleSheet(
             f"color: {color}; background: transparent; border: none;"
