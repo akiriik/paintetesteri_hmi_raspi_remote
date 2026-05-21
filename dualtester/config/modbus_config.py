@@ -1,10 +1,10 @@
 # config/modbus_config.py
 
 """
-Modbus-rekisterien keskitetty konfiguraatio.
+Opta / yhteisen Modbus-väylän rekisterit.
 
-Tähän tiedostoon kerätään dualtester-rakenteessa käytettävät
-Modbus-rekisteriosoitteet.
+Nämä kuuluvat Arduino Optan RS485 Modbus RTU -väylään.
+ForTest-laitteiden rekisterit ovat tiedostossa fortest_config.py.
 """
 
 # ------------------------------------------------------------
@@ -16,11 +16,3 @@ SHUTDOWN_REQUEST_REGISTER = 17999
 
 # Ohjelmallisen hätäseis-tilan kuittaus
 EMERGENCY_RESET_REGISTER = 19099
-
-
-# ------------------------------------------------------------
-# ForTest
-# ------------------------------------------------------------
-
-# ForTest-ohjelman valinta
-FORTEST_PROGRAM_REGISTER = 0x0060

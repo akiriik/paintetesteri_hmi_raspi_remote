@@ -1,37 +1,57 @@
 # utils/fortest_handler.py
+from config.fortest_config import (
+    FORTEST_START_TEST_COIL,
+    FORTEST_ABORT_TEST_COIL,
+    FORTEST_STATUS_REGISTER,
+    FORTEST_STATUS_REGISTER_COUNT,
+    FORTEST_RESULTS_REGISTER,
+    FORTEST_RESULTS_REGISTER_COUNT,
+)
+
 from utils.modbus_handler import ModbusHandler
 
+
 class ForTestHandler:
-    def __init__(self, port='/dev/ttyUSB1', baudrate=19200):
+    def __init__(self, port=None, baudrate=19200):
+        if not port:
+            raise ValueError("ForTest-portti puuttuu")
+
         self.modbus = ModbusHandler(port=port, baudrate=baudrate)
-        
+
     def start_test(self):
-        """Start test command (0x0A)"""
-        return self.modbus.write_coil(0x0A, True)
-    
+        """Käynnistä ForTest-testi."""
+        return self.modbus.write_coil(FORTEST_START_TEST_COIL, True)
+
     def abort_test(self):
-        """Abort test command (0x14)"""
-        return self.modbus.write_coil(0x14, True)
-    
+        """Keskeytä / pysäytä ForTest-testi."""
+        return self.modbus.write_coil(FORTEST_ABORT_TEST_COIL, True)
+
     def read_status(self):
-        """Read device status (0x0030)"""
-        return self.modbus.read_holding_registers(0x0030, 32)
-    
+        """Lue ForTest-laitteen statusalue."""
+        return self.modbus.read_holding_registers(
+            FORTEST_STATUS_REGISTER,
+            FORTEST_STATUS_REGISTER_COUNT,
+        )
+
     def read_results(self):
-        """Read test results (0x0040)"""
-        return self.modbus.read_holding_registers(0x0040, 32)
+        """Lue ForTest-testitulosten alue."""
+        return self.modbus.read_holding_registers(
+            FORTEST_RESULTS_REGISTER,
+            FORTEST_RESULTS_REGISTER_COUNT,
+        )
+
 
 class DummyForTestHandler:
     def start_test(self):
         print("DummyForTest: Testi käynnistetty (ei oikeaa laitetta)")
         return True
-    
+
     def abort_test(self):
         print("DummyForTest: Testi pysäytetty (ei oikeaa laitetta)")
         return True
-    
+
     def read_status(self):
         return None
-    
+
     def read_results(self):
         return None

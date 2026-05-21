@@ -1,7 +1,7 @@
 # services/fortest_service.py
 from PyQt5.QtCore import QObject
 
-from config.modbus_config import FORTEST_PROGRAM_REGISTER
+from config.fortest_config import FORTEST_PROGRAM_REGISTER
 from utils.fortest_manager import ForTestManager
 
 
