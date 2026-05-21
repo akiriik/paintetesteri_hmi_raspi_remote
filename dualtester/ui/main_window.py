@@ -105,9 +105,6 @@ class MainWindow(QWidget):
         self.gpio_input_handler = self.hardware_service.gpio_input_handler
         self.dfr0558_manager = self.hardware_service.dfr0558_manager
 
-        # Vanhan yhden testerin yhteensopivuus station 1:lle.
-        self.fortest_manager = self.fortest_service.get_manager(1)
-
     def create_station_controllers(self):
         self.station_controllers = {
             1: StationController(
