@@ -48,27 +48,27 @@ RESULTS_BOX_H = 520
 
 # Alapainikkeet
 SELECT_PROGRAM_X = 20
-SELECT_PROGRAM_Y = 795
+SELECT_PROGRAM_Y = 910
 SELECT_PROGRAM_W = 280
 SELECT_PROGRAM_H = 75
 
 START_X = 330
-START_Y = 795
+START_Y = 910
 START_W = 250
 START_H = 75
 
 STOP_X = 610
-STOP_Y = 795
+STOP_Y = 910
 STOP_W = 290
 STOP_H = 75
 
-DEV_RESULT_X = 20
-DEV_RESULT_Y = 885
-DEV_RESULT_W = 280
+DEV_RESULT_X = 375
+DEV_RESULT_Y = 720
+DEV_RESULT_W = 160
 DEV_RESULT_H = 60
 
 # Fontit
-FONT_TITLE = ("Consolas", 24)
+FONT_TITLE = ("Consolas", 16)
 FONT_STATUS = ("Consolas", 16)
 FONT_PROGRAM_TITLE = ("Consolas", 18)
 FONT_PROGRAM_DESC = ("Consolas", 13)
@@ -86,11 +86,10 @@ class ForTestStation(QFrame):
     Tämä ei sisällä Modbus-, GPIO- tai ForTest-yhteyslogiikkaa.
     """
 
-    def __init__(self, station_id, title, parent=None):
+    def __init__(self, station_id, parent=None):
         super().__init__(parent)
 
         self.station_id = station_id
-        self.title = title
         self.results_history = []
 
         self.init_ui()
@@ -104,13 +103,13 @@ class ForTestStation(QFrame):
             }
         """)
 
-        self.title_label = QLabel(self.title, self)
+        self.title_label = QLabel(f"FORTEST {self.station_id}", self)
         self.title_label.setGeometry(TITLE_X, TITLE_Y, TITLE_W, TITLE_H)
-        self.title_label.setFont(QFont(FONT_TITLE[0], FONT_TITLE[1], QFont.Bold))
+        self.title_label.setFont(QFont(FONT_TITLE[0], FONT_TITLE[1]))
         self.title_label.setStyleSheet("color: white; background: transparent; border: none;")
         self.title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
-        self.status_label = QLabel("TILA: --    FORTEST: --", self)
+        self.status_label = QLabel("VALITSE OHJELMA", self)
         self.status_label.setGeometry(STATUS_X, STATUS_Y, STATUS_W, STATUS_H)
         self.status_label.setFont(QFont(FONT_STATUS[0], FONT_STATUS[1]))
         self.status_label.setStyleSheet("color: orange; background: transparent; border: none;")

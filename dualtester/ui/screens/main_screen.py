@@ -23,7 +23,6 @@ class MainScreen(QWidget):
         # Vasen ForTest
         self.fortest1 = ForTestStation(
             station_id=1,
-            title="FORTEST 1",
             parent=self
         )
         self.fortest1.setGeometry(0, 85, 960, 995)
@@ -31,7 +30,6 @@ class MainScreen(QWidget):
         # Oikea ForTest
         self.fortest2 = ForTestStation(
             station_id=2,
-            title="FORTEST 2",
             parent=self
         )
         self.fortest2.setGeometry(960, 85, 960, 995)
