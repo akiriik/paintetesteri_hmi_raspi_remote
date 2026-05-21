@@ -8,8 +8,13 @@ class ForTestService(QObject):
     """
     ForTest-laitteiden hallinta.
 
-    Tässä vaiheessa rakenne tukee kahta asemaa, mutta ei pakota toista fyysistä porttia käyttöön,
-    ellei sitä määritellä. Näin nykyinen toimiva yhden ForTestin /dev/ttyUSB1-logiikka ei rikkoudu.
+    Vastuu:
+    - luo station-kohtaiset ForTestManagerit
+    - reitittää managerien tulokset MainWindowille station_id:n kanssa
+    - tarjoaa station-kohtaiset start/stop/status/result-metodit
+
+    Tämä luokka ei päätä aseman ajotilaa eikä päivitä UI:ta.
+    Aseman tila kuuluu StationControllerille.
     """
 
     def __init__(
@@ -50,7 +55,12 @@ class ForTestService(QObject):
                 if self.parent_window and hasattr(self.parent_window, "handle_fortest_result"):
                     manager.resultReady.connect(
                         lambda result, op_code, error_msg, sid=station_id:
-                            self.parent_window.handle_fortest_result(sid, result, op_code, error_msg)
+                            self.parent_window.handle_fortest_result(
+                                sid,
+                                result,
+                                op_code,
+                                error_msg,
+                            )
                     )
 
                 self.managers[station_id] = manager
@@ -60,6 +70,17 @@ class ForTestService(QObject):
 
     def get_manager(self, station_id):
         return self.managers.get(station_id)
+
+    def _get_manager_or_warn(self, station_id, operation_name):
+        manager = self.get_manager(station_id)
+
+        if manager:
+            return manager
+
+        if not self.dev_mode_fortest:
+            print(f"ForTest {station_id}: ei manageria operaatiolle {operation_name}")
+
+        return None
 
     def is_connected(self, station_id):
         manager = self.get_manager(station_id)
@@ -78,7 +99,7 @@ class ForTestService(QObject):
             return False
 
     def write_program(self, station_id, program_number):
-        manager = self.get_manager(station_id)
+        manager = self._get_manager_or_warn(station_id, "write_program")
 
         if not manager:
             return None
@@ -91,25 +112,25 @@ class ForTestService(QObject):
             return None
 
     def start_test(self, station_id):
-        manager = self.get_manager(station_id)
+        manager = self._get_manager_or_warn(station_id, "start_test")
 
         if manager:
             manager.start_test()
 
     def abort_test(self, station_id):
-        manager = self.get_manager(station_id)
+        manager = self._get_manager_or_warn(station_id, "abort_test")
 
         if manager:
             manager.abort_test()
 
     def read_status(self, station_id):
-        manager = self.get_manager(station_id)
+        manager = self._get_manager_or_warn(station_id, "read_status")
 
         if manager:
             manager.read_status()
 
     def read_results(self, station_id):
-        manager = self.get_manager(station_id)
+        manager = self._get_manager_or_warn(station_id, "read_results")
 
         if manager:
             manager.read_results()
