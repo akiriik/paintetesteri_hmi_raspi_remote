@@ -13,25 +13,12 @@ class MainScreen(QWidget):
     def init_ui(self):
         self.setStyleSheet("background-color: black;")
 
-        screen_w = self.parent().screen_width if self.parent() else 1920
-        screen_h = self.parent().screen_height if self.parent() else 1080
-
-        top_h = 90
-        margin = 10
-        gap = 10
-
-        station_y = top_h + margin
-        station_h = screen_h - station_y - margin
-        station_w = (screen_w - (margin * 2) - gap) // 2
+        # Kiinteä 1920x1080 koordinaattiasettelu
+        # Kaikki koordinaatit ovat suhteessa MainScreenin vasempaan yläkulmaan
 
         # Yhteinen yläpalkki
         self.environment_bar = EnvironmentBar(self)
-        self.environment_bar.setGeometry(
-            margin,
-            margin,
-            screen_w - margin * 2,
-            top_h - margin
-        )
+        self.environment_bar.setGeometry(0, 0, 1920, 85)
 
         # Vasen ForTest
         self.fortest1 = ForTestStation(
@@ -39,12 +26,7 @@ class MainScreen(QWidget):
             title="FORTEST 1",
             parent=self
         )
-        self.fortest1.setGeometry(
-            margin,
-            station_y,
-            station_w,
-            station_h
-        )
+        self.fortest1.setGeometry(0, 85, 960, 995)
 
         # Oikea ForTest
         self.fortest2 = ForTestStation(
@@ -52,12 +34,7 @@ class MainScreen(QWidget):
             title="FORTEST 2",
             parent=self
         )
-        self.fortest2.setGeometry(
-            margin + station_w + gap,
-            station_y,
-            station_w,
-            station_h
-        )
+        self.fortest2.setGeometry(960, 85, 960, 995)
 
         # Yläpalkin napit
         self.environment_bar.manual_button.clicked.connect(self.open_manual_screen)

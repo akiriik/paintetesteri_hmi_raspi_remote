@@ -33,8 +33,8 @@ class EnvironmentBar(QFrame):
         self.setStyleSheet("""
             QFrame {
                 background-color: #101010;
-                border: 2px solid #333333;
-                border-radius: 10px;
+                border: 0px solid #bfbfbf;
+                border-radius: 0px;
             }
         """)
 
