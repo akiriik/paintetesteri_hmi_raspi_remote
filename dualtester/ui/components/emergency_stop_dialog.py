@@ -108,7 +108,7 @@ class EmergencyStopDialog(QDialog):
         if status == 1:
             self.accept()
         else:
-            self.reset_button.setText("KUITTAUS\nHÄTÄSEIS EDELLEEN AKTIIVINEN")
+            self.reset_button.setText("EI VOI KUITATA\nHÄTÄSEIS AKTIIVINEN!")
             self.reset_button.setStyleSheet("""
                 QPushButton {
                     background-color: #FFC107;
