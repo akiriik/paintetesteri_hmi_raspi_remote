@@ -69,7 +69,7 @@ class EmergencyStopController:
         self.emergency_dialog_open = True
         self._emergency_dialog = EmergencyStopDialog(
             self.main_window,
-            self.hardware_service.modbus_manager,
+            self.hardware_service,
         )
         self._emergency_dialog._is_emergency_stop_dialog = True
         self._emergency_dialog.finished.connect(self.on_emergency_dialog_closed)

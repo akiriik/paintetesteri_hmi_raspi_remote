@@ -10,11 +10,20 @@ class ManualScreen(BaseScreen):
     """
     Käsikäyttösivu.
 
-    Tämä näkymä ei käytä enää suoraan parent().modbus_manageria.
     Releohjaukset menevät HardwareService-luokan kautta.
+    Tämä näkymä ei käytä suoraan ModbusManageria tai GPIOHandleria.
     """
 
-    def __init__(self, parent=None, modbus=None):
+    STATUS_STYLE = """
+        QLabel {{
+            color: {color};
+            background-color: #101010;
+            border: 2px solid #333333;
+            border-radius: 10px;
+        }}
+    """
+
+    def __init__(self, parent=None):
         self.relay_buttons = []
         self.relay_states = [False] * 8
         super().__init__(parent)
@@ -25,7 +34,6 @@ class ManualScreen(BaseScreen):
         screen_w = self.parent().screen_width if self.parent() else 1920
         screen_h = self.parent().screen_height if self.parent() else 1080
 
-        # Koordinaatit
         back_x = 20
         back_y = 20
         back_w = 180
@@ -84,14 +92,7 @@ class ManualScreen(BaseScreen):
         self.connection_label.setGeometry(status_x, status_y, status_w, status_h)
         self.connection_label.setAlignment(Qt.AlignCenter)
         self.connection_label.setFont(QFont("Consolas", 17))
-        self.connection_label.setStyleSheet("""
-            QLabel {
-                color: #33FF33;
-                background-color: #101010;
-                border: 2px solid #333333;
-                border-radius: 10px;
-            }
-        """)
+        self.connection_label.setStyleSheet(self.STATUS_STYLE.format(color="#33FF33"))
 
         self.relay_panel = QFrame(self)
         self.relay_panel.setGeometry(panel_x, panel_y, panel_w, panel_h)
@@ -125,25 +126,24 @@ class ManualScreen(BaseScreen):
             bottom_status_x,
             bottom_status_y,
             bottom_status_w,
-            bottom_status_h
+            bottom_status_h,
         )
         self.relay_status_label.setAlignment(Qt.AlignCenter)
         self.relay_status_label.setFont(QFont("Consolas", 18))
-        self.relay_status_label.setStyleSheet("""
-            QLabel {
-                color: white;
-                background-color: #101010;
-                border: 2px solid #333333;
-                border-radius: 10px;
-            }
-        """)
+        self._set_relay_status_style("white")
 
         self.update_connection_status()
 
     def get_hardware_service(self):
-        if self.parent() and hasattr(self.parent(), "hardware_service"):
-            return self.parent().hardware_service
+        parent = self.parent()
+
+        if parent and hasattr(parent, "hardware_service"):
+            return parent.hardware_service
+
         return None
+
+    def refresh(self):
+        self.update_connection_status()
 
     def update_connection_status(self):
         hardware_service = self.get_hardware_service()
@@ -161,15 +161,10 @@ class ManualScreen(BaseScreen):
         hardware_service = self.get_hardware_service()
 
         if not hardware_service:
-            self.relay_status_label.setText("VIRHE: HardwareService ei ole käytössä")
-            self.relay_status_label.setStyleSheet("""
-                QLabel {
-                    color: red;
-                    background-color: #101010;
-                    border: 2px solid #333333;
-                    border-radius: 10px;
-                }
-            """)
+            self._set_relay_status(
+                "VIRHE: HardwareService ei ole käytössä",
+                "red",
+            )
             return
 
         success, message = hardware_service.control_relay(relay_num, new_state)
@@ -177,29 +172,22 @@ class ManualScreen(BaseScreen):
         if success:
             self.relay_states[index] = new_state
             self._update_relay_button_style(index)
-            self.relay_status_label.setText(message)
-            self.relay_status_label.setStyleSheet("""
-                QLabel {
-                    color: #33FF33;
-                    background-color: #101010;
-                    border: 2px solid #333333;
-                    border-radius: 10px;
-                }
-            """)
+            self._set_relay_status(message, "#33FF33")
         else:
             self.relay_states[index] = old_state
             self._update_relay_button_style(index)
-            self.relay_status_label.setText(message)
-            self.relay_status_label.setStyleSheet("""
-                QLabel {
-                    color: red;
-                    background-color: #101010;
-                    border: 2px solid #333333;
-                    border-radius: 10px;
-                }
-            """)
+            self._set_relay_status(message, "red")
 
         self.update_connection_status()
+
+    def _set_relay_status(self, message, color):
+        self.relay_status_label.setText(message)
+        self._set_relay_status_style(color)
+
+    def _set_relay_status_style(self, color):
+        self.relay_status_label.setStyleSheet(
+            self.STATUS_STYLE.format(color=color)
+        )
 
     def _update_relay_button_style(self, index):
         if index < 0 or index >= len(self.relay_buttons):

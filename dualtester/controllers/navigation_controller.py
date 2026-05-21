@@ -41,6 +41,10 @@ class NavigationController:
         self.main_screen.hide()
         self.environment_status_bar.hide()
         self.program_selection_screen.hide()
+
+        if hasattr(self.manual_screen, "refresh"):
+            self.manual_screen.refresh()
+
         self.manual_screen.show()
 
     def show_program_selection(self, station_id=None):
