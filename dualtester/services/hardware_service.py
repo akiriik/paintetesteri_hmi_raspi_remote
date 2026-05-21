@@ -14,14 +14,24 @@ from utils.dfr0558_handler import DFR0558Manager
 
 class HardwareService(QObject):
     """
-    Yhteiset fyysiset I/O-rajapinnat:
+    Yhteiset fyysiset I/O-rajapinnat.
 
-    - Opta / Modbus RTU
-    - GPIO-outputit
-    - GPIO-inputit
-    - DFR0558 kappalelämpötila-anturi
+    Vastuurajat:
 
-    Tämä luokka ei sisällä UI-layouttia.
+    - Arduino Opta / RS485 Modbus:
+      opta_modbus_manager
+
+    - Raspberry Pi:n suorat GPIO-outputit:
+      raspberry_gpio_output_handler
+
+    - Raspberry Pi:n suorat GPIO-inputit:
+      raspberry_gpio_input_handler
+
+    - Raspberry Pi:n paikallinen kappalelämpötila-anturi:
+      dfr0558_manager
+
+    ForTest-laitteet eivät kuulu tähän serviceen.
+    ForTest 1 ja ForTest 2 kuuluvat ForTestServiceen.
     """
 
     def __init__(
@@ -39,68 +49,95 @@ class HardwareService(QObject):
         self.dev_mode_modbus = dev_mode_modbus
         self.dev_mode_gpio = dev_mode_gpio
 
-        self.modbus_port = modbus_port
-        self.modbus_baudrate = modbus_baudrate
+        # Arduino Optan RS485 / Modbus RTU -väylä
+        self.opta_modbus_port = modbus_port
+        self.opta_modbus_baudrate = modbus_baudrate
+        self.opta_modbus_manager = None
 
-        self.modbus_manager = None
-        self.gpio_handler = None
-        self.gpio_input_handler = None
+        # Raspberry Pi:n suorat GPIO-rajapinnat
+        self.raspberry_gpio_output_handler = None
+        self.raspberry_gpio_input_handler = None
+
+        # Raspberry Pi:hin liitetty paikallinen anturi
         self.dfr0558_manager = None
 
+        # DEV-tilan sisäiset tilat
         self.dev_relay_states = [False] * 8
         self.dev_emergency_stop_status = None
 
-        self._init_modbus()
-        self._init_gpio_outputs()
-        self._init_gpio_inputs()
+        self._init_opta_modbus()
+        self._init_raspberry_gpio_outputs()
+        self._init_raspberry_gpio_inputs()
         self._init_part_temperature_sensor()
 
     # ------------------------------------------------------------
     # Alustus
     # ------------------------------------------------------------
 
-    def _init_modbus(self):
+    def _init_opta_modbus(self):
+        """
+        Alustaa Arduino Optan RS485 / Modbus RTU -väylän.
+
+        Tämä väylä ei ole ForTest-väylä.
+        """
         if self.dev_mode_modbus:
             return
 
         try:
-            self.modbus_manager = ModbusManager(
-                port=self.modbus_port,
-                baudrate=self.modbus_baudrate,
+            self.opta_modbus_manager = ModbusManager(
+                port=self.opta_modbus_port,
+                baudrate=self.opta_modbus_baudrate,
             )
 
             if self.parent_window and hasattr(self.parent_window, "handle_modbus_result"):
-                self.modbus_manager.resultReady.connect(self.parent_window.handle_modbus_result)
+                self.opta_modbus_manager.resultReady.connect(
+                    self.parent_window.handle_modbus_result
+                )
 
         except Exception as e:
-            print(f"Varoitus: ModbusManager-alustus epäonnistui: {e}")
-            self.modbus_manager = None
+            print(f"Varoitus: Opta Modbus -alustus epäonnistui: {e}")
+            self.opta_modbus_manager = None
 
-    def _init_gpio_outputs(self):
+    def _init_raspberry_gpio_outputs(self):
+        """
+        Alustaa Raspberry Pi:n suorat GPIO-outputit.
+
+        Nämä eivät ole Optan I/O:ta.
+        """
         if self.dev_mode_gpio:
             return
 
         try:
-            self.gpio_handler = GPIOHandler()
+            self.raspberry_gpio_output_handler = GPIOHandler()
         except Exception as e:
-            print(f"Varoitus: GPIO-outputtien alustus epäonnistui: {e}")
-            self.gpio_handler = None
+            print(f"Varoitus: Raspberry GPIO-outputtien alustus epäonnistui: {e}")
+            self.raspberry_gpio_output_handler = None
 
-    def _init_gpio_inputs(self):
+    def _init_raspberry_gpio_inputs(self):
+        """
+        Alustaa Raspberry Pi:n suorat GPIO-inputit.
+
+        Nämä eivät ole Optan I/O:ta.
+        """
         if self.dev_mode_gpio:
             return
 
         try:
-            self.gpio_input_handler = GPIOInputHandler()
+            self.raspberry_gpio_input_handler = GPIOInputHandler()
 
             if self.parent_window and hasattr(self.parent_window, "handle_button_press"):
-                self.gpio_input_handler.button_changed.connect(self.parent_window.handle_button_press)
+                self.raspberry_gpio_input_handler.button_changed.connect(
+                    self.parent_window.handle_button_press
+                )
 
         except Exception as e:
-            print(f"Varoitus: GPIO-inputtien alustus epäonnistui: {e}")
-            self.gpio_input_handler = None
+            print(f"Varoitus: Raspberry GPIO-inputtien alustus epäonnistui: {e}")
+            self.raspberry_gpio_input_handler = None
 
     def _init_part_temperature_sensor(self):
+        """
+        Alustaa Raspberry Pi:hin liitetyn DFR0558-kappalelämpötila-anturin.
+        """
         if self.dev_mode_gpio:
             return
 
@@ -123,11 +160,16 @@ class HardwareService(QObject):
     # Sisäiset apumetodit
     # ------------------------------------------------------------
 
-    def _get_modbus_manager_or_none(self):
+    def _get_opta_modbus_manager_or_none(self):
+        """
+        Palauttaa Arduino Optan Modbus-managerin, jos se on käytössä.
+
+        DEV-tilassa palauttaa None, koska fyysistä Opta-väylää ei käytetä.
+        """
         if self.dev_mode_modbus:
             return None
 
-        return self.modbus_manager
+        return self.opta_modbus_manager
 
     # ------------------------------------------------------------
     # Ympäristöanturit
@@ -138,49 +180,51 @@ class HardwareService(QObject):
             self.dfr0558_manager.read_once()
 
     # ------------------------------------------------------------
-    # GPIO-outputit
+    # Raspberry Pi GPIO-outputit
     # ------------------------------------------------------------
 
     def set_output(self, output_number, state):
         """
-        GPIO-outputin ohjaus.
+        Raspberry Pi:n suoran GPIO-outputin ohjaus.
 
         output_number käyttää samaa numerointia kuin vanha GPIOHandler.
         """
         if self.dev_mode_gpio:
             return True, "DEV GPIO: ohjaus ohitettu"
 
-        if not self.gpio_handler:
-            return False, "GPIOHandler ei ole käytössä"
+        if not self.raspberry_gpio_output_handler:
+            return False, "Raspberry GPIO-output handler ei ole käytössä"
 
         try:
-            self.gpio_handler.set_output(output_number, state)
+            self.raspberry_gpio_output_handler.set_output(output_number, state)
             return True, ""
         except Exception as e:
-            return False, f"GPIO-outputin {output_number} ohjaus epäonnistui: {e}"
+            return False, f"Raspberry GPIO-outputin {output_number} ohjaus epäonnistui: {e}"
 
     # ------------------------------------------------------------
-    # Yhteinen Modbus-väylä / Opta
+    # Arduino Opta / yhteinen Modbus-väylä
     # ------------------------------------------------------------
 
     def write_register(self, address, value):
         """
-        Matala Modbus-rekisterikirjoitus HardwareServicen sisäiseen käyttöön
+        Matala Opta Modbus -rekisterikirjoitus HardwareServicen sisäiseen käyttöön
         ja yksittäisiin yhteisiin järjestelmätoimintoihin.
+
+        Tätä ei käytetä ForTest-laitteille.
         """
         if self.dev_mode_modbus:
             return True
 
-        modbus_manager = self._get_modbus_manager_or_none()
+        opta_modbus_manager = self._get_opta_modbus_manager_or_none()
 
-        if not modbus_manager:
+        if not opta_modbus_manager:
             return None
 
-        return modbus_manager.write_register(address, value)
+        return opta_modbus_manager.write_register(address, value)
 
     def request_system_shutdown(self):
         """
-        Lähettää järjestelmän sammutuspyynnön ulkoiselle ohjaukselle.
+        Lähettää järjestelmän sammutuspyynnön Arduino Optalle.
         """
         try:
             return self.write_register(SHUTDOWN_REQUEST_REGISTER, 1)
@@ -190,7 +234,7 @@ class HardwareService(QObject):
 
     def reset_emergency_stop(self):
         """
-        Kuittaa ohjelmallisen hätäseistilan pulssittamalla kuittausrekisteriä.
+        Kuittaa ohjelmallisen hätäseistilan Arduino Optan kautta.
         """
         try:
             result = self.write_register(EMERGENCY_RESET_REGISTER, 1)
@@ -207,23 +251,26 @@ class HardwareService(QObject):
             return None
 
     def read_emergency_stop_status(self):
+        """
+        Lukee ohjelmallisen hätäseistilan Arduino Optalta.
+        """
         if self.dev_mode_modbus:
             return self.dev_emergency_stop_status
 
-        modbus_manager = self._get_modbus_manager_or_none()
+        opta_modbus_manager = self._get_opta_modbus_manager_or_none()
 
-        if modbus_manager:
-            return modbus_manager.read_emergency_stop_status()
+        if opta_modbus_manager:
+            return opta_modbus_manager.read_emergency_stop_status()
 
         return None
 
     # ------------------------------------------------------------
-    # Käsikäytön releohjaus
+    # Arduino Opta / käsikäytön releohjaus
     # ------------------------------------------------------------
 
     def control_relay(self, relay_num, state):
         """
-        Käsikäytön releohjaus.
+        Käsikäytön releohjaus Arduino Optan kautta.
 
         relay_num = 1...8
         state = True/False tai 1/0
@@ -239,15 +286,15 @@ class HardwareService(QObject):
 
         if self.dev_mode_modbus:
             self.dev_relay_states[relay_num - 1] = state_bool
-            return True, f"DEV MODBUS: RELE {relay_num} {'PÄÄLLÄ' if state_bool else 'POIS'}"
+            return True, f"DEV OPTA MODBUS: RELE {relay_num} {'PÄÄLLÄ' if state_bool else 'POIS'}"
 
-        modbus_manager = self._get_modbus_manager_or_none()
+        opta_modbus_manager = self._get_opta_modbus_manager_or_none()
 
-        if not modbus_manager:
-            return False, "ModbusManager ei ole käytössä"
+        if not opta_modbus_manager:
+            return False, "Opta ModbusManager ei ole käytössä"
 
         try:
-            modbus_manager.toggle_relay(relay_num, state_int)
+            opta_modbus_manager.toggle_relay(relay_num, state_int)
             return True, f"RELE {relay_num} {'PÄÄLLÄ' if state_bool else 'POIS'}"
         except Exception as e:
             return False, f"Releen {relay_num} ohjaus epäonnistui: {e}"
@@ -255,6 +302,7 @@ class HardwareService(QObject):
     def toggle_relay(self, relay_num, state):
         """
         Yhteensopivuus vanhan kutsutavan kanssa.
+
         Uusi koodi käyttää control_relay().
         """
         success, message = self.control_relay(relay_num, state)
@@ -265,33 +313,38 @@ class HardwareService(QObject):
     # ------------------------------------------------------------
 
     def is_modbus_connected(self):
+        """
+        Palauttaa Arduino Optan Modbus-yhteyden tilan.
+
+        Tämä ei kerro ForTest-yhteyksien tilaa.
+        """
         if self.dev_mode_modbus:
             return False
 
-        modbus_manager = self._get_modbus_manager_or_none()
+        opta_modbus_manager = self._get_opta_modbus_manager_or_none()
 
-        if not modbus_manager:
+        if not opta_modbus_manager:
             return False
 
-        if hasattr(modbus_manager, "is_connected"):
-            return modbus_manager.is_connected()
+        if hasattr(opta_modbus_manager, "is_connected"):
+            return opta_modbus_manager.is_connected()
 
         return False
 
     def get_connection_status_text(self):
         if self.dev_mode_modbus:
-            modbus_text = "MODBUS: DEV"
+            modbus_text = "OPTA MODBUS: DEV"
         elif self.is_modbus_connected():
-            modbus_text = "MODBUS: OK"
+            modbus_text = "OPTA MODBUS: OK"
         else:
-            modbus_text = "MODBUS: EI YHTEYTTÄ"
+            modbus_text = "OPTA MODBUS: EI YHTEYTTÄ"
 
         if self.dev_mode_gpio:
-            gpio_text = "GPIO: DEV"
-        elif self.gpio_handler:
-            gpio_text = "GPIO: OK"
+            gpio_text = "RASPI GPIO: DEV"
+        elif self.raspberry_gpio_output_handler:
+            gpio_text = "RASPI GPIO: OK"
         else:
-            gpio_text = "GPIO: EI KÄYTÖSSÄ"
+            gpio_text = "RASPI GPIO: EI KÄYTÖSSÄ"
 
         if self.dev_mode_gpio:
             sensor_text = "ANTURI: DEV"
@@ -310,11 +363,11 @@ class HardwareService(QObject):
         if self.dfr0558_manager:
             self.dfr0558_manager.cleanup()
 
-        if self.gpio_input_handler:
-            self.gpio_input_handler.cleanup()
+        if self.raspberry_gpio_input_handler:
+            self.raspberry_gpio_input_handler.cleanup()
 
-        if self.modbus_manager:
-            self.modbus_manager.cleanup()
+        if self.opta_modbus_manager:
+            self.opta_modbus_manager.cleanup()
 
-        if self.gpio_handler:
-            self.gpio_handler.cleanup()
+        if self.raspberry_gpio_output_handler:
+            self.raspberry_gpio_output_handler.cleanup()
