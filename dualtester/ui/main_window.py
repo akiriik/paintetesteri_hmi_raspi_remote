@@ -22,6 +22,13 @@ from controllers.top_bar_controller import TopBarController
 from controllers.application_cleanup_controller import ApplicationCleanupController
 from controllers.navigation_controller import NavigationController
 
+from config.port_config import (
+    OPTA_MODBUS_PORT,
+    OPTA_MODBUS_BAUDRATE,
+    FORTEST_1_PORT,
+    FORTEST_2_PORT,
+    FORTEST_BAUDRATE,
+)
 
 # ------------------------------------------------------------
 # DEV-asetukset
@@ -30,38 +37,6 @@ from controllers.navigation_controller import NavigationController
 DEV_MODE_FORTEST = True
 DEV_MODE_MODBUS = True
 DEV_MODE_GPIO = True
-
-
-# ------------------------------------------------------------
-# Fyysiset väylät
-# ------------------------------------------------------------
-#
-# Lopullinen rakenne:
-#
-# - Arduino Opta / yhteinen RS485 Modbus RTU:
-#   OPTA_MODBUS_PORT
-#
-# - ForTest 1:
-#   FORTEST_1_PORT
-#
-# - ForTest 2:
-#   FORTEST_2_PORT
-#
-# - Raspberry Pi:n suorat GPIO:t:
-#   eivät käytä sarjaporttia, vaan HardwareServicen GPIO-handlereita.
-#
-# Huom:
-# DEV_MODE-asetukset määräävät, avataanko fyysisiä väyliä.
-# Porttinimet voivat muuttua myöhemmin udev-säännöillä pysyviksi nimiksi.
-# ------------------------------------------------------------
-
-OPTA_MODBUS_PORT = "/dev/ttyUSB0"
-OPTA_MODBUS_BAUDRATE = 19200
-
-FORTEST_1_PORT = "/dev/ttyUSB1"
-FORTEST_2_PORT = None
-FORTEST_BAUDRATE = 19200
-
 
 class MainWindow(QWidget):
     def __init__(self, parent=None):
