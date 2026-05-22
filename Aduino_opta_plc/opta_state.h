@@ -35,8 +35,16 @@ int d1608eLastRelayRegisterValues[D1608E_RELAY_COUNT] = {
 // -----------------------------
 
 bool shutdownRequest = false;
+bool shutdownTimerRunning = false;
+bool shutdownRelayActivated = false;
+unsigned long shutdownTimerStartedMs = 0;
+int lastShutdownRegisterValue = -1;
+
 bool emergencyStopActive = false;
 bool emergencyResetRequest = false;
+bool emergencyLightState = false;
+unsigned long lastEmergencyLightBlinkMs = 0;
+int lastEmergencyResetRegisterValue = -1;
 
 // -----------------------------
 // Ajoitus

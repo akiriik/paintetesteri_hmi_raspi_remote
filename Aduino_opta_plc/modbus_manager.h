@@ -32,6 +32,10 @@ void initModbusServer() {
     MODBUS_HOLDING_REGISTER_COUNT
   );
 
+  ModbusRTUServer.holdingRegisterWrite(SHUTDOWN_REQUEST_REGISTER, 0);
+  ModbusRTUServer.holdingRegisterWrite(EMERGENCY_RESET_REGISTER, 0);
+  ModbusRTUServer.holdingRegisterWrite(EMERGENCY_STATUS_REGISTER, EMERGENCY_STATUS_OK);
+
   for (uint8_t i = 0; i < D1608E_RELAY_COUNT; i++) {
     ModbusRTUServer.holdingRegisterWrite(D1608E_RELAY_REGISTER_START + i, 0);
   }
@@ -41,6 +45,12 @@ void initModbusServer() {
   Serial.println(MODBUS_SLAVE_ID);
   Serial.print("Baudrate: ");
   Serial.println(MODBUS_BAUDRATE);
+  Serial.print("Holding register start: ");
+  Serial.println(MODBUS_HOLDING_REGISTER_START);
+  Serial.print("Holding register count: ");
+  Serial.println(MODBUS_HOLDING_REGISTER_COUNT);
+  Serial.print("Shutdown register: ");
+  Serial.println(SHUTDOWN_REQUEST_REGISTER);
   Serial.print("Relay register start: ");
   Serial.println(D1608E_RELAY_REGISTER_START);
   Serial.print("Relay count: ");
@@ -55,6 +65,40 @@ void initModbusServer() {
 
 void pollModbus() {
   ModbusRTUServer.poll();
+}
+
+// -----------------------------
+// Shutdown-rekisteri
+// -----------------------------
+
+void handleModbusShutdownRegister() {
+  int registerValue = ModbusRTUServer.holdingRegisterRead(SHUTDOWN_REQUEST_REGISTER);
+
+  if (registerValue == lastShutdownRegisterValue) {
+    return;
+  }
+
+  lastShutdownRegisterValue = registerValue;
+
+  if (registerValue != 0) {
+    shutdownRequest = true;
+  }
+}
+
+void handleModbusEmergencyResetRegister() {
+  int registerValue = ModbusRTUServer.holdingRegisterRead(EMERGENCY_RESET_REGISTER);
+
+  if (registerValue == lastEmergencyResetRegisterValue) {
+    return;
+  }
+
+  lastEmergencyResetRegisterValue = registerValue;
+
+  if (registerValue != 0) {
+    emergencyResetRequest = true;
+    ModbusRTUServer.holdingRegisterWrite(EMERGENCY_RESET_REGISTER, 0);
+    lastEmergencyResetRegisterValue = 0;
+  }
 }
 
 // -----------------------------
@@ -89,10 +133,9 @@ void handleModbusRelayRegisters() {
 
 void handleModbusSystemRegisters() {
   // Ei vielä käytössä.
-  // SHUTDOWN_REQUEST_REGISTER = 17999
   // EMERGENCY_RESET_REGISTER = 19099
   // EMERGENCY_STATUS_REGISTER = 19100
   //
-  // Näitä ei lisätä tähän vielä, koska ArduinoModbusin erilliset
-  // rekisterialueet / iso aukollinen rekisterialue pitää päättää ennen käyttöönottoa.
+  // Näitä ei lisätä tähän vielä, koska silloin rekisterialue kasvaisi
+  // 17999...19100 asti.
 }

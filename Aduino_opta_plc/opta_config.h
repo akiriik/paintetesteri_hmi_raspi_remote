@@ -37,12 +37,38 @@ const uint8_t D1608E_RELAY_COUNT = 8;
 const uint16_t EMERGENCY_RESET_REGISTER = 19099;
 const uint16_t EMERGENCY_STATUS_REGISTER = 19100;
 
-// ArduinoModbusille ei tehdä vielä jättialuetta 17999...19100.
-// Käytössä on tässä vaiheessa vain relealue.
-// Hätäseis/shutdown käsitellään myöhemmin erikseen, kun rekisterialue päätetään lopullisesti.
+// Käytössä nyt yksi yhtenäinen holding register -alue:
+// 17999 = shutdown request
+// 18000...18098 = varalla
+// 18099...18106 = D1608E releet 1...8
+//
+// Ei tehdä vielä isoa aluetta 17999...19100.
 
-const uint16_t MODBUS_HOLDING_REGISTER_START = D1608E_RELAY_REGISTER_START;
-const uint16_t MODBUS_HOLDING_REGISTER_COUNT = D1608E_RELAY_COUNT;
+const uint16_t MODBUS_HOLDING_REGISTER_START = SHUTDOWN_REQUEST_REGISTER;
+const uint16_t MODBUS_HOLDING_REGISTER_COUNT =
+  (EMERGENCY_STATUS_REGISTER + 1) - MODBUS_HOLDING_REGISTER_START;
+
+// -----------------------------
+// Sammutus
+// -----------------------------
+
+const unsigned long SHUTDOWN_DELAY_MS = 10000;
+const uint8_t SHUTDOWN_POWER_OPTA_OUTPUT_NUMBER = 1;
+
+// -----------------------------
+// Hätäseis
+// -----------------------------
+
+const uint8_t EMERGENCY_BUTTON_OPTA_INPUT_NUMBER = 1;
+const uint8_t EMERGENCY_LIGHT_OPTA_OUTPUT_NUMBER = 2;
+
+const unsigned long EMERGENCY_LIGHT_BLINK_INTERVAL_MS = 500;
+
+// Dualtester:
+// 1 = hätäseis OK
+// 0 = hätäseis aktiivinen
+const uint16_t EMERGENCY_STATUS_OK = 1;
+const uint16_t EMERGENCY_STATUS_ACTIVE = 0;
 
 // -----------------------------
 // Opta onboard inputit

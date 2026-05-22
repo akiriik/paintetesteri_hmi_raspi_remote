@@ -2,7 +2,9 @@
 #include "opta_state.h"
 #include "io_manager.h"
 #include "modbus_manager.h"
+#include "shutdown_manager.h"
 #include "sequence_engine.h"
+#include "emergency_manager.h"
 
 void setup() {
   Serial.begin(SERIAL_BAUDRATE);
@@ -28,8 +30,13 @@ void loop() {
   readD1608EInputs();
 
   handleModbusRelayRegisters();
+  handleModbusShutdownRegister();
+  handleModbusEmergencyResetRegister();  
   handleModbusSystemRegisters();
 
+  updateEmergencyManager();
+
+  updateShutdownManager();
   updateSequenceEngine();
 
   updateOptaControllerThrottled();
