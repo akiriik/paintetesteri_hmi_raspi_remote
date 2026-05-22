@@ -3,6 +3,7 @@ from PyQt5.QtCore import QObject, QTimer
 
 from controllers.station_result_handler import StationResultHandler
 from controllers.station_status_handler import StationStatusHandler
+from controllers.test_valve_controller import TestValveController
 
 
 class StationController(QObject):
@@ -16,6 +17,7 @@ class StationController(QObject):
     - ajastimista
     - status- ja result-handlerien kutsumisesta
     - aseman käyttötilan päivittämisestä UI:lle
+    - ForTest-kohtaisen testiventtiilin ohjauksesta
 
     Fyysiset napit ja niiden valot hoidetaan PhysicalButtonControllerissa.
     """
@@ -47,6 +49,8 @@ class StationController(QObject):
         self.results_started = False
         self.results_read_counter = 0
 
+        self.test_valve_controller = TestValveController(self.hardware_service)
+
         self.result_handler = StationResultHandler(self)
         self.status_handler = StationStatusHandler(self)
 
@@ -56,6 +60,7 @@ class StationController(QObject):
         self.fortest_timer.timeout.connect(self.update_fortest_data)
         self.fortest_timer.start(1000)
 
+        self.open_test_valve()
         self.refresh_station_state()
 
     def _connect_ui(self):
@@ -172,6 +177,33 @@ class StationController(QObject):
 
         return self.fortest_service.is_connected(self.station_id)
 
+    def close_test_valve(self):
+        success, message = self.test_valve_controller.close_valve(self.station_id)
+
+        if not success and message:
+            self.update_status(message, "ERROR")
+
+        return success
+
+    def open_test_valve(self):
+        success, message = self.test_valve_controller.open_valve(self.station_id)
+
+        if not success and message:
+            self.update_status(message, "ERROR")
+
+        return success
+
+    def update_test_valve_from_fortest_status(self, status_value):
+        success, message = self.test_valve_controller.update_from_fortest_status(
+            station_id=self.station_id,
+            status_value=status_value,
+        )
+
+        if not success and message:
+            self.update_status(message, "ERROR")
+
+        return success
+
     def start_test(self):
         if self.is_running:
             return
@@ -182,11 +214,19 @@ class StationController(QObject):
             return
 
         if not self.dev_mode_fortest and not self.fortest_service.is_connected(self.station_id):
+            self.open_test_valve()
             self.update_status("FORTEST-YHTEYTTÄ EI SAATAVILLA", "ERROR")
             self.refresh_station_state()
             return
 
-        self._continue_start_test()
+        valve_ok = self.close_test_valve()
+
+        if not valve_ok:
+            self.is_running = False
+            self.refresh_station_state()
+            return
+
+        QTimer.singleShot(200, self._continue_start_test)
 
     def _continue_start_test(self):
         self.results_started = True
@@ -201,6 +241,7 @@ class StationController(QObject):
 
     def stop_test(self):
         if not self.is_running:
+            self.open_test_valve()
             self.refresh_station_state()
             return
 
@@ -210,10 +251,12 @@ class StationController(QObject):
         if not self.dev_mode_fortest:
             self.fortest_service.abort_test(self.station_id)
 
+        self.open_test_valve()
         self.refresh_station_state()
 
     def finish_test(self, status_message=None, level="INFO"):
         self.is_running = False
+        self.open_test_valve()
 
         if status_message:
             self.update_status(status_message, level)
@@ -226,6 +269,7 @@ class StationController(QObject):
             return
 
         if not self.fortest_service or not self.fortest_service.has_station_port(self.station_id):
+            self.open_test_valve()
             self.refresh_station_state()
             return
 
@@ -249,6 +293,7 @@ class StationController(QObject):
 
     def show_dev_fortest_result(self):
         self.result_handler.create_dev_result()
+        self.open_test_valve()
         self.refresh_station_state()
 
     def update_status(self, message, level="INFO"):
@@ -282,5 +327,7 @@ class StationController(QObject):
             )
 
     def cleanup(self):
+        self.open_test_valve()
+
         if self.fortest_timer:
             self.fortest_timer.stop()

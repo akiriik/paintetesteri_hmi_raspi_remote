@@ -7,6 +7,7 @@ class StationStatusHandler:
 
     Tämä luokka:
     - tulkitsee ForTest statusrekisterin
+    - ohjaa ForTest-kohtaista testiventtiiliä statusarvon perusteella
     - tunnistaa testin päättymisen
     - pyytää tulokset testin päättyessä
     - päivittää aseman tilatekstin
@@ -21,17 +22,22 @@ class StationStatusHandler:
         controller = self.controller
 
         if not result or not hasattr(result, "registers"):
+            controller.open_test_valve()
             return
 
         if len(result.registers) < 2:
+            controller.open_test_valve()
             return
 
         status_value = result.registers[1]
+
+        controller.update_test_valve_from_fortest_status(status_value)
 
         # 0 = WAITING / valmis.
         # Jos edellinen tila oli testiin liittyvä tila, testi on juuri päättynyt.
         if status_value == 0 and self.last_status in [1, 2, 3]:
             controller.is_running = False
+            controller.open_test_valve()
             controller.fortest_service.read_results(controller.station_id)
             controller.refresh_station_state()
 
