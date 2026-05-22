@@ -1,5 +1,6 @@
 # utils/dfr0558_handler.py
 from collections import deque
+import time
 
 import smbus
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
@@ -17,6 +18,11 @@ class DFR0558Handler(QObject):
         self.address = address
         self.bus = None
         self.connected = False
+
+        # Jos anturi ei vastaa, ei hakata I2C-väylää jatkuvasti.
+        self.retry_interval_s = 30
+        self.next_retry_time = 0
+        self.error_reported = False
 
         # Viimeisin hyväksytty raakalämpötila
         self.last_valid_temperature = None
@@ -49,11 +55,16 @@ class DFR0558Handler(QObject):
                 raise RuntimeError("DFR0558 vastasi väärällä datamäärällä")
 
             self.connected = True
+            self.error_reported = False
             print("DFR0558 kappalelämpötila-anturi yhdistetty onnistuneesti")
 
         except Exception as e:
             self.connected = False
-            print(f"DFR0558 yhteyden muodostus epäonnistui: {e}")
+            self.next_retry_time = time.monotonic() + self.retry_interval_s
+
+            if not self.error_reported:
+                print(f"DFR0558 yhteyden muodostus epäonnistui: {e}")
+                self.error_reported = True
 
     def emit_averaged_temperature(self, temperature):
         """Lähettää hyväksytyn lämpötilan liukuvana keskiarvona."""
@@ -67,8 +78,13 @@ class DFR0558Handler(QObject):
     def read_temperature(self):
         """Lukee termoparin lämpötilan Celsius-asteina."""
         if not self.connected:
-            self.sensor_error.emit("DFR0558 ei ole yhdistetty")
-            return
+            now = time.monotonic()
+
+            if now >= self.next_retry_time:
+                self.init_sensor()
+
+            if not self.connected:
+                return
 
         try:
             data = self.bus.read_i2c_block_data(self.address, 0x00, 4)
@@ -143,7 +159,11 @@ class DFR0558Handler(QObject):
 
         except Exception as e:
             self.connected = False
-            self.sensor_error.emit(f"DFR0558 lukuvirhe: {str(e)}")
+            self.next_retry_time = time.monotonic() + self.retry_interval_s
+
+            if not self.error_reported:
+                self.sensor_error.emit(f"DFR0558 lukuvirhe: {str(e)}")
+                self.error_reported = True
 
 
 class DFR0558Worker(QObject):
