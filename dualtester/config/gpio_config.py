@@ -3,26 +3,20 @@
 """
 GPIO- ja I/O-määritykset dualtester-versiolle.
 
-Tämä tiedosto kokoaa fyysiset napit ja nappivalot yhteen paikkaan.
-Varsinainen logiikka on controllereissa ja handler-luokissa.
+Inputit:
+- BCM-numerointi
+- pull-up käytössä
+- nappi maadoittaa GPIO:n
+- ei painettu = HIGH
+- painettu = LOW
 
-Huom:
-- Nämä ovat vielä oletusmäärityksiä.
-- DEV_MODE_GPIO = True, joten fyysisiä GPIO-inputteja ei vielä käytetä.
-- Hätäseis ei korvaa oikeaa turvapiiriä.
+Outputit:
+- BCM-numerointi GPIOHandlerissa
+- fyysiselle kaksiväriselle 24 V napille on kaksi lähtöä:
+  - ON/OFF
+  - COLOR / rele
 """
 
-
-# GPIO-inputtien yleinen toimintamalli:
-#
-# Raspberry Pi input:
-# - käytetään BCM-numerointia
-# - inputit ovat PUD_UP-tilassa
-# - nappi oletetaan aktiiviseksi, kun input menee GND:hen
-#
-# Eli:
-# - ei painettu = HIGH
-# - painettu = LOW
 GPIO_INPUT_PULL_UP = True
 GPIO_INPUT_ACTIVE_LOW = True
 GPIO_DEBOUNCE_TIME_MS = 200
@@ -31,12 +25,12 @@ GPIO_EVENT_BOUNCETIME_MS = 100
 
 PHYSICAL_BUTTONS = {
     "STATION1_START": {
-        "gpio": 5,
-        "description": "ForTest 1 start/stop -nappi",
+        "gpio": 24,
+        "description": "ForTest 1 start/stop -kytkin, valkoinen johto",
     },
     "STATION2_START": {
-        "gpio": 6,
-        "description": "ForTest 2 start/stop -nappi",
+        "gpio": 25,
+        "description": "ForTest 2 start/stop -kytkin, pinkki johto",
     },
     "EMERGENCY_STOP": {
         "gpio": 12,
@@ -61,7 +55,6 @@ PHYSICAL_BUTTONS = {
 }
 
 
-# Pelkkä nimi -> GPIO -kartta GPIOInputHandlerille.
 PHYSICAL_BUTTON_PINS = {
     button_name: button_data["gpio"]
     for button_name, button_data in PHYSICAL_BUTTONS.items()
@@ -71,7 +64,6 @@ PHYSICAL_BUTTON_PINS = {
 STATION_BUTTON_MAP = {
     "STATION1_START": 1,
     "STATION2_START": 2,
-
 }
 
 
@@ -83,9 +75,25 @@ SPARE_BUTTONS = {
 }
 
 
-# HardwareService output -numerot.
-# Nämä eivät ole Raspberryn GPIO-numeroita, vaan ohjelman käyttämät output-kanavat.
+# GPIOHandlerin output-kanavat.
+#
+# Nämä ovat ohjelman sisäisiä output-numeroita.
+# Varsinainen GPIO-pinni määritellään utils/gpio_handler.py:ssä.
+GPIO_OUTPUT_CHANNELS = {
+    "FORTEST1_LED_ON": 1,       # ruskea   -> GPIO17
+    "FORTEST1_LED_COLOR": 2,    # punainen -> GPIO27
+    "FORTEST2_LED_ON": 3,       # vihreä   -> GPIO22
+    "FORTEST2_LED_COLOR": 4,    # harmaa   -> GPIO23
+}
+
+
 STATION_LIGHT_OUTPUTS = {
-    1: 4,
-    2: 5,
+    1: {
+        "on_off": GPIO_OUTPUT_CHANNELS["FORTEST1_LED_ON"],
+        "color": GPIO_OUTPUT_CHANNELS["FORTEST1_LED_COLOR"],
+    },
+    2: {
+        "on_off": GPIO_OUTPUT_CHANNELS["FORTEST2_LED_ON"],
+        "color": GPIO_OUTPUT_CHANNELS["FORTEST2_LED_COLOR"],
+    },
 }

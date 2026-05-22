@@ -1,5 +1,7 @@
 # controllers/physical_button_controller.py
 
+import time
+
 from config.gpio_config import (
     STATION_BUTTON_MAP,
     STATION_LIGHT_OUTPUTS,
@@ -11,18 +13,23 @@ class PhysicalButtonController:
     """
     Fyysisten nappien ja nappivalojen yhteinen controller.
 
-    Oletusmalli:
-    - STATION1_START: käynnistää/pysäyttää ForTest 1:n
-    - STATION2_START: käynnistää/pysäyttää ForTest 2:n
-    - EMERGENCY_STOP: pysäyttää molemmat asemat ohjelmallisesti
-    - SPARE1-4: varalla, ei toimintoa
+    ForTest 1 / 2:
+    - palautuva NO-kytkin maadoittaa GPIO-inputin
+    - ensimmäinen painallus käynnistää testin
+    - toinen painallus pysäyttää testin
 
-    Nappivalot:
-    - määritellään config/gpio_config.py tiedostossa
+    Valologiikka:
+    - ohjelma valittu ja testi ei käy = vihreä
+    - testi käy = punainen
+    - ei valmis = valo pois
 
-    Huom:
-    Tämä ei korvaa oikeaa hätäseis-turvapiiriä.
+    Relelogiikka:
+    - rele pois = vihreä
+    - rele päällä = punainen
     """
+
+    COLOR_READY_GREEN = False
+    COLOR_RUNNING_RED = True
 
     def __init__(self, station_controllers, hardware_service):
         self.station_controllers = station_controllers
@@ -31,6 +38,8 @@ class PhysicalButtonController:
         self.station_button_map = STATION_BUTTON_MAP
         self.station_light_outputs = STATION_LIGHT_OUTPUTS
         self.spare_buttons = SPARE_BUTTONS
+
+        self.last_light_states = {}
 
     def handle_button_press(self, button_name, is_pressed):
         if not is_pressed:
@@ -76,25 +85,52 @@ class PhysicalButtonController:
                     print(f"Hätäseis-napin käsittely epäonnistui asemalla {station_id}: {e}")
 
     def update_station_light_state(self, station_id, is_running, ready):
-        """
-        Päivittää fyysisen start-napin valon.
+        outputs = self.station_light_outputs.get(station_id)
 
-        Nykyinen yksinkertainen logiikka:
-        - valo päällä, jos asema on valmis tai testi käy
-        - valo pois, jos asema ei ole valmis eikä käy
-        """
+        if not outputs:
+            return
 
-        output_number = self.station_light_outputs.get(station_id)
+        on_off_output = outputs.get("on_off")
+        color_output = outputs.get("color")
 
-        if output_number is None:
+        if on_off_output is None or color_output is None:
             return
 
         light_on = bool(is_running or ready)
-        self.hardware_service.set_output(output_number, light_on)
+
+        if is_running:
+            color_state = self.COLOR_RUNNING_RED
+        else:
+            color_state = self.COLOR_READY_GREEN
+
+        new_state = {
+            "light_on": light_on,
+            "color": color_state,
+        }
+
+        old_state = self.last_light_states.get(station_id)
+
+        if old_state == new_state:
+            return
+
+        # Turvallinen värinvaihto:
+        # 1. LED pois
+        # 2. releen vaihto
+        # 3. pieni viive
+        # 4. LED päälle, jos asema on valmis/käynnissä
+        self.hardware_service.set_output(on_off_output, False)
+        self.hardware_service.set_output(color_output, color_state)
+
+        if light_on:
+            time.sleep(0.03)
+            self.hardware_service.set_output(on_off_output, True)
+
+        self.last_light_states[station_id] = new_state
 
     def cleanup(self):
-        for output_number in self.station_light_outputs.values():
+        for outputs in self.station_light_outputs.values():
             try:
-                self.hardware_service.set_output(output_number, False)
+                self.hardware_service.set_output(outputs["on_off"], False)
+                self.hardware_service.set_output(outputs["color"], False)
             except Exception:
                 pass

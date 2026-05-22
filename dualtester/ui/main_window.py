@@ -35,8 +35,8 @@ from config.port_config import (
 # ------------------------------------------------------------
 
 DEV_MODE_FORTEST = True
-DEV_MODE_MODBUS = False
-DEV_MODE_GPIO = True
+DEV_MODE_MODBUS = True
+DEV_MODE_GPIO = False
 
 class MainWindow(QWidget):
     def __init__(self, parent=None):
