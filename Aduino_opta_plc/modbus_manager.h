@@ -36,6 +36,9 @@ void initModbusServer() {
   ModbusRTUServer.holdingRegisterWrite(EMERGENCY_RESET_REGISTER, 0);
   ModbusRTUServer.holdingRegisterWrite(EMERGENCY_STATUS_REGISTER, EMERGENCY_STATUS_OK);
 
+  ModbusRTUServer.holdingRegisterWrite(FORTEST1_TEST_VALVE_REGISTER, 0);
+  ModbusRTUServer.holdingRegisterWrite(FORTEST2_TEST_VALVE_REGISTER, 0);
+
   for (uint8_t i = 0; i < D1608E_RELAY_COUNT; i++) {
     ModbusRTUServer.holdingRegisterWrite(D1608E_RELAY_REGISTER_START + i, 0);
   }
@@ -51,9 +54,13 @@ void initModbusServer() {
   Serial.println(MODBUS_HOLDING_REGISTER_COUNT);
   Serial.print("Shutdown register: ");
   Serial.println(SHUTDOWN_REQUEST_REGISTER);
-  Serial.print("Relay register start: ");
+  Serial.print("Opta test valve register start: ");
+  Serial.println(OPTA_TEST_VALVE_RELAY_REGISTER_START);
+  Serial.print("Opta test valve relay count: ");
+  Serial.println(OPTA_TEST_VALVE_RELAY_COUNT);
+  Serial.print("D1608E relay register start: ");
   Serial.println(D1608E_RELAY_REGISTER_START);
-  Serial.print("Relay count: ");
+  Serial.print("D1608E relay count: ");
   Serial.println(D1608E_RELAY_COUNT);
   Serial.print("RS485 pre/post delay us: ");
   Serial.println(preDelayBR);
@@ -102,10 +109,32 @@ void handleModbusEmergencyResetRegister() {
 }
 
 // -----------------------------
-// Releiden Modbus-käsittely
+// Optan omat testiventtiilireleet
+// -----------------------------
+
+void handleModbusOptaTestValveRegisters() {
+  int fortest1Value = ModbusRTUServer.holdingRegisterRead(FORTEST1_TEST_VALVE_REGISTER);
+  int fortest2Value = ModbusRTUServer.holdingRegisterRead(FORTEST2_TEST_VALVE_REGISTER);
+
+  bool fortest1State = (fortest1Value != 0);
+  bool fortest2State = (fortest2Value != 0);
+
+  if (fortest1State != getOptaOutput(FORTEST1_TEST_VALVE_OPTA_OUTPUT_NUMBER)) {
+    setOptaOutput(FORTEST1_TEST_VALVE_OPTA_OUTPUT_NUMBER, fortest1State);
+  }
+
+  if (fortest2State != getOptaOutput(FORTEST2_TEST_VALVE_OPTA_OUTPUT_NUMBER)) {
+    setOptaOutput(FORTEST2_TEST_VALVE_OPTA_OUTPUT_NUMBER, fortest2State);
+  }
+}
+
+// -----------------------------
+// D1608E releiden Modbus-käsittely
 // -----------------------------
 
 void handleModbusRelayRegisters() {
+  handleModbusOptaTestValveRegisters();
+
   for (uint8_t relayIndex = 0; relayIndex < D1608E_RELAY_COUNT; relayIndex++) {
     uint16_t registerAddress = D1608E_RELAY_REGISTER_START + relayIndex;
 
@@ -135,7 +164,4 @@ void handleModbusSystemRegisters() {
   // Ei vielä käytössä.
   // EMERGENCY_RESET_REGISTER = 19099
   // EMERGENCY_STATUS_REGISTER = 19100
-  //
-  // Näitä ei lisätä tähän vielä, koska silloin rekisterialue kasvaisi
-  // 17999...19100 asti.
 }

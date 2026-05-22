@@ -28,21 +28,39 @@ const unsigned long MODBUS_BAUDRATE = 19200;
 // EMERGENCY_RESET_REGISTER = 19099
 // EMERGENCY_STATUS_REGISTER = 19100
 // OPTA_RELAY_REGISTER_BASE = 18098
+//
+// HUOM:
+// Raspberryn nykyinen yleinen releohjaus käyttää D1608E-relealuetta.
+// Optan omille releille 3 ja 4 on tässä omat rekisterit testiventtiileille.
 
 const uint16_t SHUTDOWN_REQUEST_REGISTER = 17999;
 
+// Optan omat releet 3 ja 4 testiventtiileille
+const uint16_t OPTA_TEST_VALVE_RELAY_REGISTER_START = 18092;
+const uint8_t OPTA_TEST_VALVE_RELAY_COUNT = 2;
+
+// 18092 = Optan oma rele 3 = ForTest 1 testiventtiili
+// 18093 = Optan oma rele 4 = ForTest 2 testiventtiili
+
+const uint16_t FORTEST1_TEST_VALVE_REGISTER = 18092;
+const uint16_t FORTEST2_TEST_VALVE_REGISTER = 18093;
+
+const uint8_t FORTEST1_TEST_VALVE_OPTA_OUTPUT_NUMBER = 3;
+const uint8_t FORTEST2_TEST_VALVE_OPTA_OUTPUT_NUMBER = 4;
+
+// D1608E-lisäosan releet jätetään jakotukkijigin myöhempään ohjaukseen
 const uint16_t D1608E_RELAY_REGISTER_START = 18099;
 const uint8_t D1608E_RELAY_COUNT = 8;
 
 const uint16_t EMERGENCY_RESET_REGISTER = 19099;
 const uint16_t EMERGENCY_STATUS_REGISTER = 19100;
 
-// Käytössä nyt yksi yhtenäinen holding register -alue:
+// Käytössä yksi holding register -alue:
 // 17999 = shutdown request
-// 18000...18098 = varalla
+// 18092...18093 = Optan omat releet 3 ja 4 testiventtiileille
 // 18099...18106 = D1608E releet 1...8
-//
-// Ei tehdä vielä isoa aluetta 17999...19100.
+// 19099 = emergency reset
+// 19100 = emergency status
 
 const uint16_t MODBUS_HOLDING_REGISTER_START = SHUTDOWN_REQUEST_REGISTER;
 const uint16_t MODBUS_HOLDING_REGISTER_COUNT =
@@ -94,10 +112,10 @@ const uint8_t OPTA_INPUT_PINS[OPTA_INPUT_COUNT] = {
 const uint8_t OPTA_OUTPUT_COUNT = 4;
 
 const uint8_t OPTA_OUTPUT_PINS[OPTA_OUTPUT_COUNT] = {
-  RELAY1,  // OUTPUT 1
-  RELAY2,  // OUTPUT 2
-  RELAY3,  // OUTPUT 3
-  RELAY4   // OUTPUT 4
+  RELAY1,  // OUTPUT 1 = järjestelmän sammutus
+  RELAY2,  // OUTPUT 2 = hätäseisvalo
+  RELAY3,  // OUTPUT 3 = ForTest 1 testiventtiili
+  RELAY4   // OUTPUT 4 = ForTest 2 testiventtiili
 };
 
 // -----------------------------

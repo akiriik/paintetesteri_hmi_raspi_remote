@@ -1,5 +1,10 @@
 # controllers/test_valve_controller.py
 
+from config.modbus_config import (
+    FORTEST1_TEST_VALVE_REGISTER,
+    FORTEST2_TEST_VALVE_REGISTER,
+)
+
 
 class TestValveController:
     """
@@ -8,16 +13,21 @@ class TestValveController:
     Nämä venttiilit eivät kuulu jakotukkijigin sylinterisekvenssiin.
 
     Toiminta:
-    - ForTest 1 -> Opta D1608 rele 1
-    - ForTest 2 -> Opta D1608 rele 2
+    - ForTest 1 -> Optan oma rele 3 -> rekisteri 18092
+    - ForTest 2 -> Optan oma rele 4 -> rekisteri 18093
 
     Rele ON  = venttiili kiinni
     Rele OFF = venttiili auki / purku
+
+    Huom:
+    HardwareService.write_register() käyttää taustasäikeistä Modbus-kirjoitusta.
+    Se voi palauttaa None, vaikka kirjoitus lähtee oikein.
+    Siksi onnistumista ei arvioida paluuarvosta.
     """
 
-    TEST_VALVE_RELAY_BY_STATION = {
-        1: 1,
-        2: 2,
+    TEST_VALVE_REGISTER_BY_STATION = {
+        1: FORTEST1_TEST_VALVE_REGISTER,
+        2: FORTEST2_TEST_VALVE_REGISTER,
     }
 
     def __init__(self, hardware_service):
@@ -27,23 +37,14 @@ class TestValveController:
             2: None,
         }
 
-    def _get_relay_num(self, station_id):
-        return self.TEST_VALVE_RELAY_BY_STATION.get(station_id)
+    def _get_register(self, station_id):
+        return self.TEST_VALVE_REGISTER_BY_STATION.get(station_id)
 
     def set_closed(self, station_id, closed):
-        """
-        Aseta aseman testiventtiilin tila.
+        register = self._get_register(station_id)
 
-        closed=True:
-            rele ON, venttiili kiinni
-
-        closed=False:
-            rele OFF, venttiili auki
-        """
-        relay_num = self._get_relay_num(station_id)
-
-        if relay_num is None:
-            return False, f"ForTest {station_id}: testiventtiilille ei ole määritelty relettä"
+        if register is None:
+            return False, f"ForTest {station_id}: testiventtiilille ei ole määritelty rekisteriä"
 
         closed_bool = bool(closed)
 
@@ -53,58 +54,29 @@ class TestValveController:
         if not self.hardware_service:
             return False, "HardwareService ei ole käytössä"
 
-        success, message = self.hardware_service.control_relay(
-            relay_num=relay_num,
-            state=closed_bool,
-        )
+        value = 1 if closed_bool else 0
 
-        if success:
+        try:
+            self.hardware_service.write_register(register, value)
             self.last_closed_state_by_station[station_id] = closed_bool
+            return True, ""
 
-        return success, message
+        except Exception as e:
+            return False, f"ForTest {station_id}: testiventtiilin ohjaus epäonnistui: {e}"
 
     def open_valve(self, station_id):
-        """
-        Avaa testiventtiili.
-
-        Tätä käytetään:
-        - valmis-tilassa
-        - purkuvaiheessa
-        - stopissa
-        - virheessä
-        - hätäseisissä
-        - ohjelman sulkemisessa
-        """
         return self.set_closed(station_id, False)
 
     def close_valve(self, station_id):
-        """
-        Sulje testiventtiili.
-
-        Tätä käytetään:
-        - ennen ForTest START -komentoa
-        - kun ForTestin tila kertoo testin olevan käynnissä
-        """
         return self.set_closed(station_id, True)
 
     def update_from_fortest_status(self, station_id, status_value):
         """
-        Ohjaa testiventtiiliä ForTestin statusarvon perusteella.
-
-        Nykyinen statuskäsittely:
-        - 0 = valmis / waiting
-        - 1 = testi käynnissä
-        - 2 = autozero
-        - 3 = purku
-
-        Venttiililogiikka:
-        - 1 -> kiinni
-        - 3 -> auki
-        - 0 -> auki
-        - 2 -> ei muuteta tilaa
-
-        Autozero-tilassa venttiilin tilaa ei vaihdeta, koska START sulkee
-        venttiilin jo ennen ForTestin käynnistystä.
+        ForTest status:
+        - 0 = valmis / waiting -> venttiili auki
+        - 1 = testi käynnissä -> venttiili kiinni
+        - 2 = autozero -> ei muuteta
+        - 3 = purku -> venttiili auki
         """
         if status_value == 1:
             return self.close_valve(station_id)

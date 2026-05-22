@@ -23,9 +23,30 @@ EMERGENCY_STATUS_REGISTER_COUNT = 1
 
 
 # ------------------------------------------------------------
-# Opta / releohjaus
+# Opta / onboard testiventtiilireleet
 # ------------------------------------------------------------
 
+# Nämä ovat Optan omia releitä, eivät D1608E-lisäosan releitä.
+#
+# 18092 = Optan oma rele 3 = ForTest 1 testiventtiili
+# 18093 = Optan oma rele 4 = ForTest 2 testiventtiili
+#
+# Rele ON  = testiventtiili kiinni
+# Rele OFF = testiventtiili auki / purku
+
+FORTEST1_TEST_VALVE_REGISTER = 18092
+FORTEST2_TEST_VALVE_REGISTER = 18093
+
+
+# ------------------------------------------------------------
+# Opta / D1608E-lisäosan releohjaus
+# ------------------------------------------------------------
+
+# Tämä alue ohjaa D1608E-lisäosan releitä.
 # Rele 1 = 18099, rele 2 = 18100 jne.
 # Kaava: OPTA_RELAY_REGISTER_BASE + relay_num
+#
+# Tätä käytetään myöhemmin jakotukkijigin venttiileille.
+# Älä käytä tätä ForTest-testiventtiileille.
+
 OPTA_RELAY_REGISTER_BASE = 18098
