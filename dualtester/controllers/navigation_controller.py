@@ -10,6 +10,7 @@ class NavigationController:
     Tehtävät:
     - päänäkymään palaaminen
     - käsikäytön avaaminen
+    - asetussivun avaaminen
     - ohjelmanvalinnan avaaminen
     - ESC-näppäimen navigointilogiikka
     """
@@ -19,6 +20,7 @@ class NavigationController:
         main_window,
         main_screen,
         manual_screen,
+        settings_screen,
         program_selection_screen,
         environment_status_bar,
         program_selection_controller,
@@ -26,6 +28,7 @@ class NavigationController:
         self.main_window = main_window
         self.main_screen = main_screen
         self.manual_screen = manual_screen
+        self.settings_screen = settings_screen
         self.program_selection_screen = program_selection_screen
         self.environment_status_bar = environment_status_bar
         self.program_selection_controller = program_selection_controller
@@ -33,6 +36,7 @@ class NavigationController:
     def show_testing(self):
         self.environment_status_bar.hide()
         self.manual_screen.hide()
+        self.settings_screen.hide()
         self.program_selection_screen.hide()
         self.main_screen.show()
         self.main_window.update_top_bar_status()
@@ -40,6 +44,7 @@ class NavigationController:
     def show_manual(self):
         self.main_screen.hide()
         self.environment_status_bar.hide()
+        self.settings_screen.hide()
         self.program_selection_screen.hide()
 
         if hasattr(self.manual_screen, "refresh"):
@@ -47,11 +52,26 @@ class NavigationController:
 
         self.manual_screen.show()
 
+    def show_settings(self):
+        self.main_screen.hide()
+        self.environment_status_bar.hide()
+        self.manual_screen.hide()
+        self.program_selection_screen.hide()
+
+        if hasattr(self.settings_screen, "refresh"):
+            self.settings_screen.refresh()
+
+        self.settings_screen.show()
+
     def show_program_selection(self, station_id=None):
         self.program_selection_controller.open_for_station(station_id)
 
     def handle_escape_key(self):
-        if self.manual_screen.isVisible() or self.program_selection_screen.isVisible():
+        if (
+            self.manual_screen.isVisible()
+            or self.settings_screen.isVisible()
+            or self.program_selection_screen.isVisible()
+        ):
             if self.program_selection_screen.isVisible():
                 self.program_selection_controller.cancel_selection()
             else:

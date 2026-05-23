@@ -4,6 +4,7 @@ from PyQt5.QtGui import QKeyEvent
 
 from ui.screens.main_screen import MainScreen
 from ui.screens.manual_screen import ManualScreen
+from ui.screens.settings_screen import SettingsScreen
 from ui.screens.program_selection_screen import ProgramSelectionScreen
 from ui.components.environment_status_bar import EnvironmentStatusBar
 
@@ -37,6 +38,7 @@ from config.port_config import (
 DEV_MODE_FORTEST = False
 DEV_MODE_MODBUS = False
 DEV_MODE_GPIO = False
+
 
 class MainWindow(QWidget):
     def __init__(self, parent=None):
@@ -79,6 +81,10 @@ class MainWindow(QWidget):
         self.manual_screen = ManualScreen(self)
         self.manual_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
         self.manual_screen.hide()
+
+        self.settings_screen = SettingsScreen(self)
+        self.settings_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
+        self.settings_screen.hide()
 
         self.program_selection_screen = ProgramSelectionScreen(self, self.program_manager)
         self.program_selection_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
@@ -152,11 +158,11 @@ class MainWindow(QWidget):
             main_window=self,
             main_screen=self.main_screen,
             manual_screen=self.manual_screen,
+            settings_screen=self.settings_screen,
             program_selection_screen=self.program_selection_screen,
             environment_status_bar=self.environment_status_bar,
             program_selection_controller=self.program_selection_controller,
         )
-
 
         self.emergency_stop_controller = EmergencyStopController(
             main_window=self,
@@ -258,6 +264,15 @@ class MainWindow(QWidget):
 
         if hasattr(self, "navigation_controller") and self.navigation_controller:
             self.navigation_controller.show_manual()
+
+    def show_settings(self):
+        """
+        Asetussivun avaaminen.
+        Varsinainen logiikka on NavigationControllerissa.
+        """
+
+        if hasattr(self, "navigation_controller") and self.navigation_controller:
+            self.navigation_controller.show_settings()
 
     def show_program_selection(self, station_id=None):
         """

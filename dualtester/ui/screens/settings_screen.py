@@ -1,0 +1,380 @@
+# ui/screens/settings_screen.py
+from PyQt5.QtWidgets import QPushButton, QLabel, QFrame
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
+
+from ui.screens.base_screen import BaseScreen
+
+
+class SettingsScreen(BaseScreen):
+    """
+    Asetussivu.
+
+    Tämä näkymä on koko näytön asetussivu:
+    - ForTest 1 asetukset
+    - ForTest 2 asetukset
+    - ohjelmien haku / myöhempi ohjelmien muokkaus
+    - status- ja tulosluennan testaus
+
+    Tässä vaiheessa ohjelmien haku ja ohjelman kirjoitus ovat vain UI-valmiina.
+    ForTestiin kirjoittavia toimintoja ei tehdä ennen erillistä varmistettua toteutusta.
+    """
+
+    STATUS_STYLE = """
+        QLabel {{
+            color: {color};
+            background-color: #101010;
+            border: 2px solid #333333;
+            border-radius: 10px;
+        }}
+    """
+
+    PANEL_STYLE = """
+        QFrame {
+            background-color: #050505;
+            border: 2px solid #333333;
+            border-radius: 10px;
+        }
+    """
+
+    TITLE_STYLE = """
+        color: white;
+        background: transparent;
+        border: none;
+    """
+
+    SUBTITLE_STYLE = """
+        color: #33FF33;
+        background: transparent;
+        border: none;
+    """
+
+    INFO_STYLE = """
+        color: #CCCCCC;
+        background: transparent;
+        border: none;
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def init_ui(self):
+        self.setStyleSheet("background-color: black;")
+
+        screen_w = self.parent().screen_width if self.parent() else 1920
+        screen_h = self.parent().screen_height if self.parent() else 1080
+
+        self.back_button = QPushButton("← TAKAISIN", self)
+        self.back_button.setGeometry(20, 20, 180, 65)
+        self.back_button.setFont(QFont("Arial", 16, QFont.Bold))
+        self.back_button.setStyleSheet(self._button_style("#2196F3", "#1976D2"))
+        self.back_button.clicked.connect(self.go_back)
+
+        self.title_label = QLabel("ASETUKSET", self)
+        self.title_label.setGeometry(230, 20, screen_w - 460, 65)
+        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setFont(QFont("Arial", 32, QFont.Bold))
+        self.title_label.setStyleSheet(self.TITLE_STYLE)
+
+        self.info_label = QLabel(
+            "Laiteasetukset ja ForTest-ohjelmien hallinta",
+            self,
+        )
+        self.info_label.setGeometry(20, 100, screen_w - 40, 55)
+        self.info_label.setAlignment(Qt.AlignCenter)
+        self.info_label.setFont(QFont("Consolas", 17))
+        self.info_label.setStyleSheet(self.STATUS_STYLE.format(color="#33FF33"))
+
+        left_panel_x = 50
+        right_panel_x = 985
+        panel_y = 185
+        panel_w = 885
+        panel_h = 690
+
+        self.fortest1_panel = self._create_fortest_panel(
+            station_id=1,
+            title="FORTEST 1 ASETUKSET",
+            x=left_panel_x,
+            y=panel_y,
+            w=panel_w,
+            h=panel_h,
+        )
+
+        self.fortest2_panel = self._create_fortest_panel(
+            station_id=2,
+            title="FORTEST 2 ASETUKSET",
+            x=right_panel_x,
+            y=panel_y,
+            w=panel_w,
+            h=panel_h,
+        )
+
+        self.status_label = QLabel("Valitse asetustoiminto", self)
+        self.status_label.setGeometry(20, screen_h - 110, screen_w - 40, 70)
+        self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setFont(QFont("Consolas", 18))
+        self._set_status("Valitse asetustoiminto", "white")
+
+    def _create_fortest_panel(self, station_id, title, x, y, w, h):
+        panel = QFrame(self)
+        panel.setGeometry(x, y, w, h)
+        panel.setStyleSheet(self.PANEL_STYLE)
+
+        title_label = QLabel(title, panel)
+        title_label.setGeometry(20, 20, w - 40, 50)
+        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setFont(QFont("Arial", 22, QFont.Bold))
+        title_label.setStyleSheet(self.TITLE_STYLE)
+
+        connection_label = QLabel(self._get_connection_text(station_id), panel)
+        connection_label.setGeometry(30, 85, w - 60, 45)
+        connection_label.setAlignment(Qt.AlignCenter)
+        connection_label.setFont(QFont("Consolas", 14))
+        connection_label.setStyleSheet(self.STATUS_STYLE.format(color="#CCCCCC"))
+
+        button_w = 380
+        button_h = 90
+        left_x = 55
+        right_x = 450
+        start_y = 165
+        gap_y = 115
+
+        self._create_button(
+            parent=panel,
+            text="TESTAA\nYHTEYS",
+            x=left_x,
+            y=start_y,
+            w=button_w,
+            h=button_h,
+            callback=lambda checked=False, sid=station_id: self.test_connection(sid),
+        )
+
+        self._create_button(
+            parent=panel,
+            text="HAE OHJELMAT\nTESTERILTÄ",
+            x=right_x,
+            y=start_y,
+            w=button_w,
+            h=button_h,
+            callback=lambda checked=False, sid=station_id: self.fetch_programs_placeholder(sid),
+        )
+
+        self._create_button(
+            parent=panel,
+            text="AKTIIVISEN OHJELMAN\nTARKISTUS",
+            x=left_x,
+            y=start_y + gap_y,
+            w=button_w,
+            h=button_h,
+            callback=lambda checked=False, sid=station_id: self.read_active_program_placeholder(sid),
+        )
+
+        self._create_button(
+            parent=panel,
+            text="OHJELMAN LUONTI /\nMUOKKAUS",
+            x=right_x,
+            y=start_y + gap_y,
+            w=button_w,
+            h=button_h,
+            callback=lambda checked=False, sid=station_id: self.program_edit_placeholder(sid),
+        )
+
+        self._create_button(
+            parent=panel,
+            text="STATUS-\nLUENNAN TESTI",
+            x=left_x,
+            y=start_y + gap_y * 2,
+            w=button_w,
+            h=button_h,
+            callback=lambda checked=False, sid=station_id: self.read_status(sid),
+        )
+
+        self._create_button(
+            parent=panel,
+            text="TULOS-\nLUENNAN TESTI",
+            x=right_x,
+            y=start_y + gap_y * 2,
+            w=button_w,
+            h=button_h,
+            callback=lambda checked=False, sid=station_id: self.read_results(sid),
+        )
+
+        self._create_button(
+            parent=panel,
+            text="NÄYTÄ VIIMEISIN\nMODBUS-VIRHE",
+            x=left_x,
+            y=start_y + gap_y * 3,
+            w=button_w,
+            h=button_h,
+            callback=lambda checked=False, sid=station_id: self.last_error_placeholder(sid),
+        )
+
+        warning_label = QLabel(
+            "Ohjelman kirjoitus ForTestiin tehdään myöhemmin erillisen vahvistuksen taakse.",
+            panel,
+        )
+        warning_label.setGeometry(30, h - 85, w - 60, 45)
+        warning_label.setAlignment(Qt.AlignCenter)
+        warning_label.setFont(QFont("Consolas", 12))
+        warning_label.setStyleSheet("""
+            QLabel {
+                color: orange;
+                background: transparent;
+                border: none;
+            }
+        """)
+
+        return panel
+
+    def _create_button(self, parent, text, x, y, w, h, callback):
+        button = QPushButton(text, parent)
+        button.setGeometry(x, y, w, h)
+        button.setFont(QFont("Arial", 17, QFont.Bold))
+        button.setStyleSheet(self._button_style("#555555", "#1976D2"))
+        button.clicked.connect(callback)
+        return button
+
+    def _button_style(self, bg_color, hover_color):
+        return f"""
+            QPushButton {{
+                background-color: {bg_color};
+                color: white;
+                border-radius: 10px;
+                border: none;
+            }}
+            QPushButton:hover {{
+                background-color: {hover_color};
+            }}
+            QPushButton:disabled {{
+                background-color: #222222;
+                color: #777777;
+            }}
+        """
+
+    def _get_fortest_service(self):
+        parent = self.parent()
+
+        if parent and hasattr(parent, "fortest_service"):
+            return parent.fortest_service
+
+        return None
+
+    def _get_connection_text(self, station_id):
+        parent = self.parent()
+
+        if not parent or not hasattr(parent, "fortest_service"):
+            return f"ForTest {station_id}: yhteystila ei käytettävissä"
+
+        fortest_service = parent.fortest_service
+
+        port = "--"
+        if hasattr(fortest_service, "fortest_station_ports"):
+            port = fortest_service.fortest_station_ports.get(station_id, "--")
+
+        baudrate = "--"
+        if hasattr(fortest_service, "fortest_baudrate"):
+            baudrate = fortest_service.fortest_baudrate
+
+        connected = False
+        if hasattr(fortest_service, "is_connected"):
+            connected = fortest_service.is_connected(station_id)
+
+        state_text = "YHDISTETTY" if connected else "EI YHTEYTTÄ"
+
+        return f"ForTest {station_id}: {state_text}    Portti: {port}    Baud: {baudrate}"
+
+    def refresh(self):
+        self.info_label.setText("Laiteasetukset ja ForTest-ohjelmien hallinta")
+
+    def test_connection(self, station_id):
+        fortest_service = self._get_fortest_service()
+
+        if not fortest_service:
+            self._set_status("VIRHE: ForTestService ei ole käytössä", "red")
+            return
+
+        if not hasattr(fortest_service, "is_connected"):
+            self._set_status("VIRHE: ForTest-yhteystarkistusta ei löydy", "red")
+            return
+
+        if fortest_service.is_connected(station_id):
+            self._set_status(f"ForTest {station_id}: yhteys OK", "#33FF33")
+        else:
+            self._set_status(f"ForTest {station_id}: ei yhteyttä", "red")
+
+    def fetch_programs_placeholder(self, station_id):
+        self._set_status(
+            f"ForTest {station_id}: ohjelmien haku lisätään seuraavassa vaiheessa",
+            "orange",
+        )
+
+    def read_active_program_placeholder(self, station_id):
+        fortest_service = self._get_fortest_service()
+
+        if not fortest_service:
+            self._set_status("VIRHE: ForTestService ei ole käytössä", "red")
+            return
+
+        if hasattr(fortest_service, "read_status"):
+            fortest_service.read_status(station_id)
+            self._set_status(
+                f"ForTest {station_id}: aktiivisen ohjelman tarkistuspyyntö lähetetty",
+                "#33FF33",
+            )
+        else:
+            self._set_status("VIRHE: read_status puuttuu ForTestServicestä", "red")
+
+    def program_edit_placeholder(self, station_id):
+        self._set_status(
+            f"ForTest {station_id}: ohjelman luonti/muokkaus lisätään lukutestin jälkeen",
+            "orange",
+        )
+
+    def read_status(self, station_id):
+        fortest_service = self._get_fortest_service()
+
+        if not fortest_service:
+            self._set_status("VIRHE: ForTestService ei ole käytössä", "red")
+            return
+
+        if hasattr(fortest_service, "read_status"):
+            fortest_service.read_status(station_id)
+            self._set_status(
+                f"ForTest {station_id}: statusluenta lähetetty",
+                "#33FF33",
+            )
+        else:
+            self._set_status("VIRHE: read_status puuttuu ForTestServicestä", "red")
+
+    def read_results(self, station_id):
+        fortest_service = self._get_fortest_service()
+
+        if not fortest_service:
+            self._set_status("VIRHE: ForTestService ei ole käytössä", "red")
+            return
+
+        if hasattr(fortest_service, "read_results"):
+            fortest_service.read_results(station_id)
+            self._set_status(
+                f"ForTest {station_id}: tulosluenta lähetetty",
+                "#33FF33",
+            )
+        else:
+            self._set_status("VIRHE: read_results puuttuu ForTestServicestä", "red")
+
+    def last_error_placeholder(self, station_id):
+        self._set_status(
+            f"ForTest {station_id}: viimeisimmän virheen näyttö lisätään kun virhehistoria tallennetaan",
+            "orange",
+        )
+
+    def _set_status(self, message, color):
+        self.status_label.setText(message)
+        self.status_label.setStyleSheet(self.STATUS_STYLE.format(color=color))
+
+    def go_back(self):
+        if hasattr(self.parent(), "show_testing"):
+            self.parent().show_testing()
+
+    def cleanup(self):
+        pass
