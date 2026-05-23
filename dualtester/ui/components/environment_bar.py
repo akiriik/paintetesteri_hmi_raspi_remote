@@ -56,8 +56,13 @@ class EnvironmentBar(QFrame):
 
         ft_x = 720
         ft_y = 40
-        ft_w = 600
+        ft_w = 500
         ft_h = 30
+
+        settings_x = 1240
+        settings_y = 10
+        settings_w = 190
+        settings_h = 60
 
         manual_x = 1450
         manual_y = 10
@@ -92,6 +97,21 @@ class EnvironmentBar(QFrame):
         self.fortest_label.setFont(QFont("Consolas", 13))
         self.fortest_label.setStyleSheet("color: orange; background: transparent; border: none;")
         self.fortest_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.settings_button = QPushButton("ASETUKSET", self)
+        self.settings_button.setGeometry(settings_x, settings_y, settings_w, settings_h)
+        self.settings_button.setFont(QFont("Arial", 16, QFont.Bold))
+        self.settings_button.setStyleSheet("""
+            QPushButton {
+                background-color: #303030;
+                color: white;
+                border-radius: 10px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+        """)
 
         self.manual_button = QPushButton("KÄSIKÄYTTÖ", self)
         self.manual_button.setGeometry(manual_x, manual_y, manual_w, manual_h)
