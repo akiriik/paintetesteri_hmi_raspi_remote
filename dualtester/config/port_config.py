@@ -25,6 +25,6 @@ OPTA_MODBUS_BAUDRATE = 19200
 # ForTest-laitteet
 # ------------------------------------------------------------
 
-FORTEST_1_PORT = "/dev/ttyUSB1"
-FORTEST_2_PORT = "/dev/ttyUSB2"
+FORTEST_1_PORT = "/dev/fortest1"
+FORTEST_2_PORT = "/dev/fortest2"
 FORTEST_BAUDRATE = 19200
