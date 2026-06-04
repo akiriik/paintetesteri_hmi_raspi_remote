@@ -72,7 +72,8 @@ class MainWindow(QWidget):
         self.DEV_MODE_GPIO = DEV_MODE_GPIO
 
     def create_managers(self):
-        self.program_manager = ProgramManager()
+        self.program_manager_1 = ProgramManager("config/programs1.json")
+        self.program_manager_2 = ProgramManager("config/programs2.json")
 
     def create_screens(self):
         self.main_screen = MainScreen(self)
@@ -86,7 +87,7 @@ class MainWindow(QWidget):
         self.settings_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
         self.settings_screen.hide()
 
-        self.program_selection_screen = ProgramSelectionScreen(self, self.program_manager)
+        self.program_selection_screen = ProgramSelectionScreen(self, self.program_manager_1)
         self.program_selection_screen.setGeometry(0, 0, self.screen_width, self.screen_height)
         self.program_selection_screen.hide()
 

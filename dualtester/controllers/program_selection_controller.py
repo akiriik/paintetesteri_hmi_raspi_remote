@@ -34,6 +34,14 @@ class ProgramSelectionController:
 
         self.active_station_id = station_id
 
+        if station_id == 1:
+            self.program_selection_screen.program_manager = self.main_window.program_manager_1
+        elif station_id == 2:
+            self.program_selection_screen.program_manager = self.main_window.program_manager_2
+
+        self.program_selection_screen.current_page = 0
+        self.program_selection_screen.update_program_list()
+
         self.main_window.manual_screen.hide()
         self.main_window.main_screen.show()
 
