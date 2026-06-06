@@ -61,6 +61,9 @@ class StationController(QObject):
         self.results_started = False
         self.results_read_counter = 0
 
+        self.test_has_reached_active_status = False
+        self.waiting_result_from_finished_test = False
+
         self.auto_part_change_enabled = False
         self.auto_part_change_in_progress = False
         self.auto_cycle_started_by_user = False
@@ -511,6 +514,8 @@ class StationController(QObject):
     def handle_result_for_automatic_cycle(self, test_result):
         self.is_running = False
         self.results_started = False
+        self.test_has_reached_active_status = False
+        self.waiting_result_from_finished_test = False
 
         if not self.auto_part_change_enabled:
             return
@@ -631,7 +636,9 @@ class StationController(QObject):
         QTimer.singleShot(200, self._continue_start_test)
 
     def _continue_start_test(self):
-        self.results_started = True
+        self.results_started = False
+        self.test_has_reached_active_status = False
+        self.waiting_result_from_finished_test = False
         self.is_running = True
 
         self.update_status("TESTI KÄYNNISTETTY", "INFO")
@@ -650,6 +657,9 @@ class StationController(QObject):
         self.disable_auto_part_change("STOP PAINETTU - AUTOMAATTI POIS", show_message=True)
 
         self.is_running = False
+        self.results_started = False
+        self.test_has_reached_active_status = False
+        self.waiting_result_from_finished_test = False
         self.update_status("TESTI PYSÄYTETTY", "INFO")
 
         if not self.dev_mode_fortest:
@@ -660,6 +670,9 @@ class StationController(QObject):
 
     def finish_test(self, status_message=None, level="INFO"):
         self.is_running = False
+        self.results_started = False
+        self.test_has_reached_active_status = False
+        self.waiting_result_from_finished_test = False
         self.open_test_valve()
 
         if status_message:
@@ -679,11 +692,12 @@ class StationController(QObject):
 
         self.fortest_service.read_status(self.station_id)
 
-        self.results_read_counter += 1
+        if self.waiting_result_from_finished_test:
+            self.results_read_counter += 1
 
-        if self.results_read_counter >= 5:
-            self.fortest_service.read_results(self.station_id)
-            self.results_read_counter = 0
+            if self.results_read_counter >= 2:
+                self.fortest_service.read_results(self.station_id)
+                self.results_read_counter = 0
 
         self.refresh_station_state()
 
@@ -691,10 +705,36 @@ class StationController(QObject):
         self.status_handler.update_status_from_fortest(result)
         self.refresh_station_state()
 
+    def mark_test_active_status_seen(self):
+        """
+        Kutsutaan, kun ForTest-status käy oikeasti testin aikaisessa tilassa.
+        Tämä estää vanhan tulosrekisterin käyttämisen automaattisyklissä.
+        """
+        if self.is_running:
+            self.test_has_reached_active_status = True
+
+    def mark_test_finished_and_allow_result_read(self):
+        """
+        Kutsutaan vain, kun ForTest-status palaa testitilasta VALMIS-tilaan.
+        Tämän jälkeen seuraava tulosrekisterin luku hyväksytään.
+        """
+        if not self.test_has_reached_active_status:
+            return
+
+        self.is_running = False
+        self.results_started = True
+        self.waiting_result_from_finished_test = True
+        self.results_read_counter = 0
+
     def update_test_results(self, result):
+        if not self.waiting_result_from_finished_test:
+            return
+
         test_result = self.result_handler.update_test_results(result)
 
         if test_result is not None:
+            self.waiting_result_from_finished_test = False
+            self.results_started = False
             self.handle_result_for_automatic_cycle(test_result)
 
         self.refresh_station_state()
