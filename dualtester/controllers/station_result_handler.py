@@ -65,24 +65,24 @@ class StationResultHandler:
         controller = self.controller
 
         if not result or not hasattr(result, "registers"):
-            return
+            return False
 
         if controller.program_number <= 0:
-            return
+            return False
 
         if len(result.registers) < 25:
-            return
+            return False
 
         test_result = result.registers[9]
 
         if test_result == 0 or test_result == 99:
-            return
+            return False
 
         if result.registers[6] != controller.program_number:
-            return
+            return False
 
         if not controller.results_started:
-            return
+            return False
 
         hours = result.registers[0]
         minutes = result.registers[1]
@@ -95,7 +95,7 @@ class StationResultHandler:
         result_id = f"{timestamp}-{test_result}-{result.registers[6]}-{result.registers[21]}"
 
         if self.last_result_id == result_id:
-            return
+            return False
 
         self.last_result_id = result_id
 
@@ -117,6 +117,8 @@ class StationResultHandler:
             room_temp_text=room_temp_text,
             part_temp_text=part_temp_text,
         )
+
+        return True
 
     def _get_result_color(self, test_result):
         if test_result == 1:

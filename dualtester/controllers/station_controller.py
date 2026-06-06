@@ -54,6 +54,9 @@ class StationController(QObject):
         self.results_started = False
         self.results_read_counter = 0
 
+        self.auto_part_change_enabled = False
+        self.auto_part_change_in_progress = False
+
         self.test_valve_controller = TestValveController(self.hardware_service)
 
         self.result_handler = StationResultHandler(self)
@@ -278,6 +281,86 @@ class StationController(QObject):
             "KAPPALEEN POISTO",
         )
 
+    def set_auto_part_change_enabled(self, enabled):
+        """
+        Automaattisen kappaleenvaihdon päällä/pois-tila.
+
+        Tätä ei vielä kytketä UI-nappiin.
+        Kun UI-nappi lisätään, se kutsuu tätä metodia.
+        """
+        self.auto_part_change_enabled = bool(enabled)
+
+        if self.auto_part_change_enabled:
+            self.update_status("AUTOMAATTINEN KAPPALEENVAIHTO PÄÄLLÄ", "INFO")
+        else:
+            self.update_status("AUTOMAATTINEN KAPPALEENVAIHTO POIS", "WARNING")
+
+        self.refresh_station_state()
+
+    def can_start_auto_part_change_after_result(self):
+        """
+        Tarkistaa, saako testin valmistumisen jälkeen käynnistää
+        automaattisen kappaleenvaihdon.
+        """
+        if not self.auto_part_change_enabled:
+            return False
+
+        if self.auto_part_change_in_progress:
+            return False
+
+        if self.station_id != JAKOTUBBI_STATION_ID:
+            return False
+
+        if self.program_number != JAKOTUBBI_PROGRAM_NUMBER:
+            return False
+
+        if self.is_running:
+            return False
+
+        if not self.hardware_service:
+            return False
+
+        if not hasattr(self.hardware_service, "start_jig_auto_part_change_sequence"):
+            return False
+
+        return True
+
+    def start_auto_part_change_after_result(self):
+        """
+        Käynnistää Optan AUTO_PART_CHANGE-sekvenssin yhden kerran
+        hyväksytyn/käsitellyn testituloksen jälkeen.
+        """
+        if not self.can_start_auto_part_change_after_result():
+            return
+
+        self.auto_part_change_in_progress = True
+
+        if hasattr(self.station_widget, "set_jig_controls_enabled"):
+            self.station_widget.set_jig_controls_enabled(False)
+
+        self.update_status("AUTOMAATTINEN KAPPALEENVAIHTO KÄYNNISTYY...", "INFO")
+
+        success, message = self.hardware_service.start_jig_auto_part_change_sequence()
+
+        if success:
+            self.update_status(message, "INFO")
+        else:
+            self.auto_part_change_in_progress = False
+            self.update_status(message, "ERROR")
+
+        self.refresh_station_state()
+
+    def clear_auto_part_change_lock(self):
+        """
+        Vapauttaa automaattisyklin lukituksen.
+
+        Huomio:
+        Tässä vaiheessa lukitus vapautetaan vasta seuraavan testin STARTissa.
+        Myöhemmin tämä kannattaa kytkeä Optan JIG_SEQUENCE_STATUS_REGISTER-lukuun,
+        jolloin lukitus vapautetaan kun Opta ilmoittaa DONE tai ERROR.
+        """
+        self.auto_part_change_in_progress = False
+
     def close_test_valve(self):
         success, message = self.test_valve_controller.close_valve(self.station_id)
 
@@ -308,6 +391,8 @@ class StationController(QObject):
     def start_test(self):
         if self.is_running:
             return
+
+        self.clear_auto_part_change_lock()
 
         if not self.has_selected_program():
             self.update_status("VIRHE: VALITSE OHJELMA", "ERROR")
@@ -389,7 +474,11 @@ class StationController(QObject):
         self.refresh_station_state()
 
     def update_test_results(self, result):
-        self.result_handler.update_test_results(result)
+        result_added = self.result_handler.update_test_results(result)
+
+        if result_added:
+            self.start_auto_part_change_after_result()
+
         self.refresh_station_state()
 
     def show_dev_fortest_result(self):
