@@ -119,11 +119,17 @@ void readD1608EInputs() {
   DigitalMechExpansion mechExp = getD1608EExpansion();
 
   if (!mechExp) {
+    for (uint8_t i = 0; i < D1608E_INPUT_COUNT; i++) {
+      d1608eInputStates[i] = false;
+    }
     return;
   }
 
+  mechExp.updateDigitalInputs();
+
   for (uint8_t i = 0; i < D1608E_INPUT_COUNT; i++) {
-    d1608eInputStates[i] = (mechExp.digitalRead(D1608E_INPUT_INDEX[i]) == HIGH);
+    PinStatus value = mechExp.digitalRead(D1608E_INPUT_INDEX[i]);
+    d1608eInputStates[i] = (value == HIGH);
   }
 }
 

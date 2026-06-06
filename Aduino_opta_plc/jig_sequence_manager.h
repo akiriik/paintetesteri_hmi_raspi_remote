@@ -26,6 +26,14 @@ void setAllJigCylindersOff() {
   setJigCylinder3(false);
 }
 
+bool areAllJigCylindersOff() {
+  return (
+    !getD1608ERelay(JIG_CYL1_RELAY_NUMBER) &&
+    !getD1608ERelay(JIG_CYL2_RELAY_NUMBER) &&
+    !getD1608ERelay(JIG_CYL3_RELAY_NUMBER)
+  );
+}
+
 bool isPartPresent() {
   return getD1608EInput(JIG_PART_PRESENT_INPUT_NUMBER);
 }
@@ -149,6 +157,17 @@ void startJigSequence(uint16_t command) {
   }
 
   if (command == JIG_SEQUENCE_COMMAND_PART_REMOVE) {
+    if (areAllJigCylindersOff()) {
+      // Kappale on jo irti:
+      // ajetaan vain poistoliike
+      // SYL3 kiinni -> odota -> SYL3 auki
+      setJigCylinder3(true);
+      setJigSequenceStep(4);
+      return;
+    }
+
+    // Kappale on vielä kiinni:
+    // ajetaan ensin irrotus ja sen jälkeen poistoliike
     setJigCylinder3(false);
     setJigSequenceStep(1);
     return;
@@ -287,6 +306,7 @@ void updatePartRemoveSequence() {
 
   switch (jigSequenceStep) {
     case 1:
+      // SYL3 auki -> odota 500 ms -> SYL1 auki
       if (elapsedMs >= PART_REMOVE_SYL3_OPEN_1_WAIT_MS) {
         setJigCylinder1(false);
         setJigSequenceStep(2);
@@ -294,6 +314,7 @@ void updatePartRemoveSequence() {
       break;
 
     case 2:
+      // SYL1 auki -> odota 500 ms -> SYL2 auki
       if (elapsedMs >= PART_REMOVE_SYL1_OPEN_WAIT_MS) {
         setJigCylinder2(false);
         setJigSequenceStep(3);
@@ -301,6 +322,7 @@ void updatePartRemoveSequence() {
       break;
 
     case 3:
+      // SYL2 auki -> odota 1000 ms -> SYL3 kiinni
       if (elapsedMs >= PART_REMOVE_SYL2_OPEN_WAIT_MS) {
         setJigCylinder3(true);
         setJigSequenceStep(4);
@@ -308,6 +330,7 @@ void updatePartRemoveSequence() {
       break;
 
     case 4:
+      // SYL3 kiinni -> odota 1000 ms -> SYL3 auki
       if (elapsedMs >= PART_REMOVE_SYL3_CLOSE_WAIT_MS) {
         setJigCylinder3(false);
         finishJigSequence();
