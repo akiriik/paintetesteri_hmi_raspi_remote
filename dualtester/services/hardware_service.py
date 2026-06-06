@@ -8,6 +8,8 @@ from config.modbus_config import (
     JIG_SEQUENCE_START_REGISTER,
     JIG_SEQUENCE_STOP_REGISTER,
     JIG_SEQUENCE_COMMAND_PART_CLAMP,
+    JIG_SEQUENCE_COMMAND_PART_RELEASE,
+    JIG_SEQUENCE_COMMAND_PART_REMOVE,
 )
 
 from utils.modbus_manager import ModbusManager
@@ -257,18 +259,21 @@ class HardwareService(QObject):
             print(f"Hätäseis-kuittaus epäonnistui: {e}")
             return None
 
-    def start_jig_part_clamp_sequence(self):
+    # ------------------------------------------------------------
+    # Arduino Opta / jig-sekvenssit
+    # ------------------------------------------------------------
+
+    def _start_jig_sequence(self, command, sequence_name):
         """
-        Käynnistää Optan jig-sekvenssin:
-        kappale kiinni.
+        Käynnistää Optan jig-sekvenssin.
 
         Dualtest ei aja ajoituksia.
         Dualtest vain lähettää Optalle:
-        19200 = 1
+        19200 = command
         19201 = 1
         """
         if self.dev_mode_modbus:
-            return True, "DEV OPTA MODBUS: KAPPALE KIINNI -SEKVENSSI KÄYNNISTETTY"
+            return True, f"DEV OPTA MODBUS: {sequence_name} -SEKVENSSI KÄYNNISTETTY"
 
         opta_modbus_manager = self._get_opta_modbus_manager_or_none()
 
@@ -278,17 +283,45 @@ class HardwareService(QObject):
         try:
             self.write_register(
                 JIG_SEQUENCE_COMMAND_REGISTER,
-                JIG_SEQUENCE_COMMAND_PART_CLAMP,
+                command,
             )
+
             self.write_register(
                 JIG_SEQUENCE_START_REGISTER,
                 1,
             )
 
-            return True, "KAPPALE KIINNI -SEKVENSSI KÄYNNISTETTY"
+            return True, f"{sequence_name} -SEKVENSSI KÄYNNISTETTY"
 
         except Exception as e:
-            return False, f"Kappale kiinni -sekvenssin käynnistys epäonnistui: {e}"
+            return False, f"{sequence_name} -sekvenssin käynnistys epäonnistui: {e}"
+
+    def start_jig_part_clamp_sequence(self):
+        """
+        Käynnistää Optan kappale kiinni -sekvenssin.
+        """
+        return self._start_jig_sequence(
+            JIG_SEQUENCE_COMMAND_PART_CLAMP,
+            "KAPPALE KIINNI",
+        )
+
+    def start_jig_part_release_sequence(self):
+        """
+        Käynnistää Optan kappale irti -sekvenssin.
+        """
+        return self._start_jig_sequence(
+            JIG_SEQUENCE_COMMAND_PART_RELEASE,
+            "KAPPALE IRTI",
+        )
+
+    def start_jig_part_remove_sequence(self):
+        """
+        Käynnistää Optan kappaleen poisto -sekvenssin.
+        """
+        return self._start_jig_sequence(
+            JIG_SEQUENCE_COMMAND_PART_REMOVE,
+            "KAPPALEEN POISTO",
+        )
 
     def stop_jig_sequence(self):
         """
@@ -322,8 +355,6 @@ class HardwareService(QObject):
             return opta_modbus_manager.read_emergency_stop_status()
 
         return None
-
-
 
     # ------------------------------------------------------------
     # Arduino Opta / käsikäytön releohjaus
@@ -359,76 +390,3 @@ class HardwareService(QObject):
             return True, f"RELE {relay_num} {'PÄÄLLÄ' if state_bool else 'POIS'}"
         except Exception as e:
             return False, f"Releen {relay_num} ohjaus epäonnistui: {e}"
-
-    def toggle_relay(self, relay_num, state):
-        """
-        Yhteensopivuus vanhan kutsutavan kanssa.
-
-        Uusi koodi käyttää control_relay().
-        """
-        success, message = self.control_relay(relay_num, state)
-        return success
-
-    # ------------------------------------------------------------
-    # Yhteystilat
-    # ------------------------------------------------------------
-
-    def is_modbus_connected(self):
-        """
-        Palauttaa Arduino Optan Modbus-yhteyden tilan.
-
-        Tämä ei kerro ForTest-yhteyksien tilaa.
-        """
-        if self.dev_mode_modbus:
-            return False
-
-        opta_modbus_manager = self._get_opta_modbus_manager_or_none()
-
-        if not opta_modbus_manager:
-            return False
-
-        if hasattr(opta_modbus_manager, "is_connected"):
-            return opta_modbus_manager.is_connected()
-
-        return False
-
-    def get_connection_status_text(self):
-        if self.dev_mode_modbus:
-            modbus_text = "OPTA MODBUS: DEV"
-        elif self.is_modbus_connected():
-            modbus_text = "OPTA MODBUS: OK"
-        else:
-            modbus_text = "OPTA MODBUS: EI YHTEYTTÄ"
-
-        if self.dev_mode_gpio:
-            gpio_text = "RASPI GPIO: DEV"
-        elif self.raspberry_gpio_output_handler:
-            gpio_text = "RASPI GPIO: OK"
-        else:
-            gpio_text = "RASPI GPIO: EI KÄYTÖSSÄ"
-
-        if self.dev_mode_gpio:
-            sensor_text = "ANTURI: DEV"
-        elif self.dfr0558_manager:
-            sensor_text = "ANTURI: OK"
-        else:
-            sensor_text = "ANTURI: EI KÄYTÖSSÄ"
-
-        return f"{modbus_text}    {gpio_text}    {sensor_text}"
-
-    # ------------------------------------------------------------
-    # Sulkeminen
-    # ------------------------------------------------------------
-
-    def cleanup(self):
-        if self.dfr0558_manager:
-            self.dfr0558_manager.cleanup()
-
-        if self.raspberry_gpio_input_handler:
-            self.raspberry_gpio_input_handler.cleanup()
-
-        if self.opta_modbus_manager:
-            self.opta_modbus_manager.cleanup()
-
-        if self.raspberry_gpio_output_handler:
-            self.raspberry_gpio_output_handler.cleanup()

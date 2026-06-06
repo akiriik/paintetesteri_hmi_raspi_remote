@@ -22,6 +22,7 @@ class StationController(QObject):
     - status- ja result-handlerien kutsumisesta
     - aseman käyttötilan päivittämisestä UI:lle
     - ForTest-kohtaisen testiventtiilin ohjauksesta
+    - jigin sekvenssinappien ohjauksesta
 
     Fyysiset napit ja niiden valot hoidetaan PhysicalButtonControllerissa.
     """
@@ -75,6 +76,16 @@ class StationController(QObject):
         if hasattr(self.station_widget, "jig_part_clamp_button"):
             self.station_widget.jig_part_clamp_button.clicked.connect(
                 self.start_jig_part_clamp_sequence
+            )
+
+        if hasattr(self.station_widget, "jig_part_release_button"):
+            self.station_widget.jig_part_release_button.clicked.connect(
+                self.start_jig_part_release_sequence
+            )
+
+        if hasattr(self.station_widget, "jig_part_remove_button"):
+            self.station_widget.jig_part_remove_button.clicked.connect(
+                self.start_jig_part_remove_sequence
             )
 
         if hasattr(self.station_widget, "dev_result_button"):
@@ -192,51 +203,80 @@ class StationController(QObject):
 
     def update_jig_controls_visibility(self):
         """
-        Näyttää KAPPALE KIINNI -napin vain:
+        Näyttää jigin sekvenssinapit vain:
         - ForTest 2 -asemalla
         - kun valittu ohjelma on 3 / jakotubbi
         """
-        if not hasattr(self.station_widget, "set_jig_part_clamp_visible"):
-            return
-
         visible = (
             self.station_id == JAKOTUBBI_STATION_ID
             and self.program_number == JAKOTUBBI_PROGRAM_NUMBER
         )
 
-        self.station_widget.set_jig_part_clamp_visible(visible)
+        if hasattr(self.station_widget, "set_jig_controls_visible"):
+            self.station_widget.set_jig_controls_visible(visible)
+            return
 
-    def start_jig_part_clamp_sequence(self):
+        if hasattr(self.station_widget, "set_jig_part_clamp_visible"):
+            self.station_widget.set_jig_part_clamp_visible(visible)
+
+    def _start_jig_sequence(self, hardware_method_name, sequence_name):
         """
-        Käynnistää Optan kappale kiinni -sekvenssin.
+        Käynnistää Optan jig-sekvenssin.
         """
         if self.station_id != JAKOTUBBI_STATION_ID:
             return
 
         if self.program_number != JAKOTUBBI_PROGRAM_NUMBER:
-            self.update_status("KAPPALE KIINNI VAIN OHJELMALLA 3", "ERROR")
+            self.update_status(f"{sequence_name} VAIN OHJELMALLA 3", "ERROR")
             return
 
         if not self.hardware_service:
             self.update_status("OPTA-OHJAUS EI OLE KÄYTÖSSÄ", "ERROR")
             return
 
-        if not hasattr(self.hardware_service, "start_jig_part_clamp_sequence"):
+        if not hasattr(self.hardware_service, hardware_method_name):
             self.update_status("JIG-SEKVENSSIN OHJAUS PUUTTUU HARDWARE SERVICESTÄ", "ERROR")
             return
 
-        self.station_widget.set_jig_part_clamp_enabled(False)
-        self.update_status("KÄYNNISTETÄÄN KAPPALE KIINNI -SEKVENSSI...", "INFO")
+        if hasattr(self.station_widget, "set_jig_controls_enabled"):
+            self.station_widget.set_jig_controls_enabled(False)
+        elif hasattr(self.station_widget, "set_jig_part_clamp_enabled"):
+            self.station_widget.set_jig_part_clamp_enabled(False)
 
-        success, message = self.hardware_service.start_jig_part_clamp_sequence()
+        self.update_status(f"KÄYNNISTETÄÄN {sequence_name} -SEKVENSSI...", "INFO")
+
+        hardware_method = getattr(self.hardware_service, hardware_method_name)
+        success, message = hardware_method()
 
         if success:
             self.update_status(message, "INFO")
         else:
             self.update_status(message, "ERROR")
 
-        self.station_widget.set_jig_part_clamp_enabled(True)
+        if hasattr(self.station_widget, "set_jig_controls_enabled"):
+            self.station_widget.set_jig_controls_enabled(True)
+        elif hasattr(self.station_widget, "set_jig_part_clamp_enabled"):
+            self.station_widget.set_jig_part_clamp_enabled(True)
+
         self.refresh_station_state()
+
+    def start_jig_part_clamp_sequence(self):
+        self._start_jig_sequence(
+            "start_jig_part_clamp_sequence",
+            "KAPPALE KIINNI",
+        )
+
+    def start_jig_part_release_sequence(self):
+        self._start_jig_sequence(
+            "start_jig_part_release_sequence",
+            "KAPPALE IRTI",
+        )
+
+    def start_jig_part_remove_sequence(self):
+        self._start_jig_sequence(
+            "start_jig_part_remove_sequence",
+            "KAPPALEEN POISTO",
+        )
 
     def close_test_valve(self):
         success, message = self.test_valve_controller.close_valve(self.station_id)

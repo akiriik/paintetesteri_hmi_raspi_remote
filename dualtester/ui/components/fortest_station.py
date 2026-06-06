@@ -68,10 +68,20 @@ STOP_W = 290
 STOP_H = 75
 
 # Jakotubbi / jigi
+JIG_PART_RELEASE_X = 20
+JIG_PART_RELEASE_Y = 815
+JIG_PART_RELEASE_W = 280
+JIG_PART_RELEASE_H = 65
+
 JIG_PART_CLAMP_X = 330
 JIG_PART_CLAMP_Y = 815
 JIG_PART_CLAMP_W = 250
 JIG_PART_CLAMP_H = 65
+
+JIG_PART_REMOVE_X = 610
+JIG_PART_REMOVE_Y = 815
+JIG_PART_REMOVE_W = 290
+JIG_PART_REMOVE_H = 65
 
 DEV_RESULT_X = 375
 DEV_RESULT_Y = 720
@@ -227,17 +237,7 @@ class ForTestStation(QFrame):
         """)
         self._refresh_results_table()
 
-        self.jig_part_clamp_button = QPushButton("KAPPALE KIINNI", self)
-        self.jig_part_clamp_button.setGeometry(
-            JIG_PART_CLAMP_X,
-            JIG_PART_CLAMP_Y,
-            JIG_PART_CLAMP_W,
-            JIG_PART_CLAMP_H
-        )
-        self.jig_part_clamp_button.setFont(
-            QFont(FONT_JIG_BUTTON[0], FONT_JIG_BUTTON[1], QFont.Bold)
-        )
-        self.jig_part_clamp_button.setStyleSheet("""
+        jig_button_style = """
             QPushButton {
                 background-color: #6A3D9A;
                 color: white;
@@ -251,8 +251,46 @@ class ForTestStation(QFrame):
                 background-color: #333333;
                 color: #777777;
             }
-        """)
+        """
+
+        self.jig_part_release_button = QPushButton("KAPPALE IRTI", self)
+        self.jig_part_release_button.setGeometry(
+            JIG_PART_RELEASE_X,
+            JIG_PART_RELEASE_Y,
+            JIG_PART_RELEASE_W,
+            JIG_PART_RELEASE_H
+        )
+        self.jig_part_release_button.setFont(
+            QFont(FONT_JIG_BUTTON[0], FONT_JIG_BUTTON[1], QFont.Bold)
+        )
+        self.jig_part_release_button.setStyleSheet(jig_button_style)
+        self.jig_part_release_button.hide()
+
+        self.jig_part_clamp_button = QPushButton("KAPPALE KIINNI", self)
+        self.jig_part_clamp_button.setGeometry(
+            JIG_PART_CLAMP_X,
+            JIG_PART_CLAMP_Y,
+            JIG_PART_CLAMP_W,
+            JIG_PART_CLAMP_H
+        )
+        self.jig_part_clamp_button.setFont(
+            QFont(FONT_JIG_BUTTON[0], FONT_JIG_BUTTON[1], QFont.Bold)
+        )
+        self.jig_part_clamp_button.setStyleSheet(jig_button_style)
         self.jig_part_clamp_button.hide()
+
+        self.jig_part_remove_button = QPushButton("KAPPALEEN POISTO", self)
+        self.jig_part_remove_button.setGeometry(
+            JIG_PART_REMOVE_X,
+            JIG_PART_REMOVE_Y,
+            JIG_PART_REMOVE_W,
+            JIG_PART_REMOVE_H
+        )
+        self.jig_part_remove_button.setFont(
+            QFont(FONT_JIG_BUTTON[0], FONT_JIG_BUTTON[1], QFont.Bold)
+        )
+        self.jig_part_remove_button.setStyleSheet(jig_button_style)
+        self.jig_part_remove_button.hide()
 
         self.select_program_button = QPushButton("VALITSE OHJELMA", self)
         self.select_program_button.setGeometry(
@@ -385,11 +423,27 @@ class ForTestStation(QFrame):
             self.start_button.setEnabled(bool(ready))
             self.stop_button.setEnabled(False)
 
+    def set_jig_controls_visible(self, visible):
+        visible = bool(visible)
+
+        self.jig_part_release_button.setVisible(visible)
+        self.jig_part_clamp_button.setVisible(visible)
+        self.jig_part_remove_button.setVisible(visible)
+
+    def set_jig_controls_enabled(self, enabled):
+        enabled = bool(enabled)
+
+        self.jig_part_release_button.setEnabled(enabled)
+        self.jig_part_clamp_button.setEnabled(enabled)
+        self.jig_part_remove_button.setEnabled(enabled)
+
     def set_jig_part_clamp_visible(self, visible):
-        self.jig_part_clamp_button.setVisible(bool(visible))
+        # Vanha yhteensopivuus
+        self.set_jig_controls_visible(visible)
 
     def set_jig_part_clamp_enabled(self, enabled):
-        self.jig_part_clamp_button.setEnabled(bool(enabled))
+        # Vanha yhteensopivuus
+        self.set_jig_controls_enabled(enabled)
 
     def add_result_row(
         self,

@@ -46,10 +46,10 @@ FORTEST2_TEST_VALVE_REGISTER = 18093
 # Rele 1 = 18099, rele 2 = 18100 jne.
 # Kaava: OPTA_RELAY_REGISTER_BASE + relay_num
 #
-# Tätä käytetään myöhemmin jakotukkijigin venttiileille.
 # Älä käytä tätä ForTest-testiventtiileille.
 
 OPTA_RELAY_REGISTER_BASE = 18098
+
 
 # ------------------------------------------------------------
 # Opta / jig-sekvenssit
@@ -64,7 +64,11 @@ JIG_SEQUENCE_STEP_REGISTER = 19211
 JIG_SEQUENCE_ERROR_REGISTER = 19212
 
 JIG_SEQUENCE_NONE = 0
+
 JIG_SEQUENCE_COMMAND_PART_CLAMP = 1
+JIG_SEQUENCE_COMMAND_PART_CHANGE = 2
+JIG_SEQUENCE_COMMAND_PART_RELEASE = 3
+JIG_SEQUENCE_COMMAND_PART_REMOVE = 4
 
 JIG_SEQUENCE_STATUS_IDLE = 0
 JIG_SEQUENCE_STATUS_RUNNING = 1
