@@ -20,7 +20,8 @@ JAKOTUBBI_STATION_ID = 2
 
 FORTEST_RESULT_OK = 1
 
-AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS = 4000
+AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS = 3000
+AUTO_RESTART_AFTER_CLAMP_DELAY_MS = 3000
 
 AUTO_PHASE_IDLE = "IDLE"
 AUTO_PHASE_WAIT_BEFORE_REMOVE = "WAIT_BEFORE_REMOVE"
@@ -386,7 +387,7 @@ class StationController(QObject):
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(False)
 
-        self.update_status("OK - ODOTETAAN 4s ENNEN KAPPALEENVAIHTOA", "INFO")
+        self.update_status("OK - ODOTETAAN 3s ENNEN KAPPALEENVAIHTOA", "INFO")
         self.refresh_station_state()
 
         QTimer.singleShot(
@@ -495,8 +496,8 @@ class StationController(QObject):
                 self.refresh_station_state()
                 return
 
-            self.update_status("KAPPALE KIINNI - UUSI TESTI KÄYNNISTYY", "INFO")
-            QTimer.singleShot(300, self.start_test)
+            self.update_status("KAPPALE KIINNI - ODOTETAAN 3s ENNEN UUTTA TESTIÄ", "INFO")
+            QTimer.singleShot(AUTO_RESTART_AFTER_CLAMP_DELAY_MS, self.start_test)
             self.refresh_station_state()
             return
 
@@ -533,7 +534,7 @@ class StationController(QObject):
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(False)
 
-        self.update_status("NOK - ODOTETAAN 4s ENNEN KAPPALE IRTI -AJOA", "ERROR")
+        self.update_status("NOK - ODOTETAAN 3s ENNEN KAPPALE IRTI -AJOA", "ERROR")
         self.refresh_station_state()
 
         QTimer.singleShot(
