@@ -10,6 +10,7 @@ from config.modbus_config import (
     JIG_SEQUENCE_COMMAND_PART_CLAMP,
     JIG_SEQUENCE_COMMAND_PART_RELEASE,
     JIG_SEQUENCE_COMMAND_PART_REMOVE,
+    JIG_SEQUENCE_COMMAND_AUTO_PART_CHANGE,
 )
 
 from utils.modbus_manager import ModbusManager
@@ -321,6 +322,19 @@ class HardwareService(QObject):
         return self._start_jig_sequence(
             JIG_SEQUENCE_COMMAND_PART_REMOVE,
             "KAPPALEEN POISTO",
+        )
+
+    def start_jig_auto_part_change_sequence(self):
+        """
+        Käynnistää Optan automaattisen kappaleenvaihtosyklin.
+
+        Opta ajaa sisäisesti:
+        - kappaleen poisto
+        - kappale kiinni
+        """
+        return self._start_jig_sequence(
+            JIG_SEQUENCE_COMMAND_AUTO_PART_CHANGE,
+            "AUTOMAATTINEN KAPPALEENVAIHTO",
         )
 
     def stop_jig_sequence(self):
