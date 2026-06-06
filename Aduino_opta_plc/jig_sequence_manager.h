@@ -45,6 +45,12 @@ void writeJigSequenceError(uint16_t errorCode) {
   ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_ERROR_REGISTER, errorCode);
 }
 
+void setJigSequenceStep(uint16_t step) {
+  jigSequenceStep = step;
+  jigSequenceStepStartedMs = millis();
+  writeJigSequenceStep(jigSequenceStep);
+}
+
 // -----------------------------
 // Sekvenssin lopetus / keskeytys
 // -----------------------------
@@ -81,6 +87,14 @@ void abortJigSequence(uint16_t errorCode) {
 // Sekvenssin käynnistys
 // -----------------------------
 
+bool isKnownJigSequenceCommand(uint16_t command) {
+  return (
+    command == JIG_SEQUENCE_COMMAND_PART_CLAMP ||
+    command == JIG_SEQUENCE_COMMAND_PART_RELEASE ||
+    command == JIG_SEQUENCE_COMMAND_PART_REMOVE
+  );
+}
+
 void startJigSequence(uint16_t command) {
   if (jigSequenceRunning) {
     return;
@@ -91,21 +105,34 @@ void startJigSequence(uint16_t command) {
     return;
   }
 
-  if (command != JIG_SEQUENCE_COMMAND_PART_CLAMP) {
+  if (!isKnownJigSequenceCommand(command)) {
     abortJigSequence(JIG_SEQUENCE_ERROR_UNKNOWN_COMMAND);
     return;
   }
 
-  setAllJigCylindersOff();
-
   jigSequenceCommand = command;
   jigSequenceRunning = true;
-  jigSequenceStep = 1;
-  jigSequenceStepStartedMs = millis();
 
   writeJigSequenceError(JIG_SEQUENCE_ERROR_NONE);
   writeJigSequenceStatus(JIG_SEQUENCE_STATUS_RUNNING);
-  writeJigSequenceStep(jigSequenceStep);
+
+  if (command == JIG_SEQUENCE_COMMAND_PART_CLAMP) {
+    setJigCylinder2(true);
+    setJigSequenceStep(1);
+    return;
+  }
+
+  if (command == JIG_SEQUENCE_COMMAND_PART_RELEASE) {
+    setJigCylinder3(false);
+    setJigSequenceStep(1);
+    return;
+  }
+
+  if (command == JIG_SEQUENCE_COMMAND_PART_REMOVE) {
+    setJigCylinder3(false);
+    setJigSequenceStep(1);
+    return;
+  }
 }
 
 // -----------------------------
@@ -128,12 +155,19 @@ void handleModbusJigSequenceRegisters() {
 }
 
 // -----------------------------
-// Kappale kiinni -sekvenssi
+// PART_CLAMP = kappale kiinni
 //
-// Releet:
-// D1608E R1 = sylinteri 1
-// D1608E R2 = sylinteri 2
-// D1608E R3 = sylinteri 3
+// Alkutapahtuma käynnistyksessä:
+// SYL2 kiinni
+//
+// Vaiheet:
+// 1 odota 1000 ms
+// 2 SYL1 kiinni, odota 150 ms
+// 3 SYL1 auki, odota 800 ms
+// 4 SYL3 kiinni, odota 500 ms
+// 5 SYL3 auki, odota 500 ms
+// 6 SYL1 kiinni, odota 500 ms
+// 7 SYL3 kiinni, valmis
 // -----------------------------
 
 void updatePartClampSequence() {
@@ -141,52 +175,131 @@ void updatePartClampSequence() {
 
   switch (jigSequenceStep) {
     case 1:
-      if (elapsedMs >= DELAY_SYL1_ON) {
+      if (elapsedMs >= PART_CLAMP_SYL2_CLOSE_WAIT_MS) {
         setJigCylinder1(true);
-        jigSequenceStep = 2;
-        jigSequenceStepStartedMs = millis();
-        writeJigSequenceStep(jigSequenceStep);
+        setJigSequenceStep(2);
       }
       break;
 
     case 2:
-      if (elapsedMs >= DELAY_SYL1_OFF) {
+      if (elapsedMs >= PART_CLAMP_SYL1_CLOSE_WAIT_MS) {
         setJigCylinder1(false);
-        jigSequenceStep = 3;
-        jigSequenceStepStartedMs = millis();
-        writeJigSequenceStep(jigSequenceStep);
+        setJigSequenceStep(3);
       }
       break;
 
     case 3:
-      if (elapsedMs >= DELAY_SYL3_ON) {
+      if (elapsedMs >= PART_CLAMP_SYL1_OPEN_WAIT_MS) {
         setJigCylinder3(true);
-        jigSequenceStep = 4;
-        jigSequenceStepStartedMs = millis();
-        writeJigSequenceStep(jigSequenceStep);
+        setJigSequenceStep(4);
       }
       break;
 
     case 4:
-      if (elapsedMs >= DELAY_SYL2_ON) {
-        setJigCylinder2(true);
-        jigSequenceStep = 5;
-        jigSequenceStepStartedMs = millis();
-        writeJigSequenceStep(jigSequenceStep);
+      if (elapsedMs >= PART_CLAMP_SYL3_CLOSE_1_WAIT_MS) {
+        setJigCylinder3(false);
+        setJigSequenceStep(5);
       }
       break;
 
     case 5:
-      if (elapsedMs >= DELAY_SYL1_ON) {
+      if (elapsedMs >= PART_CLAMP_SYL3_OPEN_WAIT_MS) {
         setJigCylinder1(true);
-        jigSequenceStep = 6;
-        jigSequenceStepStartedMs = millis();
-        writeJigSequenceStep(jigSequenceStep);
+        setJigSequenceStep(6);
       }
       break;
 
     case 6:
-      if (elapsedMs >= SEQUENCE_COMPLETION_DELAY) {
+      if (elapsedMs >= PART_CLAMP_SYL1_CLOSE_2_WAIT_MS) {
+        setJigCylinder3(true);
+        finishJigSequence();
+      }
+      break;
+
+    default:
+      abortJigSequence(JIG_SEQUENCE_ERROR_INVALID_STEP);
+      break;
+  }
+}
+
+// -----------------------------
+// PART_RELEASE = kappale irti
+//
+// Alkutapahtuma käynnistyksessä:
+// SYL3 auki
+//
+// Vaiheet:
+// 1 odota 500 ms
+// 2 SYL1 auki, odota 500 ms
+// 3 SYL2 auki, valmis
+// -----------------------------
+
+void updatePartReleaseSequence() {
+  unsigned long elapsedMs = millis() - jigSequenceStepStartedMs;
+
+  switch (jigSequenceStep) {
+    case 1:
+      if (elapsedMs >= PART_RELEASE_SYL3_OPEN_WAIT_MS) {
+        setJigCylinder1(false);
+        setJigSequenceStep(2);
+      }
+      break;
+
+    case 2:
+      if (elapsedMs >= PART_RELEASE_SYL1_OPEN_WAIT_MS) {
+        setJigCylinder2(false);
+        finishJigSequence();
+      }
+      break;
+
+    default:
+      abortJigSequence(JIG_SEQUENCE_ERROR_INVALID_STEP);
+      break;
+  }
+}
+
+// -----------------------------
+// PART_REMOVE = kappaleen poisto
+//
+// Alkutapahtuma käynnistyksessä:
+// SYL3 auki
+//
+// Vaiheet:
+// 1 odota 500 ms
+// 2 SYL1 auki, odota 500 ms
+// 3 SYL2 auki, odota 1000 ms
+// 4 SYL3 kiinni, odota 1000 ms
+// 5 SYL3 auki, valmis
+// -----------------------------
+
+void updatePartRemoveSequence() {
+  unsigned long elapsedMs = millis() - jigSequenceStepStartedMs;
+
+  switch (jigSequenceStep) {
+    case 1:
+      if (elapsedMs >= PART_REMOVE_SYL3_OPEN_1_WAIT_MS) {
+        setJigCylinder1(false);
+        setJigSequenceStep(2);
+      }
+      break;
+
+    case 2:
+      if (elapsedMs >= PART_REMOVE_SYL1_OPEN_WAIT_MS) {
+        setJigCylinder2(false);
+        setJigSequenceStep(3);
+      }
+      break;
+
+    case 3:
+      if (elapsedMs >= PART_REMOVE_SYL2_OPEN_WAIT_MS) {
+        setJigCylinder3(true);
+        setJigSequenceStep(4);
+      }
+      break;
+
+    case 4:
+      if (elapsedMs >= PART_REMOVE_SYL3_CLOSE_WAIT_MS) {
+        setJigCylinder3(false);
         finishJigSequence();
       }
       break;
@@ -213,6 +326,16 @@ void updateJigSequenceManager() {
 
   if (jigSequenceCommand == JIG_SEQUENCE_COMMAND_PART_CLAMP) {
     updatePartClampSequence();
+    return;
+  }
+
+  if (jigSequenceCommand == JIG_SEQUENCE_COMMAND_PART_RELEASE) {
+    updatePartReleaseSequence();
+    return;
+  }
+
+  if (jigSequenceCommand == JIG_SEQUENCE_COMMAND_PART_REMOVE) {
+    updatePartRemoveSequence();
     return;
   }
 

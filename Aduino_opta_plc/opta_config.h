@@ -25,17 +25,23 @@ const unsigned long MODBUS_BAUDRATE = 19200;
 // Ajat ovat millisekunteina.
 // -----------------------------
 
-const unsigned long DELAY_SYL1_ON = 800;
-const unsigned long DELAY_SYL1_OFF = 150;
+// PART_CLAMP = kappale kiinni
+const unsigned long PART_CLAMP_SYL2_CLOSE_WAIT_MS = 1000;
+const unsigned long PART_CLAMP_SYL1_CLOSE_WAIT_MS = 150;
+const unsigned long PART_CLAMP_SYL1_OPEN_WAIT_MS = 800;
+const unsigned long PART_CLAMP_SYL3_CLOSE_1_WAIT_MS = 500;
+const unsigned long PART_CLAMP_SYL3_OPEN_WAIT_MS = 500;
+const unsigned long PART_CLAMP_SYL1_CLOSE_2_WAIT_MS = 500;
 
-const unsigned long DELAY_SYL2_ON = 1000;
-const unsigned long DELAY_SYL2_OFF = 300;
+// PART_RELEASE = kappale irti
+const unsigned long PART_RELEASE_SYL3_OPEN_WAIT_MS = 500;
+const unsigned long PART_RELEASE_SYL1_OPEN_WAIT_MS = 500;
 
-const unsigned long DELAY_SYL3_ON = 1000;
-const unsigned long DELAY_SYL3_OFF = 500;
-
-const unsigned long SIGNAL_WAIT_TIME = 5000;
-const unsigned long SEQUENCE_COMPLETION_DELAY = 5000;
+// PART_REMOVE = kappaleen poisto
+const unsigned long PART_REMOVE_SYL3_OPEN_1_WAIT_MS = 500;
+const unsigned long PART_REMOVE_SYL1_OPEN_WAIT_MS = 500;
+const unsigned long PART_REMOVE_SYL2_OPEN_WAIT_MS = 1000;
+const unsigned long PART_REMOVE_SYL3_CLOSE_WAIT_MS = 1000;
 
 // Anturi lisätään myöhemmin.
 // const unsigned long SENSOR_CHECK_TIMEOUT = 1000;
@@ -102,11 +108,9 @@ const uint16_t JIG_SEQUENCE_ERROR_REGISTER = 19212;
 // Komennot
 const uint16_t JIG_SEQUENCE_NONE = 0;
 const uint16_t JIG_SEQUENCE_COMMAND_PART_CLAMP = 1;
-
-// Myöhemmäksi varattu:
-// 2 = kappaleen vaihto
-// 3 = NOK / kappale irti
-// 4 = kappaleen poisto
+const uint16_t JIG_SEQUENCE_COMMAND_PART_CHANGE = 2;
+const uint16_t JIG_SEQUENCE_COMMAND_PART_RELEASE = 3;
+const uint16_t JIG_SEQUENCE_COMMAND_PART_REMOVE = 4;
 
 // Statukset
 const uint16_t JIG_SEQUENCE_STATUS_IDLE = 0;

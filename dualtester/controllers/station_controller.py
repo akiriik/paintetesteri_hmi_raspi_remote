@@ -6,6 +6,10 @@ from controllers.station_status_handler import StationStatusHandler
 from controllers.test_valve_controller import TestValveController
 
 
+JAKOTUBBI_PROGRAM_NUMBER = 3
+JAKOTUBBI_STATION_ID = 2
+
+
 class StationController(QObject):
     """
     Yhden ForTest-aseman pääohjain.
@@ -68,6 +72,11 @@ class StationController(QObject):
         self.station_widget.start_button.clicked.connect(self.start_test)
         self.station_widget.stop_button.clicked.connect(self.stop_test)
 
+        if hasattr(self.station_widget, "jig_part_clamp_button"):
+            self.station_widget.jig_part_clamp_button.clicked.connect(
+                self.start_jig_part_clamp_sequence
+            )
+
         if hasattr(self.station_widget, "dev_result_button"):
             self.station_widget.dev_result_button.clicked.connect(self.show_dev_fortest_result)
             self.station_widget.dev_result_button.setVisible(self.dev_mode_fortest)
@@ -88,6 +97,7 @@ class StationController(QObject):
             self.program_number = 0
             self.program_written_to_fortest = False
             self.update_status("VIRHE: OHJELMAN ID PUUTTUU", "ERROR")
+            self.update_jig_controls_visibility()
             self.refresh_station_state()
             return
 
@@ -98,6 +108,7 @@ class StationController(QObject):
                 self.selected_program = None
                 self.program_number = 0
                 self.update_status("FORTEST-YHTEYTTÄ EI SAATAVILLA", "ERROR")
+                self.update_jig_controls_visibility()
                 self.refresh_station_state()
                 return
 
@@ -110,6 +121,7 @@ class StationController(QObject):
                 self.program_number = 0
                 self.program_written_to_fortest = False
                 self.update_status("OHJELMAN VAIHTO EPÄONNISTUI", "ERROR")
+                self.update_jig_controls_visibility()
                 self.refresh_station_state()
                 return
 
@@ -156,6 +168,7 @@ class StationController(QObject):
         )
 
         self.update_status("OHJELMA VALITTU", "SUCCESS")
+        self.update_jig_controls_visibility()
         self.refresh_station_state()
 
     def has_selected_program(self):
@@ -176,6 +189,54 @@ class StationController(QObject):
             return True
 
         return self.fortest_service.is_connected(self.station_id)
+
+    def update_jig_controls_visibility(self):
+        """
+        Näyttää KAPPALE KIINNI -napin vain:
+        - ForTest 2 -asemalla
+        - kun valittu ohjelma on 3 / jakotubbi
+        """
+        if not hasattr(self.station_widget, "set_jig_part_clamp_visible"):
+            return
+
+        visible = (
+            self.station_id == JAKOTUBBI_STATION_ID
+            and self.program_number == JAKOTUBBI_PROGRAM_NUMBER
+        )
+
+        self.station_widget.set_jig_part_clamp_visible(visible)
+
+    def start_jig_part_clamp_sequence(self):
+        """
+        Käynnistää Optan kappale kiinni -sekvenssin.
+        """
+        if self.station_id != JAKOTUBBI_STATION_ID:
+            return
+
+        if self.program_number != JAKOTUBBI_PROGRAM_NUMBER:
+            self.update_status("KAPPALE KIINNI VAIN OHJELMALLA 3", "ERROR")
+            return
+
+        if not self.hardware_service:
+            self.update_status("OPTA-OHJAUS EI OLE KÄYTÖSSÄ", "ERROR")
+            return
+
+        if not hasattr(self.hardware_service, "start_jig_part_clamp_sequence"):
+            self.update_status("JIG-SEKVENSSIN OHJAUS PUUTTUU HARDWARE SERVICESTÄ", "ERROR")
+            return
+
+        self.station_widget.set_jig_part_clamp_enabled(False)
+        self.update_status("KÄYNNISTETÄÄN KAPPALE KIINNI -SEKVENSSI...", "INFO")
+
+        success, message = self.hardware_service.start_jig_part_clamp_sequence()
+
+        if success:
+            self.update_status(message, "INFO")
+        else:
+            self.update_status(message, "ERROR")
+
+        self.station_widget.set_jig_part_clamp_enabled(True)
+        self.refresh_station_state()
 
     def close_test_valve(self):
         success, message = self.test_valve_controller.close_valve(self.station_id)
@@ -307,6 +368,7 @@ class StationController(QObject):
             ready=ready,
         )
 
+        self.update_jig_controls_visibility()
         self._update_physical_button_light(ready)
 
     def _update_physical_button_light(self, ready=None):

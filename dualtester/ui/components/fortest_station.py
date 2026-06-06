@@ -67,6 +67,12 @@ STOP_Y = 900
 STOP_W = 290
 STOP_H = 75
 
+# Jakotubbi / jigi
+JIG_PART_CLAMP_X = 330
+JIG_PART_CLAMP_Y = 815
+JIG_PART_CLAMP_W = 250
+JIG_PART_CLAMP_H = 65
+
 DEV_RESULT_X = 375
 DEV_RESULT_Y = 720
 DEV_RESULT_W = 160
@@ -81,6 +87,7 @@ FONT_PROGRAM_INFO = ("Consolas", 14)
 FONT_RESULTS = ("Consolas", 15)
 FONT_BUTTON = ("Arial", 18)
 FONT_START_STOP = ("Arial", 22)
+FONT_JIG_BUTTON = ("Arial", 18)
 FONT_DEV_BUTTON = ("Arial", 15)
 
 
@@ -220,6 +227,33 @@ class ForTestStation(QFrame):
         """)
         self._refresh_results_table()
 
+        self.jig_part_clamp_button = QPushButton("KAPPALE KIINNI", self)
+        self.jig_part_clamp_button.setGeometry(
+            JIG_PART_CLAMP_X,
+            JIG_PART_CLAMP_Y,
+            JIG_PART_CLAMP_W,
+            JIG_PART_CLAMP_H
+        )
+        self.jig_part_clamp_button.setFont(
+            QFont(FONT_JIG_BUTTON[0], FONT_JIG_BUTTON[1], QFont.Bold)
+        )
+        self.jig_part_clamp_button.setStyleSheet("""
+            QPushButton {
+                background-color: #6A3D9A;
+                color: white;
+                border-radius: 10px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #8E5CC2;
+            }
+            QPushButton:disabled {
+                background-color: #333333;
+                color: #777777;
+            }
+        """)
+        self.jig_part_clamp_button.hide()
+
         self.select_program_button = QPushButton("VALITSE OHJELMA", self)
         self.select_program_button.setGeometry(
             SELECT_PROGRAM_X,
@@ -350,6 +384,12 @@ class ForTestStation(QFrame):
         else:
             self.start_button.setEnabled(bool(ready))
             self.stop_button.setEnabled(False)
+
+    def set_jig_part_clamp_visible(self, visible):
+        self.jig_part_clamp_button.setVisible(bool(visible))
+
+    def set_jig_part_clamp_enabled(self, enabled):
+        self.jig_part_clamp_button.setEnabled(bool(enabled))
 
     def add_result_row(
         self,

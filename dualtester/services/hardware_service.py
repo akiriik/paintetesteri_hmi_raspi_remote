@@ -4,6 +4,10 @@ from PyQt5.QtCore import QObject, QTimer
 from config.modbus_config import (
     SHUTDOWN_REQUEST_REGISTER,
     EMERGENCY_RESET_REGISTER,
+    JIG_SEQUENCE_COMMAND_REGISTER,
+    JIG_SEQUENCE_START_REGISTER,
+    JIG_SEQUENCE_STOP_REGISTER,
+    JIG_SEQUENCE_COMMAND_PART_CLAMP,
 )
 
 from utils.modbus_manager import ModbusManager
@@ -253,6 +257,58 @@ class HardwareService(QObject):
             print(f"Hätäseis-kuittaus epäonnistui: {e}")
             return None
 
+    def start_jig_part_clamp_sequence(self):
+        """
+        Käynnistää Optan jig-sekvenssin:
+        kappale kiinni.
+
+        Dualtest ei aja ajoituksia.
+        Dualtest vain lähettää Optalle:
+        19200 = 1
+        19201 = 1
+        """
+        if self.dev_mode_modbus:
+            return True, "DEV OPTA MODBUS: KAPPALE KIINNI -SEKVENSSI KÄYNNISTETTY"
+
+        opta_modbus_manager = self._get_opta_modbus_manager_or_none()
+
+        if not opta_modbus_manager:
+            return False, "Opta ModbusManager ei ole käytössä"
+
+        try:
+            self.write_register(
+                JIG_SEQUENCE_COMMAND_REGISTER,
+                JIG_SEQUENCE_COMMAND_PART_CLAMP,
+            )
+            self.write_register(
+                JIG_SEQUENCE_START_REGISTER,
+                1,
+            )
+
+            return True, "KAPPALE KIINNI -SEKVENSSI KÄYNNISTETTY"
+
+        except Exception as e:
+            return False, f"Kappale kiinni -sekvenssin käynnistys epäonnistui: {e}"
+
+    def stop_jig_sequence(self):
+        """
+        Keskeyttää Optan jig-sekvenssin.
+        """
+        if self.dev_mode_modbus:
+            return True, "DEV OPTA MODBUS: JIG-SEKVENSSI KESKEYTETTY"
+
+        opta_modbus_manager = self._get_opta_modbus_manager_or_none()
+
+        if not opta_modbus_manager:
+            return False, "Opta ModbusManager ei ole käytössä"
+
+        try:
+            self.write_register(JIG_SEQUENCE_STOP_REGISTER, 1)
+            return True, "JIG-SEKVENSSI KESKEYTETTY"
+
+        except Exception as e:
+            return False, f"Jig-sekvenssin keskeytys epäonnistui: {e}"
+
     def read_emergency_stop_status(self):
         """
         Lukee ohjelmallisen hätäseistilan Arduino Optalta.
@@ -266,6 +322,8 @@ class HardwareService(QObject):
             return opta_modbus_manager.read_emergency_stop_status()
 
         return None
+
+
 
     # ------------------------------------------------------------
     # Arduino Opta / käsikäytön releohjaus
