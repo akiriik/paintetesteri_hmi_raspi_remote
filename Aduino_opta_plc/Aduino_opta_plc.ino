@@ -27,6 +27,8 @@ void setup() {
 void loop() {
   pollModbus();
 
+  updateOptaControllerThrottled();
+
   readOptaInputs();
   readD1608EInputs();
 
@@ -41,6 +43,4 @@ void loop() {
 
   updateSequenceEngine();
   updateJigSequenceManager();
-
-  updateOptaControllerThrottled();
 }
