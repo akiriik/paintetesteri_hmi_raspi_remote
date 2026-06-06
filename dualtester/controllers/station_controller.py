@@ -20,6 +20,14 @@ JAKOTUBBI_STATION_ID = 2
 
 FORTEST_RESULT_OK = 1
 
+AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS = 4000
+
+AUTO_PHASE_IDLE = "IDLE"
+AUTO_PHASE_WAIT_BEFORE_REMOVE = "WAIT_BEFORE_REMOVE"
+AUTO_PHASE_REMOVE = "REMOVE"
+AUTO_PHASE_CLAMP = "CLAMP"
+AUTO_PHASE_WAIT_BEFORE_RELEASE = "WAIT_BEFORE_RELEASE"
+AUTO_PHASE_RELEASE = "RELEASE"
 
 class StationController(QObject):
     """
@@ -56,6 +64,7 @@ class StationController(QObject):
         self.auto_part_change_enabled = False
         self.auto_part_change_in_progress = False
         self.auto_cycle_started_by_user = False
+        self.auto_cycle_phase = AUTO_PHASE_IDLE
 
         self.test_valve_controller = TestValveController(self.hardware_service)
 
@@ -322,6 +331,7 @@ class StationController(QObject):
         self.auto_part_change_enabled = False
         self.auto_cycle_started_by_user = False
         self.auto_part_change_in_progress = False
+        self.auto_cycle_phase = AUTO_PHASE_IDLE
 
         if hasattr(self.station_widget, "set_auto_part_change_enabled_state"):
             self.station_widget.set_auto_part_change_enabled_state(False)
@@ -354,23 +364,57 @@ class StationController(QObject):
         return True
 
     def start_auto_part_change_after_result(self):
+        """
+        OK-tuloksen jälkeen käynnistettävä automaattinen kappaleenvaihto.
+
+        Ei käytetä Optan komentoa 5.
+        Raspberry ajaa vaiheet:
+        1. odota 4 s
+        2. KAPPALEEN POISTO
+        3. kun DONE -> KAPPALE KIINNI
+        4. kun DONE -> uusi ForTest START
+        """
         if not self.can_start_auto_part_change_after_result():
             return
 
         self.auto_part_change_in_progress = True
+        self.auto_cycle_phase = AUTO_PHASE_WAIT_BEFORE_REMOVE
 
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(False)
 
-        self.update_status("AUTOMAATTINEN KAPPALEENVAIHTO KÄYNNISSÄ", "INFO")
+        self.update_status("OK - ODOTETAAN 4s ENNEN KAPPALEENVAIHTOA", "INFO")
+        self.refresh_station_state()
 
-        success, message = self.hardware_service.start_jig_auto_part_change_sequence()
+        QTimer.singleShot(
+            AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS,
+            self._start_auto_remove_after_delay,
+        )
+
+    def _start_auto_remove_after_delay(self):
+        if not self.auto_part_change_enabled:
+            return
+
+        if not self.auto_part_change_in_progress:
+            return
+
+        if self.auto_cycle_phase != AUTO_PHASE_WAIT_BEFORE_REMOVE:
+            return
+
+        if not self.hardware_service:
+            self.disable_auto_part_change("AUTOMAATTI POIS: OPTA-OHJAUS PUUTTUU")
+            self.refresh_station_state()
+            return
+
+        self.auto_cycle_phase = AUTO_PHASE_REMOVE
+        self.update_status("AUTOMAATTI: KAPPALEEN POISTO", "INFO")
+
+        success, message = self.hardware_service.start_jig_part_remove_sequence()
 
         if success:
             self.update_status(message, "INFO")
         else:
-            self.auto_part_change_in_progress = False
-            self.disable_auto_part_change("AUTOMAATTI POIS: JIG-SEKVENSSI EI KÄYNNISTYNYT")
+            self.disable_auto_part_change("AUTOMAATTI POIS: POISTO EI KÄYNNISTYNYT")
             self.update_status(message, "ERROR")
 
         self.refresh_station_state()
@@ -399,23 +443,9 @@ class StationController(QObject):
         if status == JIG_SEQUENCE_STATUS_IDLE:
             return
 
-        if status == JIG_SEQUENCE_STATUS_DONE:
-            self.auto_part_change_in_progress = False
-
-            if hasattr(self.station_widget, "set_jig_controls_enabled"):
-                self.station_widget.set_jig_controls_enabled(True)
-
-            if not self.auto_part_change_enabled:
-                self.refresh_station_state()
-                return
-
-            self.update_status("KAPPALE VAIHDETTU - UUSI TESTI KÄYNNISTYY", "INFO")
-            QTimer.singleShot(300, self.start_test)
-            self.refresh_station_state()
-            return
-
         if status == JIG_SEQUENCE_STATUS_ERROR:
             self.auto_part_change_in_progress = False
+            self.auto_cycle_phase = AUTO_PHASE_IDLE
 
             if error == JIG_SEQUENCE_ERROR_PART_MISSING:
                 self.disable_auto_part_change("KAPPALE PUUTTUU - AUTOMAATTI POIS", show_message=True)
@@ -429,6 +459,54 @@ class StationController(QObject):
                 self.station_widget.set_jig_controls_enabled(True)
 
             self.refresh_station_state()
+            return
+
+        if status != JIG_SEQUENCE_STATUS_DONE:
+            return
+
+        if self.auto_cycle_phase == AUTO_PHASE_REMOVE:
+            self.auto_cycle_phase = AUTO_PHASE_CLAMP
+            self.update_status("AUTOMAATTI: KAPPALE KIINNI", "INFO")
+
+            success, message = self.hardware_service.start_jig_part_clamp_sequence()
+
+            if success:
+                self.update_status(message, "INFO")
+            else:
+                self.auto_part_change_in_progress = False
+                self.auto_cycle_phase = AUTO_PHASE_IDLE
+                self.disable_auto_part_change("AUTOMAATTI POIS: KIINNITYS EI KÄYNNISTYNYT")
+                self.update_status(message, "ERROR")
+
+            self.refresh_station_state()
+            return
+
+        if self.auto_cycle_phase == AUTO_PHASE_CLAMP:
+            self.auto_part_change_in_progress = False
+            self.auto_cycle_phase = AUTO_PHASE_IDLE
+
+            if hasattr(self.station_widget, "set_jig_controls_enabled"):
+                self.station_widget.set_jig_controls_enabled(True)
+
+            if not self.auto_part_change_enabled:
+                self.refresh_station_state()
+                return
+
+            self.update_status("KAPPALE KIINNI - UUSI TESTI KÄYNNISTYY", "INFO")
+            QTimer.singleShot(300, self.start_test)
+            self.refresh_station_state()
+            return
+
+        if self.auto_cycle_phase == AUTO_PHASE_RELEASE:
+            self.auto_part_change_in_progress = False
+            self.auto_cycle_phase = AUTO_PHASE_IDLE
+
+            if hasattr(self.station_widget, "set_jig_controls_enabled"):
+                self.station_widget.set_jig_controls_enabled(True)
+
+            self.disable_auto_part_change("NOK-TULOS - AUTOMAATTI POIS", show_message=True)
+            self.refresh_station_state()
+            return
 
     def handle_result_for_automatic_cycle(self, test_result):
         self.is_running = False
@@ -444,13 +522,51 @@ class StationController(QObject):
             self.start_auto_part_change_after_result()
             return
 
-        self.disable_auto_part_change("NOK-TULOS - AUTOMAATTI POIS", show_message=True)
+        self.auto_part_change_in_progress = True
+        self.auto_cycle_phase = AUTO_PHASE_WAIT_BEFORE_RELEASE
 
-        if self.is_jakotubbi_station_and_program():
-            self.update_status("NOK-TULOS - AJETAAN KAPPALE IRTI", "ERROR")
+        if hasattr(self.station_widget, "set_jig_controls_enabled"):
+            self.station_widget.set_jig_controls_enabled(False)
 
-            if self.hardware_service and hasattr(self.hardware_service, "start_jig_part_release_sequence"):
-                self.hardware_service.start_jig_part_release_sequence()
+        self.update_status("NOK - ODOTETAAN 4s ENNEN KAPPALE IRTI -AJOA", "ERROR")
+        self.refresh_station_state()
+
+        QTimer.singleShot(
+            AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS,
+            self._start_auto_release_after_delay,
+        )
+
+    def _start_auto_release_after_delay(self):
+        if not self.auto_part_change_in_progress:
+            return
+
+        if self.auto_cycle_phase != AUTO_PHASE_WAIT_BEFORE_RELEASE:
+            return
+
+        if not self.is_jakotubbi_station_and_program():
+            self.disable_auto_part_change("AUTOMAATTI POIS: VÄÄRÄ ASEMA TAI OHJELMA")
+            self.refresh_station_state()
+            return
+
+        self.auto_cycle_phase = AUTO_PHASE_RELEASE
+        self.update_status("NOK-TULOS - AJETAAN KAPPALE IRTI", "ERROR")
+
+        if self.hardware_service and hasattr(self.hardware_service, "start_jig_part_release_sequence"):
+            success, message = self.hardware_service.start_jig_part_release_sequence()
+
+            if success:
+                self.update_status(message, "INFO")
+            else:
+                self.auto_part_change_in_progress = False
+                self.auto_cycle_phase = AUTO_PHASE_IDLE
+                self.disable_auto_part_change("AUTOMAATTI POIS: KAPPALE IRTI EI KÄYNNISTYNYT")
+                self.update_status(message, "ERROR")
+        else:
+            self.auto_part_change_in_progress = False
+            self.auto_cycle_phase = AUTO_PHASE_IDLE
+            self.disable_auto_part_change("AUTOMAATTI POIS: KAPPALE IRTI -OHJAUS PUUTTUU")
+
+        self.refresh_station_state()
 
     def close_test_valve(self):
         success, message = self.test_valve_controller.close_valve(self.station_id)
