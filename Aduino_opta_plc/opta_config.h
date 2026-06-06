@@ -21,7 +21,6 @@ const unsigned long MODBUS_BAUDRATE = 19200;
 
 // -----------------------------
 // Jigin sekvenssin ajat
-// Muuta näitä tarvittaessa.
 // Ajat ovat millisekunteina.
 // -----------------------------
 
@@ -29,7 +28,7 @@ const unsigned long MODBUS_BAUDRATE = 19200;
 const unsigned long PART_CLAMP_SYL2_CLOSE_WAIT_MS = 1000;
 const unsigned long PART_CLAMP_SYL1_CLOSE_WAIT_MS = 150;
 const unsigned long PART_CLAMP_SYL1_OPEN_WAIT_MS = 800;
-const unsigned long PART_CLAMP_SYL3_CLOSE_1_WAIT_MS = 500;
+const unsigned long PART_CLAMP_SYL3_CLOSE_1_WAIT_MS = 1500;
 const unsigned long PART_CLAMP_SYL3_OPEN_WAIT_MS = 500;
 const unsigned long PART_CLAMP_SYL1_CLOSE_2_WAIT_MS = 500;
 
@@ -43,8 +42,11 @@ const unsigned long PART_REMOVE_SYL1_OPEN_WAIT_MS = 500;
 const unsigned long PART_REMOVE_SYL2_OPEN_WAIT_MS = 1000;
 const unsigned long PART_REMOVE_SYL3_CLOSE_WAIT_MS = 1000;
 
-// Anturi lisätään myöhemmin.
-// const unsigned long SENSOR_CHECK_TIMEOUT = 1000;
+// -----------------------------
+// Jigin D1608E inputit
+// -----------------------------
+
+const uint8_t JIG_PART_PRESENT_INPUT_NUMBER = 1;
 
 // -----------------------------
 // Jigin D1608E releet
@@ -61,24 +63,11 @@ const uint8_t JIG_CYL3_RELAY_NUMBER = 3;
 // Modbus-rekisterit
 // -----------------------------
 
-// Dualtester:
-// SHUTDOWN_REQUEST_REGISTER = 17999
-// EMERGENCY_RESET_REGISTER = 19099
-// EMERGENCY_STATUS_REGISTER = 19100
-// OPTA_RELAY_REGISTER_BASE = 18098
-//
-// HUOM:
-// Raspberryn nykyinen yleinen releohjaus käyttää D1608E-relealuetta.
-// Optan omille releille 3 ja 4 on tässä omat rekisterit testiventtiileille.
-
 const uint16_t SHUTDOWN_REQUEST_REGISTER = 17999;
 
 // Optan omat releet 3 ja 4 testiventtiileille
 const uint16_t OPTA_TEST_VALVE_RELAY_REGISTER_START = 18092;
 const uint8_t OPTA_TEST_VALVE_RELAY_COUNT = 2;
-
-// 18092 = Optan oma rele 3 = ForTest 1 testiventtiili
-// 18093 = Optan oma rele 4 = ForTest 2 testiventtiili
 
 const uint16_t FORTEST1_TEST_VALVE_REGISTER = 18092;
 const uint16_t FORTEST2_TEST_VALVE_REGISTER = 18093;
@@ -124,19 +113,7 @@ const uint16_t JIG_SEQUENCE_ERROR_ABORTED = 1;
 const uint16_t JIG_SEQUENCE_ERROR_EMERGENCY_STOP = 2;
 const uint16_t JIG_SEQUENCE_ERROR_UNKNOWN_COMMAND = 3;
 const uint16_t JIG_SEQUENCE_ERROR_INVALID_STEP = 4;
-
-// Käytössä yksi holding register -alue:
-// 17999 = shutdown request
-// 18092...18093 = Optan omat releet 3 ja 4 testiventtiileille
-// 18099...18106 = D1608E releet 1...8
-// 19099 = emergency reset
-// 19100 = emergency status
-// 19200 = jig sequence command
-// 19201 = jig sequence start
-// 19202 = jig sequence stop
-// 19210 = jig sequence status
-// 19211 = jig sequence step
-// 19212 = jig sequence error
+const uint16_t JIG_SEQUENCE_ERROR_PART_MISSING = 5;
 
 const uint16_t MODBUS_HOLDING_REGISTER_START = SHUTDOWN_REQUEST_REGISTER;
 const uint16_t MODBUS_HOLDING_REGISTER_COUNT =
@@ -158,9 +135,6 @@ const uint8_t EMERGENCY_LIGHT_OPTA_OUTPUT_NUMBER = 2;
 
 const unsigned long EMERGENCY_LIGHT_BLINK_INTERVAL_MS = 500;
 
-// Dualtester:
-// 1 = hätäseis OK
-// 0 = hätäseis aktiivinen
 const uint16_t EMERGENCY_STATUS_OK = 1;
 const uint16_t EMERGENCY_STATUS_ACTIVE = 0;
 
@@ -171,14 +145,14 @@ const uint16_t EMERGENCY_STATUS_ACTIVE = 0;
 const uint8_t OPTA_INPUT_COUNT = 8;
 
 const uint8_t OPTA_INPUT_PINS[OPTA_INPUT_COUNT] = {
-  A0,  // I1
-  A1,  // I2
-  A2,  // I3
-  A3,  // I4
-  A4,  // I5
-  A5,  // I6
-  A6,  // I7
-  A7   // I8
+  A0,
+  A1,
+  A2,
+  A3,
+  A4,
+  A5,
+  A6,
+  A7
 };
 
 // -----------------------------
@@ -188,10 +162,10 @@ const uint8_t OPTA_INPUT_PINS[OPTA_INPUT_COUNT] = {
 const uint8_t OPTA_OUTPUT_COUNT = 4;
 
 const uint8_t OPTA_OUTPUT_PINS[OPTA_OUTPUT_COUNT] = {
-  RELAY1,  // OUTPUT 1 = järjestelmän sammutus
-  RELAY2,  // OUTPUT 2 = hätäseisvalo
-  RELAY3,  // OUTPUT 3 = ForTest 1 testiventtiili
-  RELAY4   // OUTPUT 4 = ForTest 2 testiventtiili
+  RELAY1,
+  RELAY2,
+  RELAY3,
+  RELAY4
 };
 
 // -----------------------------
@@ -201,32 +175,24 @@ const uint8_t OPTA_OUTPUT_PINS[OPTA_OUTPUT_COUNT] = {
 const uint8_t D1608E_INPUT_COUNT = 6;
 const uint8_t D1608E_OUTPUT_COUNT = 8;
 
-// D1608E output indexit 0...7
-// Rele 1 = output 0
-// Rele 8 = output 7
-
 const uint8_t D1608E_RELAY_INDEX[D1608E_OUTPUT_COUNT] = {
-  0,  // rele 1
-  1,  // rele 2
-  2,  // rele 3
-  3,  // rele 4
-  4,  // rele 5
-  5,  // rele 6
-  6,  // rele 7
-  7   // rele 8
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7
 };
 
-// D1608E input indexit 0...5
-// Input 1 = input 0
-// Input 6 = input 5
-
 const uint8_t D1608E_INPUT_INDEX[D1608E_INPUT_COUNT] = {
-  0,  // input 1
-  1,  // input 2
-  2,  // input 3
-  3,  // input 4
-  4,  // input 5
-  5   // input 6
+  0,
+  1,
+  2,
+  3,
+  4,
+  5
 };
 
 // -----------------------------

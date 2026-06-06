@@ -26,6 +26,10 @@ void setAllJigCylindersOff() {
   setJigCylinder3(false);
 }
 
+bool isPartPresent() {
+  return getD1608EInput(JIG_PART_PRESENT_INPUT_NUMBER);
+}
+
 // -----------------------------
 // Modbus status
 // -----------------------------
@@ -80,6 +84,22 @@ void abortJigSequence(uint16_t errorCode) {
 
   ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_START_REGISTER, 0);
   ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_STOP_REGISTER, 0);
+  ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_COMMAND_REGISTER, 0);
+}
+
+void stopPartClampBecausePartMissing() {
+  setJigCylinder3(false);
+  setJigCylinder2(false);
+
+  jigSequenceRunning = false;
+  jigSequenceCommand = JIG_SEQUENCE_NONE;
+  jigSequenceStep = 0;
+
+  writeJigSequenceError(JIG_SEQUENCE_ERROR_PART_MISSING);
+  writeJigSequenceStatus(JIG_SEQUENCE_STATUS_ERROR);
+  writeJigSequenceStep(0);
+
+  ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_START_REGISTER, 0);
   ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_COMMAND_REGISTER, 0);
 }
 
@@ -165,9 +185,12 @@ void handleModbusJigSequenceRegisters() {
 // 2 SYL1 kiinni, odota 150 ms
 // 3 SYL1 auki, odota 800 ms
 // 4 SYL3 kiinni, odota 500 ms
-// 5 SYL3 auki, odota 500 ms
-// 6 SYL1 kiinni, odota 500 ms
-// 7 SYL3 kiinni, valmis
+// 5 tarkista D1608E I1:
+//   - jos 0: SYL3 auki, SYL2 auki, virhe PART_MISSING
+//   - jos 1: jatka
+// 6 SYL3 auki, odota 500 ms
+// 7 SYL1 kiinni, odota 500 ms
+// 8 SYL3 kiinni, valmis
 // -----------------------------
 
 void updatePartClampSequence() {
@@ -197,6 +220,11 @@ void updatePartClampSequence() {
 
     case 4:
       if (elapsedMs >= PART_CLAMP_SYL3_CLOSE_1_WAIT_MS) {
+        if (!isPartPresent()) {
+          stopPartClampBecausePartMissing();
+          return;
+        }
+
         setJigCylinder3(false);
         setJigSequenceStep(5);
       }
@@ -224,14 +252,6 @@ void updatePartClampSequence() {
 
 // -----------------------------
 // PART_RELEASE = kappale irti
-//
-// Alkutapahtuma käynnistyksessä:
-// SYL3 auki
-//
-// Vaiheet:
-// 1 odota 500 ms
-// 2 SYL1 auki, odota 500 ms
-// 3 SYL2 auki, valmis
 // -----------------------------
 
 void updatePartReleaseSequence() {
@@ -260,16 +280,6 @@ void updatePartReleaseSequence() {
 
 // -----------------------------
 // PART_REMOVE = kappaleen poisto
-//
-// Alkutapahtuma käynnistyksessä:
-// SYL3 auki
-//
-// Vaiheet:
-// 1 odota 500 ms
-// 2 SYL1 auki, odota 500 ms
-// 3 SYL2 auki, odota 1000 ms
-// 4 SYL3 kiinni, odota 1000 ms
-// 5 SYL3 auki, valmis
 // -----------------------------
 
 void updatePartRemoveSequence() {

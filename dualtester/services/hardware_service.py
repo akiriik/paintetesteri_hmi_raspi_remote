@@ -390,3 +390,76 @@ class HardwareService(QObject):
             return True, f"RELE {relay_num} {'PÄÄLLÄ' if state_bool else 'POIS'}"
         except Exception as e:
             return False, f"Releen {relay_num} ohjaus epäonnistui: {e}"
+
+    def toggle_relay(self, relay_num, state):
+        """
+        Yhteensopivuus vanhan kutsutavan kanssa.
+
+        Uusi koodi käyttää control_relay().
+        """
+        success, message = self.control_relay(relay_num, state)
+        return success
+
+    # ------------------------------------------------------------
+    # Yhteystilat
+    # ------------------------------------------------------------
+
+    def is_modbus_connected(self):
+        """
+        Palauttaa Arduino Optan Modbus-yhteyden tilan.
+
+        Tämä ei kerro ForTest-yhteyksien tilaa.
+        """
+        if self.dev_mode_modbus:
+            return False
+
+        opta_modbus_manager = self._get_opta_modbus_manager_or_none()
+
+        if not opta_modbus_manager:
+            return False
+
+        if hasattr(opta_modbus_manager, "is_connected"):
+            return opta_modbus_manager.is_connected()
+
+        return False
+
+    def get_connection_status_text(self):
+        if self.dev_mode_modbus:
+            modbus_text = "OPTA MODBUS: DEV"
+        elif self.is_modbus_connected():
+            modbus_text = "OPTA MODBUS: OK"
+        else:
+            modbus_text = "OPTA MODBUS: EI YHTEYTTÄ"
+
+        if self.dev_mode_gpio:
+            gpio_text = "RASPI GPIO: DEV"
+        elif self.raspberry_gpio_output_handler:
+            gpio_text = "RASPI GPIO: OK"
+        else:
+            gpio_text = "RASPI GPIO: EI KÄYTÖSSÄ"
+
+        if self.dev_mode_gpio:
+            sensor_text = "ANTURI: DEV"
+        elif self.dfr0558_manager:
+            sensor_text = "ANTURI: OK"
+        else:
+            sensor_text = "ANTURI: EI KÄYTÖSSÄ"
+
+        return f"{modbus_text}    {gpio_text}    {sensor_text}"
+
+    # ------------------------------------------------------------
+    # Sulkeminen
+    # ------------------------------------------------------------
+
+    def cleanup(self):
+        if self.dfr0558_manager:
+            self.dfr0558_manager.cleanup()
+
+        if self.raspberry_gpio_input_handler:
+            self.raspberry_gpio_input_handler.cleanup()
+
+        if self.opta_modbus_manager:
+            self.opta_modbus_manager.cleanup()
+
+        if self.raspberry_gpio_output_handler:
+            self.raspberry_gpio_output_handler.cleanup()
