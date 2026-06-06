@@ -7,13 +7,6 @@ import random
 class StationResultHandler:
     """
     Yhden ForTest-aseman tulosten käsittely.
-
-    Tämä luokka:
-    - tarkistaa tulosrekisterit
-    - estää duplikaattitulokset
-    - tulkitsee tuloskoodin
-    - laskee vuotoarvon ja yksikön
-    - lähettää rivin ForTestStation UI-komponentille
     """
 
     RESULT_TEXTS = {
@@ -60,29 +53,35 @@ class StationResultHandler:
     def __init__(self, controller):
         self.controller = controller
         self.last_result_id = None
+        self.last_test_result = None
 
     def update_test_results(self, result):
+        """
+        Palauttaa:
+        - test_result-koodi, jos uusi tulos lisättiin
+        - None, jos ei uutta tulosta
+        """
         controller = self.controller
 
         if not result or not hasattr(result, "registers"):
-            return False
+            return None
 
         if controller.program_number <= 0:
-            return False
+            return None
 
         if len(result.registers) < 25:
-            return False
+            return None
 
         test_result = result.registers[9]
 
         if test_result == 0 or test_result == 99:
-            return False
+            return None
 
         if result.registers[6] != controller.program_number:
-            return False
+            return None
 
         if not controller.results_started:
-            return False
+            return None
 
         hours = result.registers[0]
         minutes = result.registers[1]
@@ -95,9 +94,10 @@ class StationResultHandler:
         result_id = f"{timestamp}-{test_result}-{result.registers[6]}-{result.registers[21]}"
 
         if self.last_result_id == result_id:
-            return False
+            return None
 
         self.last_result_id = result_id
+        self.last_test_result = test_result
 
         result_status = self.RESULT_TEXTS.get(test_result, f"TULOS: {test_result}")
         result_color = self._get_result_color(test_result)
@@ -118,7 +118,7 @@ class StationResultHandler:
             part_temp_text=part_temp_text,
         )
 
-        return True
+        return test_result
 
     def _get_result_color(self, test_result):
         if test_result == 1:
@@ -220,8 +220,12 @@ class StationResultHandler:
             part_temp=part_temp,
         )
 
-        self.update_test_results(fake_result)
+        added_result = self.update_test_results(fake_result)
 
         controller.is_running = False
         controller.update_status("DEV: EMULOITU TULOS LISÄTTY", "INFO")
+
+        if added_result is not None:
+            controller.handle_result_for_automatic_cycle(added_result)
+
         controller.refresh_station_state()

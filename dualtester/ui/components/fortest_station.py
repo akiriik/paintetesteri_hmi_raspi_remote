@@ -8,7 +8,6 @@ from PyQt5.QtGui import QFont
 # ForTestStation koordinaatit
 # ============================================================
 
-# Ohjelmatietolaatikko
 PROGRAM_BOX_X = 20
 PROGRAM_BOX_Y = 15
 PROGRAM_BOX_W = 880
@@ -34,7 +33,6 @@ PROGRAM_INFO_Y = 120
 PROGRAM_INFO_W = 850
 PROGRAM_INFO_H = 65
 
-# Tilalaatikko
 STATUS_BOX_X = 20
 STATUS_BOX_Y = 230
 STATUS_BOX_W = 880
@@ -45,13 +43,31 @@ STATUS_VALUE_Y = 12
 STATUS_VALUE_W = 850
 STATUS_VALUE_H = 40
 
-# Tuloslaatikko
 RESULTS_BOX_X = 20
 RESULTS_BOX_Y = 310
 RESULTS_BOX_W = 880
-RESULTS_BOX_H = 575
+RESULTS_BOX_H = 490
 
-# Alapainikkeet
+JIG_PART_RELEASE_X = 20
+JIG_PART_RELEASE_Y = 815
+JIG_PART_RELEASE_W = 205
+JIG_PART_RELEASE_H = 65
+
+JIG_PART_CLAMP_X = 245
+JIG_PART_CLAMP_Y = 815
+JIG_PART_CLAMP_W = 205
+JIG_PART_CLAMP_H = 65
+
+JIG_PART_REMOVE_X = 470
+JIG_PART_REMOVE_Y = 815
+JIG_PART_REMOVE_W = 205
+JIG_PART_REMOVE_H = 65
+
+AUTO_PART_CHANGE_X = 695
+AUTO_PART_CHANGE_Y = 815
+AUTO_PART_CHANGE_W = 205
+AUTO_PART_CHANGE_H = 65
+
 SELECT_PROGRAM_X = 20
 SELECT_PROGRAM_Y = 900
 SELECT_PROGRAM_W = 280
@@ -67,28 +83,11 @@ STOP_Y = 900
 STOP_W = 290
 STOP_H = 75
 
-# Jakotubbi / jigi
-JIG_PART_RELEASE_X = 20
-JIG_PART_RELEASE_Y = 815
-JIG_PART_RELEASE_W = 280
-JIG_PART_RELEASE_H = 65
-
-JIG_PART_CLAMP_X = 330
-JIG_PART_CLAMP_Y = 815
-JIG_PART_CLAMP_W = 250
-JIG_PART_CLAMP_H = 65
-
-JIG_PART_REMOVE_X = 610
-JIG_PART_REMOVE_Y = 815
-JIG_PART_REMOVE_W = 290
-JIG_PART_REMOVE_H = 65
-
 DEV_RESULT_X = 375
 DEV_RESULT_Y = 720
 DEV_RESULT_W = 160
 DEV_RESULT_H = 60
 
-# Fontit
 FONT_STATION_TITLE = ("Consolas", 18)
 FONT_STATUS = ("Consolas", 18)
 FONT_PROGRAM_TITLE = ("Consolas", 18)
@@ -97,7 +96,7 @@ FONT_PROGRAM_INFO = ("Consolas", 14)
 FONT_RESULTS = ("Consolas", 15)
 FONT_BUTTON = ("Arial", 18)
 FONT_START_STOP = ("Arial", 22)
-FONT_JIG_BUTTON = ("Arial", 18)
+FONT_JIG_BUTTON = ("Arial", 15)
 FONT_DEV_BUTTON = ("Arial", 15)
 
 
@@ -140,7 +139,7 @@ class ForTestStation(QFrame):
             STATION_TITLE_X,
             STATION_TITLE_Y,
             STATION_TITLE_W,
-            STATION_TITLE_H
+            STATION_TITLE_H,
         )
         self.station_title_label.setFont(
             QFont(FONT_STATION_TITLE[0], FONT_STATION_TITLE[1], QFont.Bold)
@@ -155,7 +154,7 @@ class ForTestStation(QFrame):
             PROGRAM_TITLE_X,
             PROGRAM_TITLE_Y,
             PROGRAM_TITLE_W,
-            PROGRAM_TITLE_H
+            PROGRAM_TITLE_H,
         )
         self.program_label.setFont(
             QFont(FONT_PROGRAM_TITLE[0], FONT_PROGRAM_TITLE[1], QFont.Bold)
@@ -169,7 +168,7 @@ class ForTestStation(QFrame):
             PROGRAM_DESC_X,
             PROGRAM_DESC_Y,
             PROGRAM_DESC_W,
-            PROGRAM_DESC_H
+            PROGRAM_DESC_H,
         )
         self.program_desc_label.setFont(
             QFont(FONT_PROGRAM_DESC[0], FONT_PROGRAM_DESC[1])
@@ -180,13 +179,13 @@ class ForTestStation(QFrame):
 
         self.program_info_label = QLabel(
             "PAINE: --     TILAVUUS: --     TÄYTTÖ: --     TASAUS: --     TESTI: --     RAJA: --",
-            self.program_box
+            self.program_box,
         )
         self.program_info_label.setGeometry(
             PROGRAM_INFO_X,
             PROGRAM_INFO_Y,
             PROGRAM_INFO_W,
-            PROGRAM_INFO_H
+            PROGRAM_INFO_H,
         )
         self.program_info_label.setFont(
             QFont(FONT_PROGRAM_INFO[0], FONT_PROGRAM_INFO[1])
@@ -211,7 +210,7 @@ class ForTestStation(QFrame):
             STATUS_VALUE_X,
             STATUS_VALUE_Y,
             STATUS_VALUE_W,
-            STATUS_VALUE_H
+            STATUS_VALUE_H,
         )
         self.status_label.setFont(
             QFont(FONT_STATUS[0], FONT_STATUS[1], QFont.Bold)
@@ -253,12 +252,12 @@ class ForTestStation(QFrame):
             }
         """
 
-        self.jig_part_release_button = QPushButton("KAPPALE IRTI", self)
+        self.jig_part_release_button = QPushButton("KAPPALE\nIRTI", self)
         self.jig_part_release_button.setGeometry(
             JIG_PART_RELEASE_X,
             JIG_PART_RELEASE_Y,
             JIG_PART_RELEASE_W,
-            JIG_PART_RELEASE_H
+            JIG_PART_RELEASE_H,
         )
         self.jig_part_release_button.setFont(
             QFont(FONT_JIG_BUTTON[0], FONT_JIG_BUTTON[1], QFont.Bold)
@@ -266,12 +265,12 @@ class ForTestStation(QFrame):
         self.jig_part_release_button.setStyleSheet(jig_button_style)
         self.jig_part_release_button.hide()
 
-        self.jig_part_clamp_button = QPushButton("KAPPALE KIINNI", self)
+        self.jig_part_clamp_button = QPushButton("KAPPALE\nKIINNI", self)
         self.jig_part_clamp_button.setGeometry(
             JIG_PART_CLAMP_X,
             JIG_PART_CLAMP_Y,
             JIG_PART_CLAMP_W,
-            JIG_PART_CLAMP_H
+            JIG_PART_CLAMP_H,
         )
         self.jig_part_clamp_button.setFont(
             QFont(FONT_JIG_BUTTON[0], FONT_JIG_BUTTON[1], QFont.Bold)
@@ -279,12 +278,12 @@ class ForTestStation(QFrame):
         self.jig_part_clamp_button.setStyleSheet(jig_button_style)
         self.jig_part_clamp_button.hide()
 
-        self.jig_part_remove_button = QPushButton("KAPPALEEN POISTO", self)
+        self.jig_part_remove_button = QPushButton("KAPPALEEN\nPOISTO", self)
         self.jig_part_remove_button.setGeometry(
             JIG_PART_REMOVE_X,
             JIG_PART_REMOVE_Y,
             JIG_PART_REMOVE_W,
-            JIG_PART_REMOVE_H
+            JIG_PART_REMOVE_H,
         )
         self.jig_part_remove_button.setFont(
             QFont(FONT_JIG_BUTTON[0], FONT_JIG_BUTTON[1], QFont.Bold)
@@ -292,12 +291,25 @@ class ForTestStation(QFrame):
         self.jig_part_remove_button.setStyleSheet(jig_button_style)
         self.jig_part_remove_button.hide()
 
+        self.auto_part_change_button = QPushButton("AUTOMAATTI\nOFF", self)
+        self.auto_part_change_button.setGeometry(
+            AUTO_PART_CHANGE_X,
+            AUTO_PART_CHANGE_Y,
+            AUTO_PART_CHANGE_W,
+            AUTO_PART_CHANGE_H,
+        )
+        self.auto_part_change_button.setFont(
+            QFont(FONT_JIG_BUTTON[0], FONT_JIG_BUTTON[1], QFont.Bold)
+        )
+        self.auto_part_change_button.hide()
+        self.set_auto_part_change_enabled_state(False)
+
         self.select_program_button = QPushButton("VALITSE OHJELMA", self)
         self.select_program_button.setGeometry(
             SELECT_PROGRAM_X,
             SELECT_PROGRAM_Y,
             SELECT_PROGRAM_W,
-            SELECT_PROGRAM_H
+            SELECT_PROGRAM_H,
         )
         self.select_program_button.setFont(
             QFont(FONT_BUTTON[0], FONT_BUTTON[1], QFont.Bold)
@@ -355,7 +367,7 @@ class ForTestStation(QFrame):
             DEV_RESULT_X,
             DEV_RESULT_Y,
             DEV_RESULT_W,
-            DEV_RESULT_H
+            DEV_RESULT_H,
         )
         self.dev_result_button.setFont(
             QFont(FONT_DEV_BUTTON[0], FONT_DEV_BUTTON[1], QFont.Bold)
@@ -437,12 +449,51 @@ class ForTestStation(QFrame):
         self.jig_part_clamp_button.setEnabled(enabled)
         self.jig_part_remove_button.setEnabled(enabled)
 
+    def set_auto_part_change_visible(self, visible):
+        self.auto_part_change_button.setVisible(bool(visible))
+
+    def set_auto_part_change_enabled_state(self, enabled):
+        enabled = bool(enabled)
+
+        if enabled:
+            self.auto_part_change_button.setText("AUTOMAATTI\nON")
+            self.auto_part_change_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #0B7A28;
+                    color: white;
+                    border-radius: 10px;
+                    border: none;
+                }
+                QPushButton:hover {
+                    background-color: #10A838;
+                }
+                QPushButton:disabled {
+                    background-color: #333333;
+                    color: #777777;
+                }
+            """)
+        else:
+            self.auto_part_change_button.setText("AUTOMAATTI\nOFF")
+            self.auto_part_change_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #555555;
+                    color: white;
+                    border-radius: 10px;
+                    border: none;
+                }
+                QPushButton:hover {
+                    background-color: #777777;
+                }
+                QPushButton:disabled {
+                    background-color: #333333;
+                    color: #777777;
+                }
+            """)
+
     def set_jig_part_clamp_visible(self, visible):
-        # Vanha yhteensopivuus
         self.set_jig_controls_visible(visible)
 
     def set_jig_part_clamp_enabled(self, enabled):
-        # Vanha yhteensopivuus
         self.set_jig_controls_enabled(enabled)
 
     def add_result_row(
