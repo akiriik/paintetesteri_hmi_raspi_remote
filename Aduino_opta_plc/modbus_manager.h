@@ -43,6 +43,14 @@ void initModbusServer() {
     ModbusRTUServer.holdingRegisterWrite(D1608E_RELAY_REGISTER_START + i, 0);
   }
 
+  ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_COMMAND_REGISTER, 0);
+  ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_START_REGISTER, 0);
+  ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_STOP_REGISTER, 0);
+
+  ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_STATUS_REGISTER, JIG_SEQUENCE_STATUS_IDLE);
+  ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_STEP_REGISTER, 0);
+  ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_ERROR_REGISTER, JIG_SEQUENCE_ERROR_NONE);
+
   Serial.println("Modbus RTU Server started");
   Serial.print("Slave ID: ");
   Serial.println(MODBUS_SLAVE_ID);
@@ -62,6 +70,10 @@ void initModbusServer() {
   Serial.println(D1608E_RELAY_REGISTER_START);
   Serial.print("D1608E relay count: ");
   Serial.println(D1608E_RELAY_COUNT);
+  Serial.print("Jig sequence command register: ");
+  Serial.println(JIG_SEQUENCE_COMMAND_REGISTER);
+  Serial.print("Jig sequence status register: ");
+  Serial.println(JIG_SEQUENCE_STATUS_REGISTER);
   Serial.print("RS485 pre/post delay us: ");
   Serial.println(preDelayBR);
 }

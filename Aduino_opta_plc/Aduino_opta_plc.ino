@@ -5,6 +5,7 @@
 #include "shutdown_manager.h"
 #include "sequence_engine.h"
 #include "emergency_manager.h"
+#include "jig_sequence_manager.h"
 
 void setup() {
   Serial.begin(SERIAL_BAUDRATE);
@@ -31,13 +32,15 @@ void loop() {
 
   handleModbusRelayRegisters();
   handleModbusShutdownRegister();
-  handleModbusEmergencyResetRegister();  
+  handleModbusEmergencyResetRegister();
+  handleModbusJigSequenceRegisters();
   handleModbusSystemRegisters();
 
   updateEmergencyManager();
-
   updateShutdownManager();
+
   updateSequenceEngine();
+  updateJigSequenceManager();
 
   updateOptaControllerThrottled();
 }

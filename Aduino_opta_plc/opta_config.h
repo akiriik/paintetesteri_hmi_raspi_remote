@@ -20,6 +20,38 @@ const uint8_t MODBUS_SLAVE_ID = 1;
 const unsigned long MODBUS_BAUDRATE = 19200;
 
 // -----------------------------
+// Jigin sekvenssin ajat
+// Muuta näitä tarvittaessa.
+// Ajat ovat millisekunteina.
+// -----------------------------
+
+const unsigned long DELAY_SYL1_ON = 800;
+const unsigned long DELAY_SYL1_OFF = 150;
+
+const unsigned long DELAY_SYL2_ON = 1000;
+const unsigned long DELAY_SYL2_OFF = 300;
+
+const unsigned long DELAY_SYL3_ON = 1000;
+const unsigned long DELAY_SYL3_OFF = 500;
+
+const unsigned long SIGNAL_WAIT_TIME = 5000;
+const unsigned long SEQUENCE_COMPLETION_DELAY = 5000;
+
+// Anturi lisätään myöhemmin.
+// const unsigned long SENSOR_CHECK_TIMEOUT = 1000;
+
+// -----------------------------
+// Jigin D1608E releet
+// D1608E rele 1 = sylinteri 1
+// D1608E rele 2 = sylinteri 2
+// D1608E rele 3 = sylinteri 3
+// -----------------------------
+
+const uint8_t JIG_CYL1_RELAY_NUMBER = 1;
+const uint8_t JIG_CYL2_RELAY_NUMBER = 2;
+const uint8_t JIG_CYL3_RELAY_NUMBER = 3;
+
+// -----------------------------
 // Modbus-rekisterit
 // -----------------------------
 
@@ -48,12 +80,46 @@ const uint16_t FORTEST2_TEST_VALVE_REGISTER = 18093;
 const uint8_t FORTEST1_TEST_VALVE_OPTA_OUTPUT_NUMBER = 3;
 const uint8_t FORTEST2_TEST_VALVE_OPTA_OUTPUT_NUMBER = 4;
 
-// D1608E-lisäosan releet jätetään jakotukkijigin myöhempään ohjaukseen
+// D1608E-lisäosan releet
 const uint16_t D1608E_RELAY_REGISTER_START = 18099;
 const uint8_t D1608E_RELAY_COUNT = 8;
 
 const uint16_t EMERGENCY_RESET_REGISTER = 19099;
 const uint16_t EMERGENCY_STATUS_REGISTER = 19100;
+
+// -----------------------------
+// Jigin sekvenssi Modbus
+// -----------------------------
+
+const uint16_t JIG_SEQUENCE_COMMAND_REGISTER = 19200;
+const uint16_t JIG_SEQUENCE_START_REGISTER = 19201;
+const uint16_t JIG_SEQUENCE_STOP_REGISTER = 19202;
+
+const uint16_t JIG_SEQUENCE_STATUS_REGISTER = 19210;
+const uint16_t JIG_SEQUENCE_STEP_REGISTER = 19211;
+const uint16_t JIG_SEQUENCE_ERROR_REGISTER = 19212;
+
+// Komennot
+const uint16_t JIG_SEQUENCE_NONE = 0;
+const uint16_t JIG_SEQUENCE_COMMAND_PART_CLAMP = 1;
+
+// Myöhemmäksi varattu:
+// 2 = kappaleen vaihto
+// 3 = NOK / kappale irti
+// 4 = kappaleen poisto
+
+// Statukset
+const uint16_t JIG_SEQUENCE_STATUS_IDLE = 0;
+const uint16_t JIG_SEQUENCE_STATUS_RUNNING = 1;
+const uint16_t JIG_SEQUENCE_STATUS_DONE = 2;
+const uint16_t JIG_SEQUENCE_STATUS_ERROR = 3;
+
+// Virhekoodit
+const uint16_t JIG_SEQUENCE_ERROR_NONE = 0;
+const uint16_t JIG_SEQUENCE_ERROR_ABORTED = 1;
+const uint16_t JIG_SEQUENCE_ERROR_EMERGENCY_STOP = 2;
+const uint16_t JIG_SEQUENCE_ERROR_UNKNOWN_COMMAND = 3;
+const uint16_t JIG_SEQUENCE_ERROR_INVALID_STEP = 4;
 
 // Käytössä yksi holding register -alue:
 // 17999 = shutdown request
@@ -61,10 +127,16 @@ const uint16_t EMERGENCY_STATUS_REGISTER = 19100;
 // 18099...18106 = D1608E releet 1...8
 // 19099 = emergency reset
 // 19100 = emergency status
+// 19200 = jig sequence command
+// 19201 = jig sequence start
+// 19202 = jig sequence stop
+// 19210 = jig sequence status
+// 19211 = jig sequence step
+// 19212 = jig sequence error
 
 const uint16_t MODBUS_HOLDING_REGISTER_START = SHUTDOWN_REQUEST_REGISTER;
 const uint16_t MODBUS_HOLDING_REGISTER_COUNT =
-  (EMERGENCY_STATUS_REGISTER + 1) - MODBUS_HOLDING_REGISTER_START;
+  (JIG_SEQUENCE_ERROR_REGISTER + 1) - MODBUS_HOLDING_REGISTER_START;
 
 // -----------------------------
 // Sammutus

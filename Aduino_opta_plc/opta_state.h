@@ -72,3 +72,15 @@ unsigned long sequenceStepTimeMs[SEQUENCE_MAX_STEPS] = {
   SEQUENCE_DEFAULT_STEP_TIME_MS[8],
   SEQUENCE_DEFAULT_STEP_TIME_MS[9]
 };
+
+// -----------------------------
+// Jigin sekvenssin tila
+// -----------------------------
+
+bool jigSequenceRunning = false;
+uint16_t jigSequenceCommand = JIG_SEQUENCE_NONE;
+uint16_t jigSequenceStatus = JIG_SEQUENCE_STATUS_IDLE;
+uint16_t jigSequenceStep = 0;
+uint16_t jigSequenceError = JIG_SEQUENCE_ERROR_NONE;
+
+unsigned long jigSequenceStepStartedMs = 0;

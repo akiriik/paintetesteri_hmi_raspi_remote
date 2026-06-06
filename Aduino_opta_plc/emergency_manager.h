@@ -16,7 +16,7 @@ bool readEmergencyButtonActive() {
 }
 
 // -----------------------------
-// Hätäseisvalo
+// Hätäseisvalo / shutdown-valo
 // -----------------------------
 
 void setEmergencyLight(bool state) {
@@ -25,17 +25,30 @@ void setEmergencyLight(bool state) {
 }
 
 void updateEmergencyLightBlink() {
-  if (!emergencyStopActive) {
-    if (emergencyLightState) {
-      setEmergencyLight(false);
+  // Hätäseis on tärkein tila:
+  // jos hätäseis on aktiivinen, rele 2 vilkkuu.
+  if (emergencyStopActive) {
+    if (millis() - lastEmergencyLightBlinkMs >= EMERGENCY_LIGHT_BLINK_INTERVAL_MS) {
+      lastEmergencyLightBlinkMs = millis();
+      setEmergencyLight(!emergencyLightState);
     }
 
     return;
   }
 
-  if (millis() - lastEmergencyLightBlinkMs >= EMERGENCY_LIGHT_BLINK_INTERVAL_MS) {
-    lastEmergencyLightBlinkMs = millis();
-    setEmergencyLight(!emergencyLightState);
+  // Jos shutdown on käynnissä, rele 2 palaa jatkuvasti.
+  // Tämä näyttää käyttäjälle 10 s viiveen aikana, että sammutus on aloitettu.
+  if (shutdownTimerRunning || shutdownRelayActivated) {
+    if (!emergencyLightState) {
+      setEmergencyLight(true);
+    }
+
+    return;
+  }
+
+  // Normaali tila: rele 2 pois.
+  if (emergencyLightState) {
+    setEmergencyLight(false);
   }
 }
 
