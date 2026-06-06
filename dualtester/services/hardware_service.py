@@ -383,6 +383,45 @@ class HardwareService(QObject):
 
         return None
 
+    def get_connection_status_text(self):
+        """
+        Palauttaa yläpalkille Opta / hardware-yhteyden tilatekstin.
+
+        Tätä kutsuu TopBarController.
+        """
+        if self.dev_mode_modbus:
+            opta_text = "OPTA: DEV"
+        elif self.opta_modbus_manager and self.opta_modbus_manager.is_connected():
+            opta_text = "OPTA: OK"
+        else:
+            opta_text = "OPTA: EI YHTEYTTÄ"
+
+        if self.dev_mode_gpio:
+            gpio_text = "GPIO: DEV"
+        else:
+            gpio_ok = (
+                self.raspberry_gpio_output_handler is not None
+                or self.raspberry_gpio_input_handler is not None
+            )
+            gpio_text = "GPIO: OK" if gpio_ok else "GPIO: EI KÄYTÖSSÄ"
+
+        return f"{opta_text}    {gpio_text}"
+
+    def is_modbus_connected(self):
+        """
+        Palauttaa Opta Modbus -yhteyden tilan.
+
+        Tätä kutsuu EmergencyStopController.
+        """
+        if self.dev_mode_modbus:
+            return True
+
+        if not self.opta_modbus_manager:
+            return False
+
+        return self.opta_modbus_manager.is_connected()
+
+
     # ------------------------------------------------------------
     # Arduino Opta / käsikäytön releohjaus
     # ------------------------------------------------------------
