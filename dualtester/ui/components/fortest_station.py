@@ -166,7 +166,7 @@ class ForTestStation(QFrame):
             QFont(FONT_PROGRAM_TITLE[0], FONT_PROGRAM_TITLE[1], QFont.Bold)
         )
         self.program_label.setStyleSheet(
-            "color: #33FF33; background: transparent; border: none;"
+            "color: #ffffff; background: transparent; border: none;"
         )
 
         self.program_desc_label = QLabel("", self.program_box)
@@ -180,7 +180,7 @@ class ForTestStation(QFrame):
             QFont(FONT_PROGRAM_DESC[0], FONT_PROGRAM_DESC[1])
         )
         self.program_desc_label.setStyleSheet(
-            "color: #33FF33; background: transparent; border: none;"
+            "color: #ffffff; background: transparent; border: none;"
         )
 
         self.program_info_label = QLabel(
@@ -198,7 +198,7 @@ class ForTestStation(QFrame):
         )
         self.program_info_label.setWordWrap(True)
         self.program_info_label.setStyleSheet(
-            "color: #33FF33; background: transparent; border: none;"
+            "color: #ffffff; background: transparent; border: none;"
         )
 
         self.status_box = QFrame(self)
