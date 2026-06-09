@@ -145,6 +145,11 @@ void handleModbusOptaTestValveRegisters() {
 // -----------------------------
 
 void handleModbusRelayRegisters() {
+  if (emergencyStopActive) {
+    forceEmergencyControlledOutputsOff();
+    return;
+  }
+
   handleModbusOptaTestValveRegisters();
 
   for (uint8_t relayIndex = 0; relayIndex < D1608E_RELAY_COUNT; relayIndex++) {
