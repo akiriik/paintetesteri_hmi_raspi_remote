@@ -22,6 +22,7 @@ class TopBarController:
         self.fortest_service = fortest_service
         self.dev_mode_fortest = dev_mode_fortest
         self.sen0332_manager = None
+        self.sensor_update_phase = 0
 
         self._init_room_sensor()
 
@@ -51,8 +52,12 @@ class TopBarController:
             self.sen0332_manager = None
 
     def update_environment_sensors(self):
-        if self.hardware_service:
-            self.hardware_service.update_environment_sensors()
+        self.sensor_update_phase = (self.sensor_update_phase + 1) % 2
+
+        if self.sensor_update_phase == 0:
+            if self.hardware_service:
+                self.hardware_service.update_environment_sensors()
+            return
 
         if self.sen0332_manager:
             self.sen0332_manager.read_once()
