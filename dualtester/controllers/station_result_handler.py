@@ -118,6 +118,20 @@ class StationResultHandler:
             part_temp_text=part_temp_text,
         )
 
+        self._store_result_to_database(
+            result=result,
+            test_result=test_result,
+            result_status=result_status,
+            formatted_decay=formatted_decay,
+            decay_unit=decay_unit,
+            year=year,
+            month=month,
+            day=day,
+            hours=hours,
+            minutes=minutes,
+            seconds=seconds,
+        )
+
         return test_result
 
     def _get_result_color(self, test_result):
@@ -171,6 +185,135 @@ class StationResultHandler:
             return f"{result.part_temp:.1f}°C"
 
         return ""
+
+    def _safe_float(self, value):
+        if value is None or value == "":
+            return None
+
+        try:
+            return float(value)
+        except Exception:
+            return None
+
+    def _get_environment_snapshot(self, result):
+        controller = self.controller
+        main_window = getattr(controller, "main_window", None)
+        environment_status_bar = getattr(main_window, "environment_status_bar", None)
+
+        room_temperature = None
+        room_humidity = None
+        tank_temperature = None
+        tank_humidity = None
+        tank_pressure = None
+        part_temperature = None
+
+        if environment_status_bar:
+            room_temperature = getattr(environment_status_bar, "room_temperature", None)
+            room_humidity = getattr(environment_status_bar, "room_humidity", None)
+            tank_temperature = getattr(environment_status_bar, "tank_temperature", None)
+            tank_humidity = getattr(environment_status_bar, "tank_humidity", None)
+            tank_pressure = getattr(environment_status_bar, "tank_pressure", None)
+            part_temperature = getattr(environment_status_bar, "part_temperature", None)
+
+        if hasattr(result, "room_temp"):
+            room_temperature = result.room_temp
+
+        if hasattr(result, "part_temp"):
+            part_temperature = result.part_temp
+
+        return {
+            "room_temperature_c": room_temperature,
+            "room_humidity_percent": room_humidity,
+            "tank_temperature_c": tank_temperature,
+            "tank_humidity_percent": tank_humidity,
+            "tank_pressure_bar": tank_pressure,
+            "part_temperature_c": part_temperature,
+        }
+
+    def _get_result_datetime_parts(self, year, month, day, hours, minutes, seconds):
+        try:
+            result_datetime = datetime(
+                int(year),
+                int(month),
+                int(day),
+                int(hours),
+                int(minutes),
+                int(seconds),
+            )
+        except Exception:
+            result_datetime = datetime.now()
+
+        return (
+            result_datetime.isoformat(timespec="seconds"),
+            result_datetime.date().isoformat(),
+            result_datetime.time().isoformat(timespec="seconds"),
+        )
+
+    def _store_result_to_database(
+        self,
+        result,
+        test_result,
+        result_status,
+        formatted_decay,
+        decay_unit,
+        year,
+        month,
+        day,
+        hours,
+        minutes,
+        seconds,
+    ):
+        controller = self.controller
+        main_window = getattr(controller, "main_window", None)
+        storage_service = getattr(main_window, "result_storage_service", None)
+
+        if not storage_service:
+            return
+
+        selected_program = controller.selected_program or {}
+        program_name = selected_program.get("name") or f"Ohjelma {controller.program_number}"
+        pressure_mbar = selected_program.get("pressure_mbar")
+
+        timestamp, date_text, time_text = self._get_result_datetime_parts(
+            year,
+            month,
+            day,
+            hours,
+            minutes,
+            seconds,
+        )
+
+        environment_snapshot = self._get_environment_snapshot(result)
+
+        data = {
+            "timestamp": timestamp,
+            "date": date_text,
+            "time": time_text,
+            "station_id": controller.station_id,
+            "tester_name": f"ForTest {controller.station_id}",
+            "program_number": controller.program_number,
+            "program_name": program_name,
+            "product_name": program_name,
+            "result_code": test_result,
+            "result_text": result_status,
+            "result_ok": 1 if test_result == 1 else 0,
+            "pressure_mbar": self._safe_float(pressure_mbar),
+            "decay_value": self._safe_float(formatted_decay),
+            "decay_unit": decay_unit,
+            "leak_value": self._safe_float(formatted_decay),
+            "leak_unit": decay_unit,
+            "room_temperature_c": self._safe_float(environment_snapshot.get("room_temperature_c")),
+            "room_humidity_percent": self._safe_float(environment_snapshot.get("room_humidity_percent")),
+            "tank_temperature_c": self._safe_float(environment_snapshot.get("tank_temperature_c")),
+            "tank_humidity_percent": self._safe_float(environment_snapshot.get("tank_humidity_percent")),
+            "tank_pressure_bar": self._safe_float(environment_snapshot.get("tank_pressure_bar")),
+            "part_temperature_c": self._safe_float(environment_snapshot.get("part_temperature_c")),
+            "raw_result": {
+                "registers": list(result.registers),
+            },
+        }
+
+        storage_service.save_test_result(data)
 
     def create_dev_result(self):
         controller = self.controller
