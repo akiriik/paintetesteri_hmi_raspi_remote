@@ -13,6 +13,7 @@ class EmergencyStopController:
     - lukee hätäseistilan HardwareServicen kautta
     - avaa hätäseisdialogin
     - pysäyttää kaikki asemat hätäseisissä
+    - nollaa automaattiajon tilat hätäseisissä
     - kuittaa tilan dialogin sulkeutuessa
     - pitää MainWindowin puhtaampana
 
@@ -81,11 +82,37 @@ class EmergencyStopController:
                 continue
 
             try:
-                station.stop_test()
+                if hasattr(station, "disable_auto_part_change"):
+                    station.disable_auto_part_change(
+                        "HÄTÄSEIS - AUTOMAATTI POIS",
+                        show_message=False,
+                    )
+
+                station.is_running = False
+                station.results_started = False
+                station.test_has_reached_active_status = False
+                station.waiting_result_from_finished_test = False
+                station.auto_part_change_in_progress = False
+                station.auto_cycle_started_by_user = False
+
+                if hasattr(station, "auto_cycle_phase"):
+                    station.auto_cycle_phase = "IDLE"
+
+                if not getattr(station, "dev_mode_fortest", True):
+                    fortest_service = getattr(station, "fortest_service", None)
+
+                    if fortest_service and fortest_service.is_connected(station_id):
+                        fortest_service.abort_test(station_id)
+
+                if hasattr(station, "open_test_valve"):
+                    station.open_test_valve()
+
                 station.update_status(
                     "HÄTÄSEIS AKTIVOITU, TESTI PYSÄYTETTY",
                     "ERROR",
                 )
+                station.refresh_station_state()
+
             except Exception as e:
                 print(f"Virhe testin pysäytyksessä asemalla {station_id}: {e}")
 
