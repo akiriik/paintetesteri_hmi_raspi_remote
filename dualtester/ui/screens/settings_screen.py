@@ -10,14 +10,8 @@ class SettingsScreen(BaseScreen):
     """
     Asetussivu.
 
-    Tämä näkymä on koko näytön asetussivu:
-    - ForTest 1 asetukset
-    - ForTest 2 asetukset
-    - ohjelmien haku / myöhempi ohjelmien muokkaus
-    - status- ja tulosluennan testaus
-
-    Tässä vaiheessa ohjelmien haku ja ohjelman kirjoitus ovat vain UI-valmiina.
-    ForTestiin kirjoittavia toimintoja ei tehdä ennen erillistä varmistettua toteutusta.
+    Tällä sivulla näytetään laiteyhteyksien tilat ja jätetään näkyviin vain
+    ForTest-ohjelmien hallintaan liittyvät painikkeet.
     """
 
     STATUS_STYLE = """
@@ -43,18 +37,6 @@ class SettingsScreen(BaseScreen):
         border: none;
     """
 
-    SUBTITLE_STYLE = """
-        color: #33FF33;
-        background: transparent;
-        border: none;
-    """
-
-    INFO_STYLE = """
-        color: #CCCCCC;
-        background: transparent;
-        border: none;
-    """
-
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -76,24 +58,24 @@ class SettingsScreen(BaseScreen):
         self.title_label.setFont(QFont("Arial", 32, QFont.Bold))
         self.title_label.setStyleSheet(self.TITLE_STYLE)
 
-        self.info_label = QLabel(
-            "Laiteasetukset ja ForTest-ohjelmien hallinta",
-            self,
-        )
-        self.info_label.setGeometry(20, 100, screen_w - 40, 55)
-        self.info_label.setAlignment(Qt.AlignCenter)
-        self.info_label.setFont(QFont("Consolas", 17))
-        self.info_label.setStyleSheet(self.STATUS_STYLE.format(color="#33FF33"))
+        self.connection_status_label = QLabel("", self)
+        self.connection_status_label.setGeometry(20, 100, screen_w - 40, 70)
+        self.connection_status_label.setAlignment(Qt.AlignCenter)
+        self.connection_status_label.setFont(QFont("Consolas", 17))
+        self.connection_status_label.setStyleSheet(self.STATUS_STYLE.format(color="#33FF33"))
 
         left_panel_x = 50
         right_panel_x = 985
-        panel_y = 185
+        panel_y = 195
         panel_w = 885
-        panel_h = 690
+        panel_h = 610
+
+        self.fortest1_connection_label = None
+        self.fortest2_connection_label = None
 
         self.fortest1_panel = self._create_fortest_panel(
             station_id=1,
-            title="FORTEST 1 ASETUKSET",
+            title="FORTEST 1 OHJELMAT",
             x=left_panel_x,
             y=panel_y,
             w=panel_w,
@@ -102,7 +84,7 @@ class SettingsScreen(BaseScreen):
 
         self.fortest2_panel = self._create_fortest_panel(
             station_id=2,
-            title="FORTEST 2 ASETUKSET",
+            title="FORTEST 2 OHJELMAT",
             x=right_panel_x,
             y=panel_y,
             w=panel_w,
@@ -115,6 +97,8 @@ class SettingsScreen(BaseScreen):
         self.status_label.setFont(QFont("Consolas", 18))
         self._set_status("Valitse asetustoiminto", "white")
 
+        self.refresh()
+
     def _create_fortest_panel(self, station_id, title, x, y, w, h):
         panel = QFrame(self)
         panel.setGeometry(x, y, w, h)
@@ -126,33 +110,28 @@ class SettingsScreen(BaseScreen):
         title_label.setFont(QFont("Arial", 22, QFont.Bold))
         title_label.setStyleSheet(self.TITLE_STYLE)
 
-        connection_label = QLabel(self._get_connection_text(station_id), panel)
-        connection_label.setGeometry(30, 85, w - 60, 45)
+        connection_label = QLabel("", panel)
+        connection_label.setGeometry(30, 85, w - 60, 55)
         connection_label.setAlignment(Qt.AlignCenter)
         connection_label.setFont(QFont("Consolas", 14))
         connection_label.setStyleSheet(self.STATUS_STYLE.format(color="#CCCCCC"))
 
+        if station_id == 1:
+            self.fortest1_connection_label = connection_label
+        elif station_id == 2:
+            self.fortest2_connection_label = connection_label
+
         button_w = 380
-        button_h = 90
+        button_h = 95
         left_x = 55
         right_x = 450
-        start_y = 165
-        gap_y = 115
-
-        self._create_button(
-            parent=panel,
-            text="TESTAA\nYHTEYS",
-            x=left_x,
-            y=start_y,
-            w=button_w,
-            h=button_h,
-            callback=lambda checked=False, sid=station_id: self.test_connection(sid),
-        )
+        start_y = 190
+        gap_y = 130
 
         self._create_button(
             parent=panel,
             text="HAE OHJELMAT\nTESTERILTÄ",
-            x=right_x,
+            x=left_x,
             y=start_y,
             w=button_w,
             h=button_h,
@@ -162,8 +141,8 @@ class SettingsScreen(BaseScreen):
         self._create_button(
             parent=panel,
             text="AKTIIVISEN OHJELMAN\nTARKISTUS",
-            x=left_x,
-            y=start_y + gap_y,
+            x=right_x,
+            y=start_y,
             w=button_w,
             h=button_h,
             callback=lambda checked=False, sid=station_id: self.read_active_program_placeholder(sid),
@@ -172,57 +151,12 @@ class SettingsScreen(BaseScreen):
         self._create_button(
             parent=panel,
             text="OHJELMAN LUONTI /\nMUOKKAUS",
-            x=right_x,
+            x=left_x,
             y=start_y + gap_y,
             w=button_w,
             h=button_h,
             callback=lambda checked=False, sid=station_id: self.program_edit_placeholder(sid),
         )
-
-        self._create_button(
-            parent=panel,
-            text="STATUS-\nLUENNAN TESTI",
-            x=left_x,
-            y=start_y + gap_y * 2,
-            w=button_w,
-            h=button_h,
-            callback=lambda checked=False, sid=station_id: self.read_status(sid),
-        )
-
-        self._create_button(
-            parent=panel,
-            text="TULOS-\nLUENNAN TESTI",
-            x=right_x,
-            y=start_y + gap_y * 2,
-            w=button_w,
-            h=button_h,
-            callback=lambda checked=False, sid=station_id: self.read_results(sid),
-        )
-
-        self._create_button(
-            parent=panel,
-            text="NÄYTÄ VIIMEISIN\nMODBUS-VIRHE",
-            x=left_x,
-            y=start_y + gap_y * 3,
-            w=button_w,
-            h=button_h,
-            callback=lambda checked=False, sid=station_id: self.last_error_placeholder(sid),
-        )
-
-        warning_label = QLabel(
-            "Ohjelman kirjoitus ForTestiin tehdään myöhemmin erillisen vahvistuksen taakse.",
-            panel,
-        )
-        warning_label.setGeometry(30, h - 85, w - 60, 45)
-        warning_label.setAlignment(Qt.AlignCenter)
-        warning_label.setFont(QFont("Consolas", 12))
-        warning_label.setStyleSheet("""
-            QLabel {
-                color: orange;
-                background: transparent;
-                border: none;
-            }
-        """)
 
         return panel
 
@@ -259,6 +193,14 @@ class SettingsScreen(BaseScreen):
 
         return None
 
+    def _get_hardware_service(self):
+        parent = self.parent()
+
+        if parent and hasattr(parent, "hardware_service"):
+            return parent.hardware_service
+
+        return None
+
     def _get_connection_text(self, station_id):
         parent = self.parent()
 
@@ -279,28 +221,38 @@ class SettingsScreen(BaseScreen):
         if hasattr(fortest_service, "is_connected"):
             connected = fortest_service.is_connected(station_id)
 
-        state_text = "YHDISTETTY" if connected else "EI YHTEYTTÄ"
+        state_text = "OK" if connected else "EI YHTEYTTÄ"
 
         return f"ForTest {station_id}: {state_text}    Portti: {port}    Baud: {baudrate}"
 
-    def refresh(self):
-        self.info_label.setText("Laiteasetukset ja ForTest-ohjelmien hallinta")
-
-    def test_connection(self, station_id):
+    def _get_main_connection_text(self):
+        hardware_service = self._get_hardware_service()
         fortest_service = self._get_fortest_service()
 
-        if not fortest_service:
-            self._set_status("VIRHE: ForTestService ei ole käytössä", "red")
-            return
-
-        if not hasattr(fortest_service, "is_connected"):
-            self._set_status("VIRHE: ForTest-yhteystarkistusta ei löydy", "red")
-            return
-
-        if fortest_service.is_connected(station_id):
-            self._set_status(f"ForTest {station_id}: yhteys OK", "#33FF33")
+        if hardware_service and hasattr(hardware_service, "get_connection_status_text"):
+            hardware_text = hardware_service.get_connection_status_text()
         else:
-            self._set_status(f"ForTest {station_id}: ei yhteyttä", "red")
+            hardware_text = "OPTA: EI PALVELUA    GPIO: EI PALVELUA"
+
+        if fortest_service and hasattr(fortest_service, "is_connected"):
+            f1_ok = fortest_service.is_connected(1)
+            f2_ok = fortest_service.is_connected(2)
+            f1_text = "FORTEST 1: OK" if f1_ok else "FORTEST 1: EI YHTEYTTÄ"
+            f2_text = "FORTEST 2: OK" if f2_ok else "FORTEST 2: EI YHTEYTTÄ"
+            fortest_text = f"{f1_text}    {f2_text}"
+        else:
+            fortest_text = "FORTEST 1: EI PALVELUA    FORTEST 2: EI PALVELUA"
+
+        return f"{hardware_text}    {fortest_text}"
+
+    def refresh(self):
+        self.connection_status_label.setText(self._get_main_connection_text())
+
+        if self.fortest1_connection_label:
+            self.fortest1_connection_label.setText(self._get_connection_text(1))
+
+        if self.fortest2_connection_label:
+            self.fortest2_connection_label.setText(self._get_connection_text(2))
 
     def fetch_programs_placeholder(self, station_id):
         self._set_status(
@@ -327,44 +279,6 @@ class SettingsScreen(BaseScreen):
     def program_edit_placeholder(self, station_id):
         self._set_status(
             f"ForTest {station_id}: ohjelman luonti/muokkaus lisätään lukutestin jälkeen",
-            "orange",
-        )
-
-    def read_status(self, station_id):
-        fortest_service = self._get_fortest_service()
-
-        if not fortest_service:
-            self._set_status("VIRHE: ForTestService ei ole käytössä", "red")
-            return
-
-        if hasattr(fortest_service, "read_status"):
-            fortest_service.read_status(station_id)
-            self._set_status(
-                f"ForTest {station_id}: statusluenta lähetetty",
-                "#33FF33",
-            )
-        else:
-            self._set_status("VIRHE: read_status puuttuu ForTestServicestä", "red")
-
-    def read_results(self, station_id):
-        fortest_service = self._get_fortest_service()
-
-        if not fortest_service:
-            self._set_status("VIRHE: ForTestService ei ole käytössä", "red")
-            return
-
-        if hasattr(fortest_service, "read_results"):
-            fortest_service.read_results(station_id)
-            self._set_status(
-                f"ForTest {station_id}: tulosluenta lähetetty",
-                "#33FF33",
-            )
-        else:
-            self._set_status("VIRHE: read_results puuttuu ForTestServicestä", "red")
-
-    def last_error_placeholder(self, station_id):
-        self._set_status(
-            f"ForTest {station_id}: viimeisimmän virheen näyttö lisätään kun virhehistoria tallennetaan",
             "orange",
         )
 
