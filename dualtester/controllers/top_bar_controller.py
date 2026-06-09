@@ -2,6 +2,8 @@
 
 from PyQt5.QtCore import QTimer
 
+from utils.sen0332_handler import SEN0332Manager
+
 
 class TopBarController:
     def __init__(
@@ -19,6 +21,9 @@ class TopBarController:
         self.hardware_service = hardware_service
         self.fortest_service = fortest_service
         self.dev_mode_fortest = dev_mode_fortest
+        self.sen0332_manager = None
+
+        self._init_room_sensor()
 
         self.timer = QTimer(parent)
         self.timer.timeout.connect(self.update_status)
@@ -26,9 +31,31 @@ class TopBarController:
 
         self.update_status()
 
+    def _init_room_sensor(self):
+        if not self.environment_status_bar:
+            return
+
+        if self.hardware_service and getattr(self.hardware_service, "dev_mode_gpio", False):
+            return
+
+        try:
+            self.sen0332_manager = SEN0332Manager()
+            self.sen0332_manager.data_updated.connect(
+                self.environment_status_bar.update_room_sensor_data
+            )
+            self.sen0332_manager.error_occurred.connect(
+                self.environment_status_bar.show_room_sensor_error
+            )
+        except Exception as e:
+            print(f"Varoitus: SEN0332-huoneanturin alustus epäonnistui: {e}")
+            self.sen0332_manager = None
+
     def update_environment_sensors(self):
         if self.hardware_service:
             self.hardware_service.update_environment_sensors()
+
+        if self.sen0332_manager:
+            self.sen0332_manager.read_once()
 
     def update_status(self):
         self.update_environment_sensors()
@@ -78,3 +105,6 @@ class TopBarController:
     def cleanup(self):
         if self.timer:
             self.timer.stop()
+
+        if self.sen0332_manager:
+            self.sen0332_manager.cleanup()
