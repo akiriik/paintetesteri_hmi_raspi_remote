@@ -10,13 +10,14 @@ from config.modbus_config import (
     JIG_SEQUENCE_STATUS_RUNNING,
     JIG_SEQUENCE_STATUS_DONE,
     JIG_SEQUENCE_STATUS_ERROR,
-    JIG_SEQUENCE_ERROR_NONE,
     JIG_SEQUENCE_ERROR_PART_MISSING,
 )
 
 
-JAKOTUBBI_PROGRAM_NUMBER = 3
-JAKOTUBBI_STATION_ID = 2
+JAKOTUKKI_PROGRAM_BY_STATION = {
+    1: 32,
+    2: 3,
+}
 
 FORTEST_RESULT_OK = 1
 
@@ -29,6 +30,7 @@ AUTO_PHASE_REMOVE = "REMOVE"
 AUTO_PHASE_CLAMP = "CLAMP"
 AUTO_PHASE_WAIT_BEFORE_RELEASE = "WAIT_BEFORE_RELEASE"
 AUTO_PHASE_RELEASE = "RELEASE"
+
 
 class StationController(QObject):
     """
@@ -231,14 +233,19 @@ class StationController(QObject):
 
         return self.fortest_service.is_connected(self.station_id)
 
-    def is_jakotubbi_station_and_program(self):
-        return (
-            self.station_id == JAKOTUBBI_STATION_ID
-            and self.program_number == JAKOTUBBI_PROGRAM_NUMBER
-        )
+    def get_jakotukki_program_number(self):
+        return JAKOTUKKI_PROGRAM_BY_STATION.get(self.station_id)
+
+    def is_jakotukki_station_and_program(self):
+        jakotukki_program_number = self.get_jakotukki_program_number()
+
+        if jakotukki_program_number is None:
+            return False
+
+        return self.program_number == jakotukki_program_number
 
     def update_jig_controls_visibility(self):
-        visible = self.is_jakotubbi_station_and_program()
+        visible = self.is_jakotukki_station_and_program()
 
         if hasattr(self.station_widget, "set_jig_controls_visible"):
             self.station_widget.set_jig_controls_visible(visible)
@@ -250,16 +257,23 @@ class StationController(QObject):
             self.auto_part_change_enabled = False
             self.auto_cycle_started_by_user = False
             self.auto_part_change_in_progress = False
+            self.auto_cycle_phase = AUTO_PHASE_IDLE
 
             if hasattr(self.station_widget, "set_auto_part_change_enabled_state"):
                 self.station_widget.set_auto_part_change_enabled_state(False)
 
     def _start_jig_sequence(self, hardware_method_name, sequence_name):
-        if self.station_id != JAKOTUBBI_STATION_ID:
-            return
+        if not self.is_jakotukki_station_and_program():
+            jakotukki_program_number = self.get_jakotukki_program_number()
 
-        if self.program_number != JAKOTUBBI_PROGRAM_NUMBER:
-            self.update_status(f"{sequence_name} VAIN OHJELMALLA 3", "ERROR")
+            if jakotukki_program_number is None:
+                self.update_status(f"{sequence_name} EI KÄYTÖSSÄ TÄLLÄ ASEMALLA", "ERROR")
+            else:
+                self.update_status(
+                    f"{sequence_name} VAIN JAKOTUKKI-OHJELMALLA {jakotukki_program_number}",
+                    "ERROR",
+                )
+
             return
 
         if not self.hardware_service:
@@ -313,8 +327,17 @@ class StationController(QObject):
         enabled = bool(enabled)
 
         if enabled:
-            if not self.is_jakotubbi_station_and_program():
-                self.update_status("AUTOMAATTI VAIN FORTEST 2 / OHJELMA 3", "ERROR")
+            if not self.is_jakotukki_station_and_program():
+                jakotukki_program_number = self.get_jakotukki_program_number()
+
+                if jakotukki_program_number is None:
+                    self.update_status("AUTOMAATTI EI KÄYTÖSSÄ TÄLLÄ ASEMALLA", "ERROR")
+                else:
+                    self.update_status(
+                        f"AUTOMAATTI VAIN JAKOTUKKI-OHJELMALLA {jakotukki_program_number}",
+                        "ERROR",
+                    )
+
                 self.disable_auto_part_change(show_message=False)
                 return
 
@@ -325,6 +348,7 @@ class StationController(QObject):
             self.auto_part_change_enabled = True
             self.auto_cycle_started_by_user = False
             self.auto_part_change_in_progress = False
+            self.auto_cycle_phase = AUTO_PHASE_IDLE
             self.update_status("AUTOMAATTI PÄÄLLÄ - PAINA START", "SUCCESS")
         else:
             self.disable_auto_part_change("AUTOMAATTI POIS", show_message=True)
@@ -353,7 +377,7 @@ class StationController(QObject):
         if self.auto_part_change_in_progress:
             return False
 
-        if not self.is_jakotubbi_station_and_program():
+        if not self.is_jakotukki_station_and_program():
             return False
 
         if self.is_running:
@@ -371,9 +395,8 @@ class StationController(QObject):
         """
         OK-tuloksen jälkeen käynnistettävä automaattinen kappaleenvaihto.
 
-        Ei käytetä Optan komentoa 5.
         Raspberry ajaa vaiheet:
-        1. odota 4 s
+        1. odota 3 s
         2. KAPPALEEN POISTO
         3. kun DONE -> KAPPALE KIINNI
         4. kun DONE -> uusi ForTest START
@@ -403,6 +426,11 @@ class StationController(QObject):
             return
 
         if self.auto_cycle_phase != AUTO_PHASE_WAIT_BEFORE_REMOVE:
+            return
+
+        if not self.is_jakotukki_station_and_program():
+            self.disable_auto_part_change("AUTOMAATTI POIS: VÄÄRÄ ASEMA TAI OHJELMA")
+            self.refresh_station_state()
             return
 
         if not self.hardware_service:
@@ -549,7 +577,7 @@ class StationController(QObject):
         if self.auto_cycle_phase != AUTO_PHASE_WAIT_BEFORE_RELEASE:
             return
 
-        if not self.is_jakotubbi_station_and_program():
+        if not self.is_jakotukki_station_and_program():
             self.disable_auto_part_change("AUTOMAATTI POIS: VÄÄRÄ ASEMA TAI OHJELMA")
             self.refresh_station_state()
             return
@@ -616,7 +644,7 @@ class StationController(QObject):
             return
 
         if self.auto_part_change_enabled:
-            if not self.is_jakotubbi_station_and_program():
+            if not self.is_jakotukki_station_and_program():
                 self.disable_auto_part_change("AUTOMAATTI POIS: VÄÄRÄ ASEMA TAI OHJELMA")
             else:
                 self.auto_cycle_started_by_user = True
