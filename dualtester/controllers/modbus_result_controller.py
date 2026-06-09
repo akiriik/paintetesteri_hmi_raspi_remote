@@ -11,8 +11,8 @@ class ModbusResultController:
     - hätäseisrekisterin kirjoitustulos ohitetaan
     - hätäseisdialogin aikana op_code 2 ohitetaan
     - virheilmoitus näytetään station 1:llä
-    - onnistunut kirjoitus näyttää MODBUS-KIRJOITUS OK
-    - epäonnistunut kirjoitus näyttää MODBUS-KIRJOITUS EPÄONNISTUI
+    - onnistuneita yleisiä Modbus-kirjoituksia ei näytetä etusivun tilapaneelissa
+    - epäonnistunut kirjoitus näyttää virheen
 
     Tämä käsittelee vain yleisiä Modbus-kuittauksia.
     Varsinainen hardware-rajapinta on HardwareService.
@@ -66,9 +66,9 @@ class ModbusResultController:
             return
 
         if hasattr(result, "isError") and not result.isError():
-            station.update_status("MODBUS-KIRJOITUS OK", "SUCCESS")
-        else:
-            station.update_status("MODBUS-KIRJOITUS EPÄONNISTUI", "ERROR")
+            return
+
+        station.update_status("MODBUS-KIRJOITUS EPÄONNISTUI", "ERROR")
 
     def cleanup(self):
         pass
