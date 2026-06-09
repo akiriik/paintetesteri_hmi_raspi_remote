@@ -56,11 +56,6 @@ class StationResultHandler:
         self.last_test_result = None
 
     def update_test_results(self, result):
-        """
-        Palauttaa:
-        - test_result-koodi, jos uusi tulos lisättiin
-        - None, jos ei uutta tulosta
-        """
         controller = self.controller
 
         if not result or not hasattr(result, "registers"):
@@ -207,6 +202,17 @@ class StationResultHandler:
         except Exception:
             return None
 
+    def _is_part_temperature_enabled(self):
+        station_widget = getattr(self.controller, "station_widget", None)
+
+        if not station_widget:
+            return False
+
+        if hasattr(station_widget, "is_part_temperature_enabled"):
+            return station_widget.is_part_temperature_enabled()
+
+        return bool(getattr(station_widget, "part_temperature_enabled", False))
+
     def _get_environment_snapshot(self, result):
         controller = self.controller
         main_window = getattr(controller, "main_window", None)
@@ -232,6 +238,9 @@ class StationResultHandler:
 
         if hasattr(result, "part_temp"):
             part_temperature = result.part_temp
+
+        if not self._is_part_temperature_enabled():
+            part_temperature = None
 
         return {
             "room_temperature_c": room_temperature,
