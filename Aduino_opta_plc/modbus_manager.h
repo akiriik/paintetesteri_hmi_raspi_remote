@@ -4,6 +4,8 @@
 #include "opta_state.h"
 #include "io_manager.h"
 
+void forceEmergencyControlledOutputsOff();
+
 // -----------------------------
 // Modbus alustus
 // -----------------------------
@@ -146,7 +148,9 @@ void handleModbusOptaTestValveRegisters() {
 
 void handleModbusRelayRegisters() {
   if (emergencyStopActive) {
-    forceEmergencyControlledOutputsOff();
+    if (!emergencySafetyOutputsForcedOff) {
+      forceEmergencyControlledOutputsOff();
+    }
     return;
   }
 
