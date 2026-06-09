@@ -12,6 +12,7 @@ from utils.program_manager import ProgramManager
 
 from services.hardware_service import HardwareService
 from services.fortest_service import ForTestService
+from services.result_storage_service import ResultStorageService
 
 from controllers.station_controller import StationController
 from controllers.program_selection_controller import ProgramSelectionController
@@ -107,6 +108,9 @@ class MainWindow(QWidget):
         ForTestService:
         - ForTest 1 oma väylä
         - ForTest 2 oma väylä
+
+        ResultStorageService:
+        - SQLite-tulostallennus
         """
         self.hardware_service = HardwareService(
             parent=self,
@@ -125,6 +129,8 @@ class MainWindow(QWidget):
             },
             baudrate=FORTEST_BAUDRATE,
         )
+
+        self.result_storage_service = ResultStorageService(parent=self)
 
     def create_station_controllers(self):
         self.station_controllers = {
