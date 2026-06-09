@@ -213,25 +213,38 @@ class StationResultHandler:
 
         return bool(getattr(station_widget, "part_temperature_enabled", False))
 
+    def _get_status_bar_value(self, environment_status_bar, method_name, attr_name):
+        if not environment_status_bar:
+            return None
+
+        if hasattr(environment_status_bar, method_name):
+            return getattr(environment_status_bar, method_name)()
+
+        return getattr(environment_status_bar, attr_name, None)
+
     def _get_environment_snapshot(self, result):
         controller = self.controller
         main_window = getattr(controller, "main_window", None)
         environment_status_bar = getattr(main_window, "environment_status_bar", None)
 
-        room_temperature = None
-        room_humidity = None
-        tank_temperature = None
-        tank_humidity = None
-        tank_pressure = None
-        part_temperature = None
-
-        if environment_status_bar:
-            room_temperature = getattr(environment_status_bar, "room_temperature", None)
-            room_humidity = getattr(environment_status_bar, "room_humidity", None)
-            tank_temperature = getattr(environment_status_bar, "tank_temperature", None)
-            tank_humidity = getattr(environment_status_bar, "tank_humidity", None)
-            tank_pressure = getattr(environment_status_bar, "tank_pressure", None)
-            part_temperature = getattr(environment_status_bar, "part_temperature", None)
+        room_temperature = self._get_status_bar_value(
+            environment_status_bar,
+            "get_room_temperature_for_result",
+            "room_temperature",
+        )
+        room_humidity = self._get_status_bar_value(
+            environment_status_bar,
+            "get_room_humidity_for_result",
+            "room_humidity",
+        )
+        tank_temperature = getattr(environment_status_bar, "tank_temperature", None) if environment_status_bar else None
+        tank_humidity = getattr(environment_status_bar, "tank_humidity", None) if environment_status_bar else None
+        tank_pressure = getattr(environment_status_bar, "tank_pressure", None) if environment_status_bar else None
+        part_temperature = self._get_status_bar_value(
+            environment_status_bar,
+            "get_part_temperature_for_result",
+            "part_temperature",
+        )
 
         if hasattr(result, "room_temp"):
             room_temperature = result.room_temp
