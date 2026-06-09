@@ -43,6 +43,7 @@ int lastShutdownRegisterValue = -1;
 bool emergencyStopActive = false;
 bool emergencyResetRequest = false;
 bool emergencyLightState = false;
+bool emergencySafetyOutputsForcedOff = false;
 unsigned long lastEmergencyLightBlinkMs = 0;
 int lastEmergencyResetRegisterValue = -1;
 
