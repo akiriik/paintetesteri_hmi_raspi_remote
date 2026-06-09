@@ -11,7 +11,9 @@ class EnvironmentStatusBar(QWidget):
     Tämä komponentti saa sensorisignaaleja vanhoilta toimivilta handlereilta,
     säilyttää viimeisimmät arvot ja välittää ne uudelle EnvironmentBarille.
 
-    Tämä widget pidetään edelleen piilossa MainWindowissa.
+    Yksittäinen anturivirhe ei tyhjennä viimeisintä hyvää arvoa. Arvot nollataan
+    vasta, jos anturin oma handleri katsoo katkoksen jatkuvaksi ja lähettää
+    selkeän pitkäkestoisen virheen.
     """
 
     def __init__(self, parent=None):
@@ -55,12 +57,6 @@ class EnvironmentStatusBar(QWidget):
         self.part_temperature = None
 
     def update_sensor_data(self, data):
-        """
-        Vanhan SHT20/SHT-tyyppisen datan vastaanotto.
-
-        Jos data ei erikseen kerro onko kyse huoneesta vai säiliöstä,
-        käsitellään se säiliödatana vanhan ohjelmalogiikan mukaisesti.
-        """
         if not isinstance(data, dict):
             return
 
@@ -69,9 +65,6 @@ class EnvironmentStatusBar(QWidget):
         self.update_display()
 
     def update_room_sensor_data(self, data):
-        """
-        Varattu erilliselle huoneanturille.
-        """
         if not isinstance(data, dict):
             return
 
@@ -87,7 +80,7 @@ class EnvironmentStatusBar(QWidget):
         self.update_display()
 
     def show_part_temperature_error(self, error_message):
-        self.part_temperature = None
+        # Ei tyhjennetä viimeisintä hyvää arvoa yksittäisestä anturivirheestä.
         self.update_display()
 
     def update_pressure_data(self, pressure_value):
@@ -167,13 +160,11 @@ class EnvironmentStatusBar(QWidget):
         return 0.0
 
     def show_sensor_error(self, error_message):
-        self.tank_temperature = None
-        self.tank_humidity = None
+        # Ei tyhjennetä säiliöarvoja yksittäisestä virheestä.
         self.update_display()
 
     def show_room_sensor_error(self, error_message):
-        self.room_temperature = None
-        self.room_humidity = None
+        # Ei tyhjennetä huonearvoja yksittäisestä virheestä.
         self.update_display()
 
     def show_pressure_error(self):
