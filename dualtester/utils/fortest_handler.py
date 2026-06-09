@@ -6,6 +6,7 @@ from config.fortest_config import (
     FORTEST_STATUS_REGISTER_COUNT,
     FORTEST_RESULTS_REGISTER,
     FORTEST_RESULTS_REGISTER_COUNT,
+    FORTEST_PROGRAM_REGISTER,
 )
 
 from utils.modbus_handler import ModbusHandler
@@ -17,6 +18,10 @@ class ForTestHandler:
             raise ValueError("ForTest-portti puuttuu")
 
         self.modbus = ModbusHandler(port=port, baudrate=baudrate)
+
+    def write_program(self, program_number):
+        """Vaihda ForTestin aktiivinen ohjelma."""
+        return self.modbus.write_register(FORTEST_PROGRAM_REGISTER, program_number)
 
     def start_test(self):
         """Käynnistä ForTest-testi."""
@@ -42,6 +47,10 @@ class ForTestHandler:
 
 
 class DummyForTestHandler:
+    def write_program(self, program_number):
+        print(f"DummyForTest: Ohjelma vaihdettu {program_number} (ei oikeaa laitetta)")
+        return True
+
     def start_test(self):
         print("DummyForTest: Testi käynnistetty (ei oikeaa laitetta)")
         return True
