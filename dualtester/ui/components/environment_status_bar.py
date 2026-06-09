@@ -1,19 +1,20 @@
 # ui/components/environment_status_bar.py
+import time
+
 from PyQt5.QtWidgets import QLabel, QWidget, QHBoxLayout
-from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QFont
+
+
+SENSOR_STALE_TIMEOUT_S = 30
 
 
 class EnvironmentStatusBar(QWidget):
     """
     Ympäristö- ja sensoridatan välikerros.
 
-    Tämä komponentti saa sensorisignaaleja vanhoilta toimivilta handlereilta,
-    säilyttää viimeisimmät arvot ja välittää ne uudelle EnvironmentBarille.
-
-    Yksittäinen anturivirhe ei tyhjennä viimeisintä hyvää arvoa. Arvot nollataan
-    vasta, jos anturin oma handleri katsoo katkoksen jatkuvaksi ja lähettää
-    selkeän pitkäkestoisen virheen.
+    Lyhyt yksittäinen anturivirhe ei tyhjennä viimeisintä hyvää arvoa.
+    Jos uutta onnistunutta lukemaa ei tule määräajassa, arvo tulkitaan vanhaksi
+    eikä sitä käytetä tuloksiin tai SQL-tallennukseen.
     """
 
     def __init__(self, parent=None):
@@ -53,8 +54,38 @@ class EnvironmentStatusBar(QWidget):
 
         self.room_temperature = None
         self.room_humidity = None
-
         self.part_temperature = None
+
+        self.tank_sensor_updated_at = None
+        self.room_sensor_updated_at = None
+        self.part_temperature_updated_at = None
+
+    def _now(self):
+        return time.monotonic()
+
+    def _is_fresh(self, updated_at):
+        if updated_at is None:
+            return False
+
+        return (self._now() - updated_at) <= SENSOR_STALE_TIMEOUT_S
+
+    def _fresh_or_none(self, value, updated_at):
+        if value is None:
+            return None
+
+        if not self._is_fresh(updated_at):
+            return None
+
+        return value
+
+    def get_room_temperature_for_result(self):
+        return self._fresh_or_none(self.room_temperature, self.room_sensor_updated_at)
+
+    def get_room_humidity_for_result(self):
+        return self._fresh_or_none(self.room_humidity, self.room_sensor_updated_at)
+
+    def get_part_temperature_for_result(self):
+        return self._fresh_or_none(self.part_temperature, self.part_temperature_updated_at)
 
     def update_sensor_data(self, data):
         if not isinstance(data, dict):
@@ -62,6 +93,7 @@ class EnvironmentStatusBar(QWidget):
 
         self.tank_temperature = data.get("temperature")
         self.tank_humidity = data.get("humidity")
+        self.tank_sensor_updated_at = self._now()
         self.update_display()
 
     def update_room_sensor_data(self, data):
@@ -70,6 +102,7 @@ class EnvironmentStatusBar(QWidget):
 
         self.room_temperature = data.get("temperature")
         self.room_humidity = data.get("humidity")
+        self.room_sensor_updated_at = self._now()
         self.update_display()
 
     def update_part_temperature_data(self, data):
@@ -77,10 +110,10 @@ class EnvironmentStatusBar(QWidget):
             return
 
         self.part_temperature = data.get("part_temperature")
+        self.part_temperature_updated_at = self._now()
         self.update_display()
 
     def show_part_temperature_error(self, error_message):
-        # Ei tyhjennetä viimeisintä hyvää arvoa yksittäisestä anturivirheestä.
         self.update_display()
 
     def update_pressure_data(self, pressure_value):
@@ -91,13 +124,31 @@ class EnvironmentStatusBar(QWidget):
 
         self.update_display()
 
+    def _format_temperature(self, value, updated_at):
+        if value is None:
+            return "--.-°C"
+
+        if not self._is_fresh(updated_at):
+            return "--.-°C"
+
+        return f"{value:.1f}°C"
+
+    def _format_humidity(self, value, updated_at):
+        if value is None:
+            return "--.- %"
+
+        if not self._is_fresh(updated_at):
+            return "--.- %"
+
+        return f"{value:.1f} %"
+
     def update_display(self):
-        tank_temp_str = f"{self.tank_temperature:.1f}°C" if self.tank_temperature is not None else "--.-°C"
-        tank_humidity_str = f"{self.tank_humidity:.1f} %" if self.tank_humidity is not None else "--.- %"
+        tank_temp_str = self._format_temperature(self.tank_temperature, self.tank_sensor_updated_at)
+        tank_humidity_str = self._format_humidity(self.tank_humidity, self.tank_sensor_updated_at)
         tank_pressure_str = f"{self.tank_pressure:.2f} BAR" if self.tank_pressure is not None else "-.-- BAR"
 
-        room_temp_str = f"{self.room_temperature:.1f}°C" if self.room_temperature is not None else "--.-°C"
-        room_humidity_str = f"{self.room_humidity:.1f} %" if self.room_humidity is not None else "--.- %"
+        room_temp_str = self._format_temperature(self.room_temperature, self.room_sensor_updated_at)
+        room_humidity_str = self._format_humidity(self.room_humidity, self.room_sensor_updated_at)
 
         self.container_label.setText(
             f"SÄILIÖ: {tank_temp_str} / {tank_humidity_str} / {tank_pressure_str}"
@@ -123,12 +174,12 @@ class EnvironmentStatusBar(QWidget):
             return
 
         main_screen.environment_bar.update_environment_values(
-            room_temperature=self.room_temperature,
-            room_humidity=self.room_humidity,
-            tank_temperature=self.tank_temperature,
-            tank_humidity=self.tank_humidity,
+            room_temperature=self.get_room_temperature_for_result(),
+            room_humidity=self.get_room_humidity_for_result(),
+            tank_temperature=self._fresh_or_none(self.tank_temperature, self.tank_sensor_updated_at),
+            tank_humidity=self._fresh_or_none(self.tank_humidity, self.tank_sensor_updated_at),
             tank_pressure=self.tank_pressure,
-            part_temperature=self.part_temperature,
+            part_temperature=self.get_part_temperature_for_result(),
         )
 
     def convert_adc_to_bar(self, adc_value):
@@ -160,11 +211,9 @@ class EnvironmentStatusBar(QWidget):
         return 0.0
 
     def show_sensor_error(self, error_message):
-        # Ei tyhjennetä säiliöarvoja yksittäisestä virheestä.
         self.update_display()
 
     def show_room_sensor_error(self, error_message):
-        # Ei tyhjennetä huonearvoja yksittäisestä virheestä.
         self.update_display()
 
     def show_pressure_error(self):
