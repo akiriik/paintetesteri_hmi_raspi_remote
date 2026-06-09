@@ -16,6 +16,45 @@ bool readEmergencyButtonActive() {
 }
 
 // -----------------------------
+// Hätäseisin pakkoalasajo
+// -----------------------------
+
+void forceEmergencyControlledOutputsOff() {
+  // Hätäseis ei katkaise Optan releitä 1 ja 2:
+  // rele 1 = järjestelmän sammutus
+  // rele 2 = hätäseisvalo / shutdown-valo
+  // Hätäseis katkaisee testiventtiilit ja D1608E-releet.
+
+  setOptaOutput(FORTEST1_TEST_VALVE_OPTA_OUTPUT_NUMBER, false);
+  setOptaOutput(FORTEST2_TEST_VALVE_OPTA_OUTPUT_NUMBER, false);
+
+  ModbusRTUServer.holdingRegisterWrite(FORTEST1_TEST_VALVE_REGISTER, 0);
+  ModbusRTUServer.holdingRegisterWrite(FORTEST2_TEST_VALVE_REGISTER, 0);
+
+  setAllD1608ERelaysOff();
+
+  for (uint8_t i = 0; i < D1608E_RELAY_COUNT; i++) {
+    ModbusRTUServer.holdingRegisterWrite(D1608E_RELAY_REGISTER_START + i, 0);
+    d1608eLastRelayRegisterValues[i] = 0;
+  }
+
+  jigSequenceRunning = false;
+  jigSequenceCommand = JIG_SEQUENCE_NONE;
+  jigSequenceStep = 0;
+  jigSequenceError = JIG_SEQUENCE_ERROR_EMERGENCY_STOP;
+  jigSequenceStatus = JIG_SEQUENCE_STATUS_ERROR;
+
+  ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_COMMAND_REGISTER, 0);
+  ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_START_REGISTER, 0);
+  ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_STOP_REGISTER, 0);
+  ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_STATUS_REGISTER, JIG_SEQUENCE_STATUS_ERROR);
+  ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_STEP_REGISTER, 0);
+  ModbusRTUServer.holdingRegisterWrite(JIG_SEQUENCE_ERROR_REGISTER, JIG_SEQUENCE_ERROR_EMERGENCY_STOP);
+
+  emergencySafetyOutputsForcedOff = true;
+}
+
+// -----------------------------
 // Hätäseisvalo / shutdown-valo
 // -----------------------------
 
@@ -81,6 +120,7 @@ void handleEmergencyResetRequest(bool emergencyButtonPhysicalActive) {
   // Jos nappi on vielä painettuna / piiri auki, hätäseis jää aktiiviseksi.
   if (!emergencyButtonPhysicalActive) {
     emergencyStopActive = false;
+    emergencySafetyOutputsForcedOff = false;
   }
 
   updateEmergencyStatusRegister();
@@ -96,6 +136,12 @@ void updateEmergencyManager() {
   // Hätäseis lukittuu päälle heti, kun NC-piiri aukeaa.
   if (emergencyButtonPhysicalActive) {
     emergencyStopActive = true;
+  }
+
+  // Kun hätäseis on aktiivinen, pakotetaan ohjattavat lähdöt alas.
+  // Tätä ei palauteta automaattisesti kuittauksessa.
+  if (emergencyStopActive && !emergencySafetyOutputsForcedOff) {
+    forceEmergencyControlledOutputsOff();
   }
 
   // Hätäseis poistuu vain dualtesteristä tulevalla kuittauksella,
