@@ -1,7 +1,6 @@
 # services/fortest_service.py
 from PyQt5.QtCore import QObject
 
-from config.fortest_config import FORTEST_PROGRAM_REGISTER
 from utils.fortest_manager import ForTestManager
 
 
@@ -99,23 +98,6 @@ class ForTestService(QObject):
 
         return None
 
-    def _get_fortest_modbus_or_none(self, station_id, operation_name):
-        """
-        Palauttaa ForTest-laitteen oman Modbus-rajapinnan.
-
-        Tämä ei ole Arduino Optan Modbus-väylä.
-        """
-        fortest_manager = self._get_fortest_manager_or_warn(station_id, operation_name)
-
-        if not fortest_manager:
-            return None
-
-        try:
-            return fortest_manager.worker.fortest.modbus
-        except Exception as e:
-            print(f"ForTest {station_id}: ForTest Modbus -rajapintaa ei saatu operaatiolle {operation_name}: {e}")
-            return None
-
     def has_station_port(self, station_id):
         return bool(self.fortest_station_ports.get(station_id))
 
@@ -144,16 +126,17 @@ class ForTestService(QObject):
     # ------------------------------------------------------------
 
     def write_program(self, station_id, program_number):
-        fortest_modbus = self._get_fortest_modbus_or_none(station_id, "write_program")
+        fortest_manager = self._get_fortest_manager_or_warn(station_id, "write_program")
 
-        if not fortest_modbus:
-            return None
+        if not fortest_manager:
+            return False
 
         try:
-            return fortest_modbus.write_register(FORTEST_PROGRAM_REGISTER, program_number)
+            fortest_manager.write_program(program_number)
+            return True
         except Exception as e:
             print(f"Virhe ForTest {station_id} ohjelmanvaihdossa: {e}")
-            return None
+            return False
 
     # ------------------------------------------------------------
     # ForTest-testin ohjaus
