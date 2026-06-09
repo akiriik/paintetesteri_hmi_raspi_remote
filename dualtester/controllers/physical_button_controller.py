@@ -34,7 +34,7 @@ class PhysicalButtonController:
     LIGHT_MODE_GREEN_BLINK = "green_blink"
     LIGHT_MODE_RED_BLINK = "red_blink"
 
-    BLINK_INTERVAL_S = 1.0
+    BLINK_INTERVAL_S = 0.5
 
     def __init__(self, station_controllers, hardware_service):
         self.station_controllers = station_controllers
