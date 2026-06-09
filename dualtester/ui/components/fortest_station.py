@@ -48,6 +48,11 @@ RESULTS_BOX_Y = 310
 RESULTS_BOX_W = 880
 RESULTS_BOX_H = 490
 
+CLEAR_RESULTS_X = RESULTS_BOX_X + RESULTS_BOX_W - 150
+CLEAR_RESULTS_Y = RESULTS_BOX_Y + RESULTS_BOX_H - 52
+CLEAR_RESULTS_W = 125
+CLEAR_RESULTS_H = 38
+
 JIG_PART_RELEASE_X = 20
 JIG_PART_RELEASE_Y = 815
 JIG_PART_RELEASE_W = 205
@@ -98,6 +103,7 @@ FONT_BUTTON = ("Arial", 18)
 FONT_START_STOP = ("Arial", 22)
 FONT_JIG_BUTTON = ("Arial", 15)
 FONT_DEV_BUTTON = ("Arial", 15)
+FONT_CLEAR_BUTTON = ("Arial", 11)
 
 
 class ForTestStation(QFrame):
@@ -235,6 +241,32 @@ class ForTestStation(QFrame):
             }
         """)
         self._refresh_results_table()
+
+        self.clear_results_button = QPushButton("TYHJENNÄ", self)
+        self.clear_results_button.setGeometry(
+            CLEAR_RESULTS_X,
+            CLEAR_RESULTS_Y,
+            CLEAR_RESULTS_W,
+            CLEAR_RESULTS_H,
+        )
+        self.clear_results_button.setFont(
+            QFont(FONT_CLEAR_BUTTON[0], FONT_CLEAR_BUTTON[1], QFont.Bold)
+        )
+        self.clear_results_button.setStyleSheet("""
+            QPushButton {
+                background-color: #303030;
+                color: #DDDDDD;
+                border-radius: 8px;
+                border: 1px solid #666666;
+            }
+            QPushButton:hover {
+                background-color: #555555;
+            }
+            QPushButton:pressed {
+                background-color: #777777;
+            }
+        """)
+        self.clear_results_button.clicked.connect(self.clear_results)
 
         jig_button_style = """
             QPushButton {
@@ -522,6 +554,10 @@ class ForTestStation(QFrame):
         if len(self.results_history) > 12:
             self.results_history.pop()
 
+        self._refresh_results_table()
+
+    def clear_results(self):
+        self.results_history.clear()
         self._refresh_results_table()
 
     def _refresh_results_table(self):
