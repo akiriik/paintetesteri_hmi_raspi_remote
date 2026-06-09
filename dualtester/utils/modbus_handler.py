@@ -94,12 +94,9 @@ class ModbusHandler:
         muunnos 0xFF00 / 0x0000 -arvoksi.
         """
         if not self.connected:
-            print(f"Modbus ei yhteydessä. Ei voida kirjoittaa coiliin {address}")
             return False
 
         try:
-            print(f"write_coil - Address: {address}, Value: {value}")
-
             if value:
                 value_to_write = 0xFF00
             else:
@@ -111,8 +108,6 @@ class ModbusHandler:
             )
 
             success = not result.isError() if hasattr(result, "isError") else bool(result)
-            print(f"write_coil tulos: {result}, onnistui: {success}")
-
             return success
 
         except Exception as e:
