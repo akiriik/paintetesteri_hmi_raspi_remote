@@ -4,16 +4,6 @@ from PyQt5.QtCore import QTimer
 
 
 class TopBarController:
-    """
-    Yläpalkin tilapäivitysten controller.
-
-    Tehtävät:
-    - päivittää hardware-yhteystilat EnvironmentBarille
-    - muodostaa ForTest 1 / ForTest 2 tilatekstin
-    - välittää EnvironmentStatusBarin arvot EnvironmentBarille
-    - pitää omaa päivitystimeriä
-    """
-
     def __init__(
         self,
         main_screen,
@@ -37,9 +27,12 @@ class TopBarController:
         self.update_status()
 
     def update_environment_sensors(self):
-        self.hardware_service.update_environment_sensors()
+        if self.hardware_service:
+            self.hardware_service.update_environment_sensors()
 
     def update_status(self):
+        self.update_environment_sensors()
+
         if not self.main_screen:
             return
 
