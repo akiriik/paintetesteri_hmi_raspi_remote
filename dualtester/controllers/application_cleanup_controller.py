@@ -51,6 +51,7 @@ class ApplicationCleanupController:
                     obj.cleanup()
 
             cleanup_services = [
+                "result_storage_service",
                 "fortest_service",
                 "hardware_service",
             ]
