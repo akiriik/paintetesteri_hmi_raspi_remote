@@ -8,11 +8,8 @@ class EnvironmentBar(QFrame):
     """
     Päänäkymän yläpalkki.
 
-    Tämä on UI-komponentti:
-    - ei lue Modbusia
-    - ei lue GPIO:ta
-    - ei lue antureita
-    - näyttää vain sille annetut arvot
+    Etusivulla näytetään vain ympäristöarvot ja navigointinapit.
+    Laiteyhteyksien tilat näytetään asetussivulla.
     """
 
     def __init__(self, parent=None):
@@ -24,8 +21,6 @@ class EnvironmentBar(QFrame):
         self.tank_humidity = None
         self.tank_pressure = None
         self.part_temperature = None
-        self.hardware_status_text = "IO: --    ANTURIT: --"
-        self.fortest_status_text = "FORTEST 1: --    FORTEST 2: --"
 
         self.init_ui()
 
@@ -38,26 +33,10 @@ class EnvironmentBar(QFrame):
             }
         """)
 
-        # Koordinaatit
- #       title_x = 10
- #       title_y = 10
- #       title_w = 420
- #       title_h = 60
-
         env_x = 10
         env_y = 6
-        env_w = 850
-        env_h = 32
-
-        hw_x = 10
-        hw_y = 40
-        hw_w = 760
-        hw_h = 30
-
-        ft_x = 720
-        ft_y = 40
-        ft_w = 500
-        ft_h = 30
+        env_w = 1180
+        env_h = 70
 
         settings_x = 1240
         settings_y = 10
@@ -74,29 +53,11 @@ class EnvironmentBar(QFrame):
         shutdown_w = 210
         shutdown_h = 60
 
-#        self.title_label = QLabel("TEST", self)
-#        self.title_label.setGeometry(title_x, title_y, title_w, title_h)
-#        self.title_label.setFont(QFont("Consolas", 22, QFont.Bold))
-#        self.title_label.setStyleSheet("color: white; background: transparent; border: none;")
-#        self.title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
         self.environment_label = QLabel("", self)
         self.environment_label.setGeometry(env_x, env_y, env_w, env_h)
-        self.environment_label.setFont(QFont("Consolas", 14))
+        self.environment_label.setFont(QFont("Consolas", 15))
         self.environment_label.setStyleSheet("color: #33FF33; background: transparent; border: none;")
         self.environment_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.hardware_label = QLabel("", self)
-        self.hardware_label.setGeometry(hw_x, hw_y, hw_w, hw_h)
-        self.hardware_label.setFont(QFont("Consolas", 13))
-        self.hardware_label.setStyleSheet("color: orange; background: transparent; border: none;")
-        self.hardware_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.fortest_label = QLabel("", self)
-        self.fortest_label.setGeometry(ft_x, ft_y, ft_w, ft_h)
-        self.fortest_label.setFont(QFont("Consolas", 13))
-        self.fortest_label.setStyleSheet("color: orange; background: transparent; border: none;")
-        self.fortest_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         self.settings_button = QPushButton("ASETUKSET", self)
         self.settings_button.setGeometry(settings_x, settings_y, settings_w, settings_h)
@@ -164,12 +125,10 @@ class EnvironmentBar(QFrame):
         self.refresh_display()
 
     def update_hardware_status(self, text):
-        self.hardware_status_text = text if text else "IO: --    ANTURIT: --"
-        self.refresh_display()
+        pass
 
     def update_fortest_status(self, text):
-        self.fortest_status_text = text if text else "FORTEST 1: --    FORTEST 2: --"
-        self.refresh_display()
+        pass
 
     def refresh_display(self):
         room_temp = f"{self.room_temperature:.1f}°C" if self.room_temperature is not None else "--.-°C"
@@ -186,6 +145,3 @@ class EnvironmentBar(QFrame):
             f"SÄILIÖ: {tank_temp} / {tank_hum} / {tank_pressure}    "
             f"KAPPALE: {part_temp}"
         )
-
-        self.hardware_label.setText(self.hardware_status_text)
-        self.fortest_label.setText(self.fortest_status_text)
