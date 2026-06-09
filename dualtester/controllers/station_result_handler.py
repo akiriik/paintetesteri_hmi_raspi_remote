@@ -103,10 +103,11 @@ class StationResultHandler:
         result_color = self._get_result_color(test_result)
 
         formatted_decay, decay_unit = self._parse_decay_value(result.registers)
+        environment_snapshot = self._get_environment_snapshot(result)
 
         program_text = self._get_program_text(result)
-        room_temp_text = self._get_room_temp_text(result)
-        part_temp_text = self._get_part_temp_text(result)
+        room_temp_text = self._get_room_temp_text(environment_snapshot)
+        part_temp_text = self._get_part_temp_text(environment_snapshot)
 
         controller.station_widget.add_result_row(
             display_time=f"{hours:02d}:{minutes:02d}",
@@ -124,6 +125,7 @@ class StationResultHandler:
             result_status=result_status,
             formatted_decay=formatted_decay,
             decay_unit=decay_unit,
+            environment_snapshot=environment_snapshot,
             year=year,
             month=month,
             day=day,
@@ -174,17 +176,27 @@ class StationResultHandler:
 
         return f"{controller.program_number}. Ohjelma {controller.program_number}"
 
-    def _get_room_temp_text(self, result):
-        if hasattr(result, "room_temp"):
-            return f"{result.room_temp:.1f}°C"
+    def _get_room_temp_text(self, environment_snapshot):
+        room_temperature = environment_snapshot.get("room_temperature_c")
 
-        return ""
+        if room_temperature is None:
+            return ""
 
-    def _get_part_temp_text(self, result):
-        if hasattr(result, "part_temp"):
-            return f"{result.part_temp:.1f}°C"
+        try:
+            return f"{float(room_temperature):.1f}°C"
+        except Exception:
+            return ""
 
-        return ""
+    def _get_part_temp_text(self, environment_snapshot):
+        part_temperature = environment_snapshot.get("part_temperature_c")
+
+        if part_temperature is None:
+            return ""
+
+        try:
+            return f"{float(part_temperature):.1f}°C"
+        except Exception:
+            return ""
 
     def _safe_float(self, value):
         if value is None or value == "":
@@ -256,6 +268,7 @@ class StationResultHandler:
         result_status,
         formatted_decay,
         decay_unit,
+        environment_snapshot,
         year,
         month,
         day,
@@ -282,8 +295,6 @@ class StationResultHandler:
             minutes,
             seconds,
         )
-
-        environment_snapshot = self._get_environment_snapshot(result)
 
         data = {
             "timestamp": timestamp,
