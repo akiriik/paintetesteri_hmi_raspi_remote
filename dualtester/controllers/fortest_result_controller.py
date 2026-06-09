@@ -28,11 +28,7 @@ class ForTestResultController:
         station = self.station_controllers.get(station_id)
 
         if not station:
-            print(f"ForTest: tuntematon station_id {station_id}")
             return
-
-        if op_code not in [self.OP_STATUS_READ, self.OP_RESULTS_READ]:
-            print(f"ForTest {station_id}: op_code={op_code}, error_msg={error_msg}")
 
         if op_code == self.OP_CONNECTION_ERROR:
             station.update_status(error_msg, "WARNING")
@@ -61,8 +57,6 @@ class ForTestResultController:
         if op_code == self.OP_RESULTS_READ:
             station.update_test_results(result)
             return
-
-        print(f"ForTest {station_id}: tuntematon op_code {op_code}")
 
     def cleanup(self):
         pass
