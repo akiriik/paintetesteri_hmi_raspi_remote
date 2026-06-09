@@ -6,6 +6,9 @@ import smbus
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 
 
+DFR0558_TEMPERATURE_OFFSET_C = -1.9
+
+
 class DFR0558Handler(QObject):
     """DFRobot DFR0558 / MAX31855 K-tyypin termoparianturin käsittelijä."""
 
@@ -19,7 +22,7 @@ class DFR0558Handler(QObject):
         self.bus = None
         self.connected = False
 
-        self.retry_interval_s = 10
+        self.retry_interval_s = 5
         self.next_retry_time = 0
         self.error_reported = False
         self.consecutive_error_count = 0
@@ -67,6 +70,9 @@ class DFR0558Handler(QObject):
             self.sensor_error.emit(message)
             self.error_reported = True
 
+    def _apply_calibration(self, temperature):
+        return temperature + DFR0558_TEMPERATURE_OFFSET_C
+
     def emit_averaged_temperature(self, temperature):
         self.average_samples.append(temperature)
         averaged = sum(self.average_samples) / len(self.average_samples)
@@ -101,7 +107,7 @@ class DFR0558Handler(QObject):
             if raw & 0x2000:
                 raw -= 0x4000
 
-            temperature = raw * 0.25
+            temperature = self._apply_calibration(raw * 0.25)
 
             if temperature < self.absolute_min_c or temperature > self.absolute_max_c:
                 self._handle_read_error(f"DFR0558 epäuskottava lukema hylätty: {temperature:.1f} °C")
