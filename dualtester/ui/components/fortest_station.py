@@ -4,10 +4,6 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
 
-# ============================================================
-# ForTestStation koordinaatit
-# ============================================================
-
 PROGRAM_BOX_X = 20
 PROGRAM_BOX_Y = 15
 PROGRAM_BOX_W = 880
@@ -15,8 +11,13 @@ PROGRAM_BOX_H = 200
 
 STATION_TITLE_X = 15
 STATION_TITLE_Y = 10
-STATION_TITLE_W = 850
+STATION_TITLE_W = 650
 STATION_TITLE_H = 35
+
+TEMP_BUTTON_X = PROGRAM_BOX_W - 125
+TEMP_BUTTON_Y = 10
+TEMP_BUTTON_W = 100
+TEMP_BUTTON_H = 36
 
 PROGRAM_TITLE_X = 15
 PROGRAM_TITLE_Y = 50
@@ -104,20 +105,16 @@ FONT_START_STOP = ("Arial", 22)
 FONT_JIG_BUTTON = ("Arial", 15)
 FONT_DEV_BUTTON = ("Arial", 15)
 FONT_CLEAR_BUTTON = ("Arial", 11)
+FONT_TEMP_BUTTON = ("Arial", 12)
 
 
 class ForTestStation(QFrame):
-    """
-    Yhden ForTest-aseman UI-komponentti.
-
-    Tämä ei sisällä Modbus-, GPIO- tai ForTest-yhteyslogiikkaa.
-    """
-
     def __init__(self, station_id, parent=None):
         super().__init__(parent)
 
         self.station_id = station_id
         self.results_history = []
+        self.part_temperature_enabled = False
 
         self.init_ui()
 
@@ -154,6 +151,19 @@ class ForTestStation(QFrame):
             "color: white; background: transparent; border: none;"
         )
         self.station_title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.part_temperature_button = QPushButton("LÄMPÖ", self.program_box)
+        self.part_temperature_button.setGeometry(
+            TEMP_BUTTON_X,
+            TEMP_BUTTON_Y,
+            TEMP_BUTTON_W,
+            TEMP_BUTTON_H,
+        )
+        self.part_temperature_button.setFont(
+            QFont(FONT_TEMP_BUTTON[0], FONT_TEMP_BUTTON[1], QFont.Bold)
+        )
+        self.part_temperature_button.clicked.connect(self.toggle_part_temperature_enabled)
+        self.set_part_temperature_enabled(False)
 
         self.program_label = QLabel("OHJELMA: --", self.program_box)
         self.program_label.setGeometry(
@@ -418,6 +428,40 @@ class ForTestStation(QFrame):
         self.dev_result_button.hide()
 
         self.update_running_state(False, False)
+
+    def toggle_part_temperature_enabled(self):
+        self.set_part_temperature_enabled(not self.part_temperature_enabled)
+
+    def set_part_temperature_enabled(self, enabled):
+        self.part_temperature_enabled = bool(enabled)
+
+        if self.part_temperature_enabled:
+            self.part_temperature_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #0B7A28;
+                    color: white;
+                    border-radius: 8px;
+                    border: none;
+                }
+                QPushButton:hover {
+                    background-color: #10A838;
+                }
+            """)
+        else:
+            self.part_temperature_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #555555;
+                    color: #DDDDDD;
+                    border-radius: 8px;
+                    border: none;
+                }
+                QPushButton:hover {
+                    background-color: #777777;
+                }
+            """)
+
+    def is_part_temperature_enabled(self):
+        return bool(self.part_temperature_enabled)
 
     def update_program_info(
         self,
