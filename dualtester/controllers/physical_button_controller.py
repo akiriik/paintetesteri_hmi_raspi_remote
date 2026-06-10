@@ -22,7 +22,7 @@ class PhysicalButtonController:
     - vihreä vilkkuu = kappale puuttuu, painallus ajaa KAPPALE KIINNI
     - punainen vilkkuu = FAIL-kappale odottaa poistoa, painallus ajaa KAPPALEEN POISTO
 
-    Vilkutus on rauhallinen, jotta releitä ei kuluteta turhaan.
+    Vilkutus vaihtaa vain LED ON/OFF -ohjausta, ei värirelettä joka syklillä.
     """
 
     COLOR_READY_GREEN = False
@@ -34,7 +34,7 @@ class PhysicalButtonController:
     LIGHT_MODE_GREEN_BLINK = "green_blink"
     LIGHT_MODE_RED_BLINK = "red_blink"
 
-    BLINK_INTERVAL_S = 1.5
+    BLINK_INTERVAL_S = 1.0
 
     def __init__(self, station_controllers, hardware_service):
         self.station_controllers = station_controllers
@@ -170,10 +170,7 @@ class PhysicalButtonController:
         if old_state == new_state:
             return
 
-        old_color = None
-        if old_state:
-            old_color = old_state.get("color")
-
+        old_color = old_state.get("color") if old_state else None
         light_on = new_state["light_on"]
         color_state = new_state["color"]
 
@@ -185,7 +182,6 @@ class PhysicalButtonController:
                 time.sleep(0.03)
                 self.hardware_service.set_output(on_off_output, True)
         else:
-            self.hardware_service.set_output(color_output, color_state)
             self.hardware_service.set_output(on_off_output, light_on)
 
         self.last_light_states[station_id] = new_state
