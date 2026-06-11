@@ -33,9 +33,9 @@ class EnvironmentBar(QFrame):
             }
         """)
 
-        env_x = 10
+        env_x = 220
         env_y = 6
-        env_w = 1180
+        env_w = 940
         env_h = 70
 
         settings_x = 1240
@@ -55,9 +55,9 @@ class EnvironmentBar(QFrame):
 
         self.environment_label = QLabel("", self)
         self.environment_label.setGeometry(env_x, env_y, env_w, env_h)
-        self.environment_label.setFont(QFont("Consolas", 15))
-        self.environment_label.setStyleSheet("color: #33FF33; background: transparent; border: none;")
-        self.environment_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.environment_label.setFont(QFont("Consolas", 20, QFont.Bold))
+        self.environment_label.setStyleSheet("color: white; background: transparent; border: none;")
+        self.environment_label.setAlignment(Qt.AlignCenter)
 
         self.settings_button = QPushButton("ASETUKSET", self)
         self.settings_button.setGeometry(settings_x, settings_y, settings_w, settings_h)
@@ -133,15 +133,8 @@ class EnvironmentBar(QFrame):
     def refresh_display(self):
         room_temp = f"{self.room_temperature:.1f}°C" if self.room_temperature is not None else "--.-°C"
         room_hum = f"{self.room_humidity:.1f} %" if self.room_humidity is not None else "--.- %"
-
-        tank_temp = f"{self.tank_temperature:.1f}°C" if self.tank_temperature is not None else "--.-°C"
-        tank_hum = f"{self.tank_humidity:.1f} %" if self.tank_humidity is not None else "--.- %"
-        tank_pressure = f"{self.tank_pressure:.2f} BAR" if self.tank_pressure is not None else "-.-- BAR"
-
         part_temp = f"{self.part_temperature:.1f}°C" if self.part_temperature is not None else "--.-°C"
 
         self.environment_label.setText(
-            f"HUONE: {room_temp} / {room_hum}    "
-            f"SÄILIÖ: {tank_temp} / {tank_hum} / {tank_pressure}    "
-            f"KAPPALE: {part_temp}"
+            f"HUONE: {room_temp} / {room_hum}        KAPPALE: {part_temp}"
         )
