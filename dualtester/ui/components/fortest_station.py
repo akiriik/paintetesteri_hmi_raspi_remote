@@ -582,16 +582,15 @@ class ForTestStation(QFrame):
         room_temp_text,
         part_temp_text,
     ):
-        new_result = f"""
-        <tr>
-            <td>{display_time}</td>
-            <td>{program_text}</td>
-            <td><span style="color:{result_color};">{decay_text}</span></td>
-            <td><span style="color:{result_color};">{result_text}</span></td>
-            <td>{room_temp_text}</td>
-            <td>{part_temp_text}</td>
-        </tr>
-        """
+        new_result = {
+            "display_time": display_time,
+            "program_text": program_text,
+            "decay_text": decay_text,
+            "result_text": result_text,
+            "result_color": result_color,
+            "room_temp_text": room_temp_text,
+            "part_temp_text": part_temp_text,
+        }
 
         self.results_history.insert(0, new_result)
 
@@ -604,7 +603,45 @@ class ForTestStation(QFrame):
         self.results_history.clear()
         self._refresh_results_table()
 
+    def _build_result_row(self, result, is_latest):
+        display_time = result["display_time"]
+        program_text = result["program_text"]
+        decay_text = result["decay_text"]
+        result_text = result["result_text"]
+        result_color = result["result_color"]
+        room_temp_text = result["room_temp_text"]
+        part_temp_text = result["part_temp_text"]
+
+        if is_latest:
+            cell_style = " bgcolor=\"#303030\""
+            return f"""
+            <tr>
+                <td{cell_style}><b>- {display_time}</b></td>
+                <td{cell_style}><b>{program_text}</b></td>
+                <td{cell_style}><b><span style="color:{result_color};">{decay_text}</span></b></td>
+                <td{cell_style}><b><span style="color:{result_color};">{result_text}</span></b></td>
+                <td{cell_style}><b>{room_temp_text}</b></td>
+                <td{cell_style}><b>{part_temp_text} -</b></td>
+            </tr>
+            """
+
+        return f"""
+        <tr>
+            <td>{display_time}</td>
+            <td>{program_text}</td>
+            <td><span style="color:{result_color};">{decay_text}</span></td>
+            <td><span style="color:{result_color};">{result_text}</span></td>
+            <td>{room_temp_text}</td>
+            <td>{part_temp_text}</td>
+        </tr>
+        """
+
     def _refresh_results_table(self):
+        result_rows = []
+
+        for index, result in enumerate(self.results_history):
+            result_rows.append(self._build_result_row(result, index == 0))
+
         display_html = f"""
         <table width="100%" cellspacing="0" cellpadding="6">
             <tr style="color:#888888; font-size:18px;">
@@ -615,7 +652,7 @@ class ForTestStation(QFrame):
                 <td>HUONE</td>
                 <td>KAPPALE</td>
             </tr>
-            {''.join(self.results_history)}
+            {''.join(result_rows)}
         </table>
         """
 
