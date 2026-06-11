@@ -122,6 +122,10 @@ class StationController(QObject):
             self.station_widget.dev_result_button.clicked.connect(self.show_dev_fortest_result)
             self.station_widget.dev_result_button.setVisible(self.dev_mode_fortest)
 
+    def register_test_activity(self):
+        if hasattr(self.main_window, "register_test_activity"):
+            self.main_window.register_test_activity()
+
     def request_program_selection(self):
         if hasattr(self.main_window, "show_program_selection"):
             self.main_window.show_program_selection(self.station_id)
@@ -800,6 +804,7 @@ class StationController(QObject):
             self.refresh_station_state()
             return
 
+        self.register_test_activity()
         QTimer.singleShot(200, self._continue_start_test)
 
     def _continue_start_test(self):
@@ -892,6 +897,7 @@ class StationController(QObject):
         test_result = self.result_handler.update_test_results(result)
 
         if test_result is not None:
+            self.register_test_activity()
             self.waiting_result_from_finished_test = False
             self.results_started = False
             self.handle_result_for_automatic_cycle(test_result)
@@ -900,6 +906,7 @@ class StationController(QObject):
 
     def show_dev_fortest_result(self):
         self.result_handler.create_dev_result()
+        self.register_test_activity()
         self.open_test_valve()
         self.refresh_station_state()
 
