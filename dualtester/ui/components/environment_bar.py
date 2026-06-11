@@ -55,7 +55,7 @@ class EnvironmentBar(QFrame):
 
         self.environment_label = QLabel("", self)
         self.environment_label.setGeometry(env_x, env_y, env_w, env_h)
-        self.environment_label.setFont(QFont("Consolas", 20, QFont.Bold))
+        self.environment_label.setFont(QFont("Consolas", 20))
         self.environment_label.setStyleSheet("color: white; background: transparent; border: none;")
         self.environment_label.setAlignment(Qt.AlignCenter)
 
