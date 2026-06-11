@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import QLabel, QPushButton, QFrame
 from ui.components.shutdown_dialogs import ShutdownController
 
 
-IDLE_SHUTDOWN_TIMEOUT_S = 2 * 60 * 60
+IDLE_SHUTDOWN_TIMEOUT_S = 3 * 60 * 60
 IDLE_SHUTDOWN_WARNING_S = 30 * 60
 IDLE_CHECK_INTERVAL_MS = 1000
 
@@ -33,7 +33,7 @@ class IdleShutdownWarningOverlay(QFrame):
         self.title_label.setAlignment(Qt.AlignCenter)
         self.title_label.setStyleSheet("color: white; background: transparent; border: none;")
 
-        self.info_label = QLabel("Järjestelmää ei ole käytetty kahteen tuntiin.", self)
+        self.info_label = QLabel("Järjestelmää ei ole käytetty kolmeen tuntiin.", self)
         self.info_label.setGeometry(210, 355, 1500, 60)
         self.info_label.setFont(QFont("Arial", 24))
         self.info_label.setAlignment(Qt.AlignCenter)
@@ -74,7 +74,7 @@ class IdleShutdownWarningOverlay(QFrame):
 
 class IdleShutdownController:
     """
-    Automaattinen sammutus, jos yhtään testiä ei ole tehty kahteen tuntiin.
+    Automaattinen sammutus, jos yhtään testiä ei ole tehty kolmeen tuntiin.
 
     30 min ennen sammutusta näytetään koko ruudun varoitus ja peruutusnappi.
     Sammutusta ei tehdä, jos ForTest-testi tai Opta/jig-sekvenssi on kesken.
