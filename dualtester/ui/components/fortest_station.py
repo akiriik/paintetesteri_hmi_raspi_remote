@@ -616,12 +616,12 @@ class ForTestStation(QFrame):
             cell_style = " bgcolor=\"#303030\""
             return f"""
             <tr>
-                <td{cell_style}><b>- {display_time}</b></td>
+                <td{cell_style}><b>{display_time}</b></td>
                 <td{cell_style}><b>{program_text}</b></td>
                 <td{cell_style}><b><span style="color:{result_color};">{decay_text}</span></b></td>
                 <td{cell_style}><b><span style="color:{result_color};">{result_text}</span></b></td>
                 <td{cell_style}><b>{room_temp_text}</b></td>
-                <td{cell_style}><b>{part_temp_text} -</b></td>
+                <td{cell_style}><b>{part_temp_text}</b></td>
             </tr>
             """
 
