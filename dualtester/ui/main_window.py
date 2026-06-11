@@ -23,6 +23,7 @@ from controllers.fortest_result_controller import ForTestResultController
 from controllers.top_bar_controller import TopBarController
 from controllers.application_cleanup_controller import ApplicationCleanupController
 from controllers.navigation_controller import NavigationController
+from controllers.idle_shutdown_controller import IdleShutdownController
 
 from config.port_config import (
     OPTA_MODBUS_PORT,
@@ -200,9 +201,18 @@ class MainWindow(QWidget):
             parent=self,
         )
 
+        self.idle_shutdown_controller = IdleShutdownController(
+            main_window=self,
+        )
+
         self.application_cleanup_controller = ApplicationCleanupController(
             main_window=self,
         )
+
+    def register_test_activity(self):
+        """Nollaa automaattisen sammutuksen ajastin testitoiminnasta."""
+        if hasattr(self, "idle_shutdown_controller") and self.idle_shutdown_controller:
+            self.idle_shutdown_controller.register_test_activity()
 
     def update_environment_sensors(self):
         """
@@ -303,6 +313,9 @@ class MainWindow(QWidget):
         self.showFullScreen()
 
     def closeEvent(self, event):
+        if hasattr(self, "idle_shutdown_controller") and self.idle_shutdown_controller:
+            self.idle_shutdown_controller.cleanup()
+
         if hasattr(self, "application_cleanup_controller") and self.application_cleanup_controller:
             self.application_cleanup_controller.cleanup()
 
