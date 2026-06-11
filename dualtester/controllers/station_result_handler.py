@@ -3,6 +3,11 @@ from datetime import datetime
 from types import SimpleNamespace
 import random
 
+from utils.system_time_sync import (
+    build_valid_result_datetime,
+    sync_system_time_from_fortest_result,
+)
+
 
 class StationResultHandler:
     """
@@ -94,6 +99,16 @@ class StationResultHandler:
         self.last_result_id = result_id
         self.last_test_result = test_result
 
+        result_datetime = build_valid_result_datetime(
+            year=year,
+            month=month,
+            day=day,
+            hours=hours,
+            minutes=minutes,
+            seconds=seconds,
+        )
+        self._sync_system_time_once_from_fortest_result(result_datetime)
+
         result_status = self.RESULT_TEXTS.get(test_result, f"TULOS: {test_result}")
         result_color = self._get_result_color(test_result)
 
@@ -130,6 +145,32 @@ class StationResultHandler:
         )
 
         return test_result
+
+    def _sync_system_time_once_from_fortest_result(self, result_datetime):
+        controller = self.controller
+        main_window = getattr(controller, "main_window", None)
+
+        if not main_window:
+            return
+
+        if getattr(main_window, "fortest_time_sync_done", False):
+            return
+
+        if result_datetime is None:
+            print("ForTest-aikakorjaus ohitettu: tuloksen päivämäärä/kello ei ole kelvollinen")
+            return
+
+        main_window.fortest_time_sync_done = True
+        success, message = sync_system_time_from_fortest_result(result_datetime)
+        print(message)
+
+        if success:
+            return
+
+        print(
+            "HUOM: Raspberryn ajan korjaus vaatii sudo-oikeuden ilman salasanaa "
+            "date-komennolle."
+        )
 
     def _get_result_color(self, test_result):
         if test_result == 1:
