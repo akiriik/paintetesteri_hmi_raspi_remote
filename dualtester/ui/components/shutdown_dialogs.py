@@ -133,7 +133,7 @@ class ShutdownOptionsDialog(QDialog):
 
         self.setWindowTitle("Sammutusvalikko")
         self.setModal(True)
-        self.setFixedSize(800, 400)
+        self.setFixedSize(800, 470)
 
         self.init_ui()
 
@@ -149,7 +149,7 @@ class ShutdownOptionsDialog(QDialog):
         """)
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(30)
+        layout.setSpacing(25)
         layout.setContentsMargins(40, 40, 40, 40)
 
         title = QLabel("Valitse toiminto:", self)
@@ -158,16 +158,18 @@ class ShutdownOptionsDialog(QDialog):
         layout.addWidget(title)
 
         buttons_layout = QVBoxLayout()
-        buttons_layout.setSpacing(15)
+        buttons_layout.setSpacing(12)
 
         self.raspberry_button = QPushButton("Sammuta Raspberry Pi")
         self.restart_button = QPushButton("Käynnistä ohjelma uudelleen")
+        self.minimize_button = QPushButton("Laita ohjelma alas")
         self.close_button = QPushButton("Sammuta ohjelma")
         self.cancel_button = QPushButton("Peruuta")
 
         buttons = [
             self.raspberry_button,
             self.restart_button,
+            self.minimize_button,
             self.close_button,
             self.cancel_button,
         ]
@@ -193,6 +195,7 @@ class ShutdownOptionsDialog(QDialog):
 
         self.raspberry_button.clicked.connect(lambda: self.set_result("raspberry"))
         self.restart_button.clicked.connect(lambda: self.set_result("restart"))
+        self.minimize_button.clicked.connect(lambda: self.set_result("minimize"))
         self.close_button.clicked.connect(lambda: self.set_result("close"))
         self.cancel_button.clicked.connect(lambda: self.set_result("cancel"))
 
@@ -235,6 +238,8 @@ class ShutdownController:
             ShutdownController.shutdown_system(parent)
         elif dialog.result_value == "restart":
             ShutdownController.restart_application(parent)
+        elif dialog.result_value == "minimize":
+            ShutdownController.minimize_application(parent)
         elif dialog.result_value == "close":
             ShutdownController.close_application(parent)
 
@@ -274,6 +279,14 @@ class ShutdownController:
             main_window.close()
 
         os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    @staticmethod
+    def minimize_application(parent):
+        main_window = ShutdownController._get_main_window(parent)
+
+        if main_window:
+            main_window.showMinimized()
+            main_window.setWindowState(main_window.windowState() | Qt.WindowMinimized)
 
     @staticmethod
     def close_application(parent):
