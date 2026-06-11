@@ -74,6 +74,7 @@ class StationController(QObject):
         self.auto_part_change_in_progress = False
         self.auto_cycle_started_by_user = False
         self.auto_cycle_phase = AUTO_PHASE_IDLE
+        self.auto_restart_after_manual_clamp = False
 
         self.test_valve_controller = TestValveController(self.hardware_service)
         self.result_handler = StationResultHandler(self)
@@ -262,6 +263,7 @@ class StationController(QObject):
             self.auto_cycle_started_by_user = False
             self.auto_part_change_in_progress = False
             self.auto_cycle_phase = AUTO_PHASE_IDLE
+            self.auto_restart_after_manual_clamp = False
 
             if hasattr(self.station_widget, "set_auto_part_change_enabled_state"):
                 self.station_widget.set_auto_part_change_enabled_state(False)
@@ -368,14 +370,13 @@ class StationController(QObject):
                 self.update_status("AUTOMAATTIA EI VOI KYTKEÄ TESTIN AIKANA", "ERROR")
                 return
 
-            self.auto_part_change_enabled = True
-            self.auto_cycle_started_by_user = False
-            self.auto_part_change_in_progress = False
-            self.auto_cycle_phase = AUTO_PHASE_IDLE
-            self.update_status("AUTOMAATTI PÄÄLLÄ - PAINA START", "SUCCESS")
-        else:
-            self.disable_auto_part_change("AUTOMAATTI POIS", show_message=True)
+            self.enter_missing_part_wait_state(
+                auto_restart_after_clamp=False,
+                initial_start=True,
+            )
+            return
 
+        self.disable_auto_part_change("AUTOMAATTI POIS", show_message=True)
         self.refresh_station_state()
 
     def disable_auto_part_change(self, message=None, show_message=True):
@@ -383,6 +384,7 @@ class StationController(QObject):
         self.auto_cycle_started_by_user = False
         self.auto_part_change_in_progress = False
         self.auto_cycle_phase = AUTO_PHASE_IDLE
+        self.auto_restart_after_manual_clamp = False
 
         if hasattr(self.station_widget, "set_auto_part_change_enabled_state"):
             self.station_widget.set_auto_part_change_enabled_state(False)
@@ -419,6 +421,7 @@ class StationController(QObject):
 
         self.auto_part_change_in_progress = True
         self.auto_cycle_phase = AUTO_PHASE_WAIT_BEFORE_REMOVE
+        self.auto_restart_after_manual_clamp = True
 
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(False)
@@ -462,16 +465,21 @@ class StationController(QObject):
 
         self.refresh_station_state()
 
-    def enter_missing_part_wait_state(self):
+    def enter_missing_part_wait_state(self, auto_restart_after_clamp=True, initial_start=False):
         self.auto_part_change_enabled = True
         self.auto_cycle_started_by_user = True
         self.auto_part_change_in_progress = False
         self.auto_cycle_phase = AUTO_PHASE_WAIT_MISSING_PART_CLAMP
+        self.auto_restart_after_manual_clamp = bool(auto_restart_after_clamp)
 
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(True)
 
-        self.update_status("KAPPALE PUUTTUU - LISÄÄ KAPPALE JA PAINA VIHREÄÄ NAPPIA", "WARNING")
+        if initial_start:
+            self.update_status("AUTOMAATTI PÄÄLLÄ - LISÄÄ KAPPALE JA PAINA VIHREÄÄ NAPPIA", "SUCCESS")
+        else:
+            self.update_status("KAPPALE PUUTTUU - LISÄÄ KAPPALE JA PAINA VIHREÄÄ NAPPIA", "WARNING")
+
         self.refresh_station_state()
 
     def enter_fail_remove_wait_state(self):
@@ -479,6 +487,7 @@ class StationController(QObject):
         self.auto_cycle_started_by_user = True
         self.auto_part_change_in_progress = False
         self.auto_cycle_phase = AUTO_PHASE_WAIT_FAIL_REMOVE
+        self.auto_restart_after_manual_clamp = True
 
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(True)
@@ -579,11 +588,12 @@ class StationController(QObject):
 
         if status == JIG_SEQUENCE_STATUS_ERROR:
             if error == JIG_SEQUENCE_ERROR_PART_MISSING:
-                self.enter_missing_part_wait_state()
+                self.enter_missing_part_wait_state(auto_restart_after_clamp=True)
                 return
 
             self.auto_part_change_in_progress = False
             self.auto_cycle_phase = AUTO_PHASE_IDLE
+            self.auto_restart_after_manual_clamp = False
             self.disable_auto_part_change(
                 f"JIG-SEKVENSSIN VIRHE {error} - AUTOMAATTI POIS",
                 show_message=True,
@@ -609,6 +619,7 @@ class StationController(QObject):
             else:
                 self.auto_part_change_in_progress = False
                 self.auto_cycle_phase = AUTO_PHASE_IDLE
+                self.auto_restart_after_manual_clamp = False
                 self.disable_auto_part_change("AUTOMAATTI POIS: KIINNITYS EI KÄYNNISTYNYT")
                 self.update_status(message, "ERROR")
 
@@ -642,12 +653,17 @@ class StationController(QObject):
             if hasattr(self.station_widget, "set_jig_controls_enabled"):
                 self.station_widget.set_jig_controls_enabled(True)
 
-            self.update_status("KAPPALE KIINNI - PAINA START, AUTOMAATTI JATKUU", "SUCCESS")
+            if self.auto_restart_after_manual_clamp:
+                self.update_status("KAPPALE KIINNI - TESTI JATKUU AUTOMAATTISESTI", "INFO")
+                QTimer.singleShot(AUTO_RESTART_AFTER_CLAMP_DELAY_MS, self.start_test)
+            else:
+                self.update_status("KAPPALE KIINNI - KÄYNNISTÄ ENSIMMÄINEN TESTI VIHREÄSTÄ NAPISTA", "SUCCESS")
+
             self.refresh_station_state()
             return
 
         if self.auto_cycle_phase == AUTO_PHASE_FAIL_REMOVE:
-            self.enter_missing_part_wait_state()
+            self.enter_missing_part_wait_state(auto_restart_after_clamp=True)
             return
 
     def handle_result_for_automatic_cycle(self, test_result):
@@ -668,6 +684,7 @@ class StationController(QObject):
 
         self.auto_part_change_in_progress = True
         self.auto_cycle_phase = AUTO_PHASE_WAIT_BEFORE_RELEASE
+        self.auto_restart_after_manual_clamp = True
 
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(False)
@@ -702,11 +719,13 @@ class StationController(QObject):
             else:
                 self.auto_part_change_in_progress = False
                 self.auto_cycle_phase = AUTO_PHASE_IDLE
+                self.auto_restart_after_manual_clamp = False
                 self.disable_auto_part_change("AUTOMAATTI POIS: KAPPALE IRTI EI KÄYNNISTYNYT")
                 self.update_status(message, "ERROR")
         else:
             self.auto_part_change_in_progress = False
             self.auto_cycle_phase = AUTO_PHASE_IDLE
+            self.auto_restart_after_manual_clamp = False
             self.disable_auto_part_change("AUTOMAATTI POIS: KAPPALE IRTI -OHJAUS PUUTTUU")
 
         self.refresh_station_state()
