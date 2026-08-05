@@ -42,7 +42,6 @@ class StationStatusHandler:
         # Jos edellinen tila oli testiin liittyvä tila, testi on juuri päättynyt.
         if status_value == 0 and self.last_status in [1, 2, 3]:
             controller.mark_test_finished_and_allow_result_read()
-            controller.open_test_valve()
             controller.fortest_service.read_results(controller.station_id)
             controller.refresh_station_state()
 
