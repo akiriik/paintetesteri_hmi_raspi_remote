@@ -27,10 +27,10 @@ class TestValveController:
       Rele OFF = venttiili kiinni
       Rele ON  = venttiili auki / purku huoneilmaan
 
-    ForTest 2:n VXA avataan vain ForTestin PURKU-tilassa. Kun ForTest
-    palaa PURKU-tilasta VALMIS-tilaan, venttiili pidetään auki vielä
-    10 sekuntia. Uuden testin aloitus sulkee venttiilin heti ja peruu
-    jäljellä olevan purkuajan.
+    ForTest 2:n VXA avataan ForTestin PURKU-tilassa. Kun ForTest palaa
+    PURKU-tilasta VALMIS-tilaan, venttiili pidetään auki vielä 10 sekuntia.
+    Myös käyttäjän STOP-komento avaa venttiilin 10 sekunniksi. Uuden testin
+    aloitus sulkee venttiilin heti ja peruu jäljellä olevan purkuajan.
 
     Huom:
     HardwareService.write_register() käyttää taustasäikeistä Modbus-kirjoitusta.
@@ -53,6 +53,7 @@ class TestValveController:
             1: None,
             2: None,
         }
+        self.fortest2_stop_pressure_release_active = False
 
         self.fortest2_pressure_release_timer = QTimer()
         self.fortest2_pressure_release_timer.setSingleShot(True)
@@ -103,24 +104,43 @@ class TestValveController:
         )
 
     def _close_fortest2_after_pressure_release(self):
+        self.fortest2_stop_pressure_release_active = False
         self._write_closed_state(2, True)
 
     def set_closed(self, station_id, closed):
         if station_id == 2:
             self._cancel_fortest2_pressure_release_timer()
+            self.fortest2_stop_pressure_release_active = False
 
         return self._write_closed_state(station_id, closed)
 
     def open_valve(self, station_id):
         if station_id == 2:
             # Tester 2:n VXA:ta ei avata yleisellä open-komennolla.
-            # Avaaminen sallitaan vain ForTestin PURKU-tilan perusteella.
+            # Avaaminen sallitaan vain ForTestin PURKU-tilan tai käyttäjän
+            # STOP-komennon perusteella.
             return self.set_closed(station_id, True)
 
         return self.set_closed(station_id, False)
 
     def close_valve(self, station_id):
         return self.set_closed(station_id, True)
+
+    def release_pressure_after_stop(self, station_id):
+        if station_id != 2:
+            return self.open_valve(station_id)
+
+        self._cancel_fortest2_pressure_release_timer()
+        self.fortest2_stop_pressure_release_active = True
+
+        success, message = self._open_fortest2_for_pressure_release()
+
+        if success:
+            self._start_fortest2_pressure_release_hold()
+        else:
+            self.fortest2_stop_pressure_release_active = False
+
+        return success, message
 
     def update_from_fortest_status(self, station_id, status_value):
         """
@@ -134,6 +154,9 @@ class TestValveController:
         self.last_fortest_status_by_station[station_id] = status_value
 
         if station_id == 2:
+            if self.fortest2_stop_pressure_release_active:
+                return self._open_fortest2_for_pressure_release()
+
             if status_value in (1, 2):
                 return self.close_valve(station_id)
 
