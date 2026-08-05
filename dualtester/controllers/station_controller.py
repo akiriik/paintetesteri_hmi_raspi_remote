@@ -750,6 +750,16 @@ class StationController(QObject):
 
         return success
 
+    def release_test_pressure_after_stop(self):
+        success, message = self.test_valve_controller.release_pressure_after_stop(
+            self.station_id
+        )
+
+        if not success and message:
+            self.update_status(message, "ERROR")
+
+        return success
+
     def update_test_valve_from_fortest_status(self, status_value):
         success, message = self.test_valve_controller.update_from_fortest_status(
             station_id=self.station_id,
@@ -822,7 +832,7 @@ class StationController(QObject):
 
     def stop_test(self):
         if not self.is_running:
-            self.open_test_valve()
+            self.release_test_pressure_after_stop()
             self.refresh_station_state()
             return
 
@@ -837,7 +847,7 @@ class StationController(QObject):
         if not self.dev_mode_fortest:
             self.fortest_service.abort_test(self.station_id)
 
-        self.open_test_valve()
+        self.release_test_pressure_after_stop()
         self.refresh_station_state()
 
     def finish_test(self, status_message=None, level="INFO"):
