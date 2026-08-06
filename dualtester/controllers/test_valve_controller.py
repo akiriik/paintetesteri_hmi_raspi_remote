@@ -27,8 +27,9 @@ class TestValveController:
       Rele OFF = venttiili kiinni
       Rele ON  = venttiili auki / purku huoneilmaan
 
-    ForTest 2:n VXA avataan ForTestin PURKU-tilassa. Kun ForTest palaa
-    PURKU-tilasta VALMIS-tilaan, venttiili pidetään auki vielä 10 sekuntia.
+    ForTest 2:n VXA avataan ForTestin PURKU-tilassa. Kun aktiivinen testi
+    päättyy ja ForTest palaa VALMIS-tilaan, venttiili avataan tai pidetään
+    auki 10 sekuntia, vaikka lyhyt PURKU-tila jäisi statuskyselyjen väliin.
     Myös käyttäjän STOP-komento avaa venttiilin 10 sekunniksi. Uuden testin
     aloitus sulkee venttiilin heti ja peruu jäljellä olevan purkuajan.
 
@@ -117,8 +118,8 @@ class TestValveController:
     def open_valve(self, station_id):
         if station_id == 2:
             # Tester 2:n VXA:ta ei avata yleisellä open-komennolla.
-            # Avaaminen sallitaan vain ForTestin PURKU-tilan tai käyttäjän
-            # STOP-komennon perusteella.
+            # Avaaminen sallitaan aktiivisen testin päättymisen, ForTestin
+            # PURKU-tilan tai käyttäjän STOP-komennon perusteella.
             return self.set_closed(station_id, True)
 
         return self.set_closed(station_id, False)
@@ -165,7 +166,11 @@ class TestValveController:
                 return self._open_fortest2_for_pressure_release()
 
             if status_value == 0:
-                if previous_status == 3:
+                # Testi on päättynyt aina, kun aktiivisesta testitilasta
+                # 1/2/3 palataan valmiustilaan. Purku käynnistetään myös
+                # suorassa 1->0 tai 2->0 siirtymässä, koska ForTestin lyhyt
+                # PURKU=3 voi jäädä yhden sekunnin statuskyselyjen väliin.
+                if previous_status in (1, 2, 3):
                     success, message = self._open_fortest2_for_pressure_release()
 
                     if success:
