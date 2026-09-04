@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Päivitä painetesteri
+Comment=Hae uusin painetesteriohjelma GitHubista
+Exec=/bin/bash -lc "exec /usr/bin/python3 \"$HOME/painetesteri_hmi/tools/update_manager.py\" update"
+Icon=system-software-update
+Terminal=false
+Categories=Utility;
+StartupNotify=true
