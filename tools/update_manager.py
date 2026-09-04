@@ -213,10 +213,12 @@ def configure_message_box(box):
     box.setStyleSheet(
         """
         QMessageBox {
-            background-color: white;
+            background-color: #202124;
+            color: #f1f3f4;
         }
         QMessageBox QLabel {
             min-width: 720px;
+            color: #f1f3f4;
             font-size: 24px;
             line-height: 1.25;
         }
@@ -224,8 +226,21 @@ def configure_message_box(box):
             min-width: 210px;
             min-height: 72px;
             padding: 8px 18px;
+            background-color: #3c4043;
+            color: #ffffff;
+            border: 2px solid #5f6368;
+            border-radius: 10px;
             font-size: 22px;
             font-weight: 600;
+        }
+        QMessageBox QPushButton:hover {
+            background-color: #4b5054;
+        }
+        QMessageBox QPushButton:pressed {
+            background-color: #2f3336;
+        }
+        QMessageBox QPushButton:default {
+            border: 3px solid #8ab4f8;
         }
         """
     )
