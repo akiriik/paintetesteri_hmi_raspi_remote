@@ -31,8 +31,9 @@ EMERGENCY_STATUS_REGISTER_COUNT = 1
 # 18092 = Optan oma rele 3 = ForTest 1 testiventtiili
 # 18093 = Optan oma rele 4 = ForTest 2 testiventtiili
 #
-# Rele ON  = testiventtiili kiinni
-# Rele OFF = testiventtiili auki / purku
+# Molemmissa testereissä on NC VXA -venttiili:
+# Rele OFF = testiventtiili kiinni
+# Rele ON  = testiventtiili auki / purku
 
 FORTEST1_TEST_VALVE_REGISTER = 18092
 FORTEST2_TEST_VALVE_REGISTER = 18093
