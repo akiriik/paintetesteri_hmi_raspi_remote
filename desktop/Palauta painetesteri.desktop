@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Palauta painetesteri
+Comment=Palauta ennen viimeisintä päivitystä käytössä ollut versio
+Exec=/bin/bash -lc "exec /usr/bin/python3 \"$HOME/painetesteri_hmi/tools/update_manager.py\" rollback"
+Icon=edit-undo
+Terminal=false
+Categories=Utility;
+StartupNotify=true
