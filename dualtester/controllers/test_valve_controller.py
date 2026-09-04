@@ -8,7 +8,7 @@ from config.modbus_config import (
 )
 
 
-FORTEST2_PRESSURE_RELEASE_HOLD_MS = 10000
+PRESSURE_RELEASE_HOLD_MS = 10000
 
 
 class TestValveController:
@@ -19,17 +19,15 @@ class TestValveController:
 
     Kytkennät:
     - ForTest 1 -> Optan oma rele 3 -> rekisteri 18092
-      Rele ON  = venttiili kiinni
-      Rele OFF = venttiili auki / purku
-
     - ForTest 2 -> Optan oma rele 4 -> rekisteri 18093
-      VXA on NC-venttiili:
-      Rele OFF = venttiili kiinni
-      Rele ON  = venttiili auki / purku huoneilmaan
 
-    ForTest 2:n VXA avataan ForTestin PURKU-tilassa. Kun aktiivinen testi
-    päättyy ja ForTest palaa VALMIS-tilaan, venttiili avataan tai pidetään
-    auki 10 sekuntia, vaikka lyhyt PURKU-tila jäisi statuskyselyjen väliin.
+    Molemmissa asemissa on NC-tyyppinen VXA-venttiili:
+    - Rele OFF = venttiili kiinni
+    - Rele ON  = venttiili auki / purku huoneilmaan
+
+    VXA avataan ForTestin PURKU-tilassa. Kun aktiivinen testi päättyy ja
+    ForTest palaa VALMIS-tilaan, venttiili avataan tai pidetään auki
+    10 sekuntia, vaikka lyhyt PURKU-tila jäisi statuskyselyjen väliin.
     Myös käyttäjän STOP-komento avaa venttiilin 10 sekunniksi. Uuden testin
     aloitus sulkee venttiilin heti ja peruu jäljellä olevan purkuajan.
 
@@ -54,13 +52,19 @@ class TestValveController:
             1: None,
             2: None,
         }
-        self.fortest2_stop_pressure_release_active = False
+        self.pressure_release_active_by_station = {
+            1: False,
+            2: False,
+        }
+        self.pressure_release_timers = {}
 
-        self.fortest2_pressure_release_timer = QTimer()
-        self.fortest2_pressure_release_timer.setSingleShot(True)
-        self.fortest2_pressure_release_timer.timeout.connect(
-            self._close_fortest2_after_pressure_release
-        )
+        for station_id in self.TEST_VALVE_REGISTER_BY_STATION:
+            timer = QTimer()
+            timer.setSingleShot(True)
+            timer.timeout.connect(
+                lambda sid=station_id: self._close_after_pressure_release(sid)
+            )
+            self.pressure_release_timers[station_id] = timer
 
     def _get_register(self, station_id):
         return self.TEST_VALVE_REGISTER_BY_STATION.get(station_id)
@@ -79,10 +83,9 @@ class TestValveController:
         if not self.hardware_service:
             return False, "HardwareService ei ole käytössä"
 
-        if station_id == 2:
-            value = 0 if closed_bool else 1
-        else:
-            value = 1 if closed_bool else 0
+        # Molemmat testerit käyttävät samanlaista NC VXA -venttiiliä:
+        # rele OFF (0) = kiinni, rele ON (1) = auki / purku.
+        value = 0 if closed_bool else 1
 
         try:
             self.hardware_service.write_register(register, value)
@@ -92,54 +95,53 @@ class TestValveController:
         except Exception as e:
             return False, f"ForTest {station_id}: testiventtiilin ohjaus epäonnistui: {e}"
 
-    def _cancel_fortest2_pressure_release_timer(self):
-        if self.fortest2_pressure_release_timer.isActive():
-            self.fortest2_pressure_release_timer.stop()
+    def _get_pressure_release_timer(self, station_id):
+        return self.pressure_release_timers.get(station_id)
 
-    def _open_fortest2_for_pressure_release(self):
-        return self._write_closed_state(2, False)
+    def _cancel_pressure_release_timer(self, station_id):
+        timer = self._get_pressure_release_timer(station_id)
 
-    def _start_fortest2_pressure_release_hold(self):
-        self.fortest2_pressure_release_timer.start(
-            FORTEST2_PRESSURE_RELEASE_HOLD_MS
-        )
+        if timer and timer.isActive():
+            timer.stop()
 
-    def _close_fortest2_after_pressure_release(self):
-        self.fortest2_stop_pressure_release_active = False
-        self._write_closed_state(2, True)
+    def _open_for_pressure_release(self, station_id):
+        return self._write_closed_state(station_id, False)
+
+    def _start_pressure_release_hold(self, station_id):
+        timer = self._get_pressure_release_timer(station_id)
+
+        if timer:
+            timer.start(PRESSURE_RELEASE_HOLD_MS)
+
+    def _close_after_pressure_release(self, station_id):
+        self.pressure_release_active_by_station[station_id] = False
+        self._write_closed_state(station_id, True)
 
     def set_closed(self, station_id, closed):
-        if station_id == 2:
-            self._cancel_fortest2_pressure_release_timer()
-            self.fortest2_stop_pressure_release_active = False
+        self._cancel_pressure_release_timer(station_id)
+        self.pressure_release_active_by_station[station_id] = False
 
         return self._write_closed_state(station_id, closed)
 
     def open_valve(self, station_id):
-        if station_id == 2:
-            # Tester 2:n VXA:ta ei avata yleisellä open-komennolla.
-            # Avaaminen sallitaan aktiivisen testin päättymisen, ForTestin
-            # PURKU-tilan tai käyttäjän STOP-komennon perusteella.
-            return self.set_closed(station_id, True)
-
-        return self.set_closed(station_id, False)
+        # Yleistä open_valve()-kutsua käytetään muualla ohjelmassa
+        # valmius-/vikatilan palautukseen. Molemmilla NC VXA -venttiileillä
+        # turvallinen normaali tila on kiinni.
+        return self.set_closed(station_id, True)
 
     def close_valve(self, station_id):
         return self.set_closed(station_id, True)
 
     def release_pressure_after_stop(self, station_id):
-        if station_id != 2:
-            return self.open_valve(station_id)
+        self._cancel_pressure_release_timer(station_id)
+        self.pressure_release_active_by_station[station_id] = True
 
-        self._cancel_fortest2_pressure_release_timer()
-        self.fortest2_stop_pressure_release_active = True
-
-        success, message = self._open_fortest2_for_pressure_release()
+        success, message = self._open_for_pressure_release(station_id)
 
         if success:
-            self._start_fortest2_pressure_release_hold()
+            self._start_pressure_release_hold(station_id)
         else:
-            self.fortest2_stop_pressure_release_active = False
+            self.pressure_release_active_by_station[station_id] = False
 
         return success, message
 
@@ -154,45 +156,34 @@ class TestValveController:
         previous_status = self.last_fortest_status_by_station.get(station_id)
         self.last_fortest_status_by_station[station_id] = status_value
 
-        if station_id == 2:
-            if self.fortest2_stop_pressure_release_active:
-                return self._open_fortest2_for_pressure_release()
+        if self.pressure_release_active_by_station.get(station_id, False):
+            return self._open_for_pressure_release(station_id)
 
-            if status_value in (1, 2):
-                return self.close_valve(station_id)
-
-            if status_value == 3:
-                self._cancel_fortest2_pressure_release_timer()
-                return self._open_fortest2_for_pressure_release()
-
-            if status_value == 0:
-                # Testi on päättynyt aina, kun aktiivisesta testitilasta
-                # 1/2/3 palataan valmiustilaan. Purku käynnistetään myös
-                # suorassa 1->0 tai 2->0 siirtymässä, koska ForTestin lyhyt
-                # PURKU=3 voi jäädä yhden sekunnin statuskyselyjen väliin.
-                if previous_status in (1, 2, 3):
-                    success, message = self._open_fortest2_for_pressure_release()
-
-                    if success:
-                        self._start_fortest2_pressure_release_hold()
-
-                    return success, message
-
-                if self.fortest2_pressure_release_timer.isActive():
-                    return True, ""
-
-                return self.close_valve(station_id)
-
-            return True, ""
-
-        if status_value == 1:
+        if status_value in (1, 2):
             return self.close_valve(station_id)
 
-        if status_value in (0, 3):
-            return self.open_valve(station_id)
+        if status_value == 3:
+            self._cancel_pressure_release_timer(station_id)
+            return self._open_for_pressure_release(station_id)
+
+        if status_value == 0:
+            # Testi on päättynyt aina, kun aktiivisesta testitilasta
+            # 1/2/3 palataan valmiustilaan. Purku käynnistetään myös
+            # suorassa 1->0 tai 2->0 siirtymässä, koska ForTestin lyhyt
+            # PURKU=3 voi jäädä yhden sekunnin statuskyselyjen väliin.
+            if previous_status in (1, 2, 3):
+                success, message = self._open_for_pressure_release(station_id)
+
+                if success:
+                    self._start_pressure_release_hold(station_id)
+
+                return success, message
+
+            timer = self._get_pressure_release_timer(station_id)
+
+            if timer and timer.isActive():
+                return True, ""
+
+            return self.close_valve(station_id)
 
         return True, ""
-
-    def open_all(self):
-        self.open_valve(1)
-        self.close_valve(2)
