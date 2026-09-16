@@ -21,7 +21,7 @@ JAKOTUKKI_PROGRAM_BY_STATION = {
 
 FORTEST_RESULT_OK = 1
 
-AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS = 3000
+AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS = 10000
 AUTO_RESTART_AFTER_CLAMP_DELAY_MS = 3000
 MANUAL_JIG_BUTTON_RELEASE_DELAY_MS = 1000
 
@@ -430,7 +430,7 @@ class StationController(QObject):
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(False)
 
-        self.update_status("OK - ODOTETAAN 3s ENNEN KAPPALEENVAIHTOA", "INFO")
+        self.update_status("OK - ODOTETAAN 10s ENNEN KAPPALEENVAIHTOA", "INFO")
         self.refresh_station_state()
 
         QTimer.singleShot(
@@ -693,7 +693,7 @@ class StationController(QObject):
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(False)
 
-        self.update_status("NOK - ODOTETAAN 3s ENNEN KAPPALE IRTI -AJOA", "ERROR")
+        self.update_status("NOK - ODOTETAAN 10s ENNEN KAPPALE IRTI -AJOA", "ERROR")
         self.refresh_station_state()
 
         QTimer.singleShot(
