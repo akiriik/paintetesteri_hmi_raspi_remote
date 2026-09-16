@@ -21,12 +21,13 @@ class StationStatusHandler:
     def update_status_from_fortest(self, result):
         controller = self.controller
 
+        # Yksittäinen statuslukuvirhe ei saa muuttaa venttiilin tilaa.
+        # Näin käynnissä oleva 10 s paineenpurku ei katkea sen takia,
+        # että ForTest-vastaus puuttuu tai on hetkellisesti vajaa.
         if not result or not hasattr(result, "registers"):
-            controller.open_test_valve()
             return
 
         if len(result.registers) < 2:
-            controller.open_test_valve()
             return
 
         status_value = result.registers[1]
