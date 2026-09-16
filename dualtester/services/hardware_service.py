@@ -1,4 +1,6 @@
 # services/hardware_service.py
+import time
+
 from PyQt5.QtCore import QObject, QTimer
 
 from config.modbus_config import (
@@ -14,7 +16,9 @@ from config.modbus_config import (
     JIG_SEQUENCE_COMMAND_PART_REMOVE,
     JIG_SEQUENCE_COMMAND_AUTO_PART_CHANGE,
     JIG_SEQUENCE_STATUS_IDLE,
+    JIG_SEQUENCE_STATUS_RUNNING,
     JIG_SEQUENCE_STATUS_DONE,
+    JIG_SEQUENCE_STATUS_ERROR,
     JIG_SEQUENCE_ERROR_NONE,
 )
 
@@ -22,6 +26,12 @@ from utils.modbus_manager import ModbusManager
 from utils.gpio_handler import GPIOHandler
 from utils.gpio_input_handler import GPIOInputHandler
 from utils.dfr0558_handler import DFR0558Manager
+
+
+JIG_START_CONFIRM_TIMEOUT_S = 2.0
+JIG_SEQUENCE_MAX_RUNTIME_S = 15.0
+JIG_SYNTHETIC_ERROR_STATE_LOST = 102
+JIG_SYNTHETIC_ERROR_RUNTIME_TIMEOUT = 103
 
 
 class HardwareService(QObject):
@@ -78,6 +88,9 @@ class HardwareService(QObject):
         self.dev_jig_sequence_status = JIG_SEQUENCE_STATUS_IDLE
         self.dev_jig_sequence_step = 0
         self.dev_jig_sequence_error = JIG_SEQUENCE_ERROR_NONE
+
+        self.active_jig_sequence_name = None
+        self.active_jig_sequence_deadline = None
 
         self._init_opta_modbus()
         self._init_raspberry_gpio_outputs()
@@ -162,6 +175,48 @@ class HardwareService(QObject):
 
         return self.opta_modbus_manager
 
+    def _get_opta_modbus_handler_or_none(self):
+        opta_modbus_manager = self._get_opta_modbus_manager_or_none()
+
+        if not opta_modbus_manager:
+            return None
+
+        modbus_handler = getattr(opta_modbus_manager, "modbus_handler", None)
+
+        if not modbus_handler or not modbus_handler.connected:
+            return None
+
+        return modbus_handler
+
+    def _write_register_direct(self, address, value):
+        """
+        Kriittinen synkroninen Opta-kirjoitus.
+
+        Jig-sekvenssin command/start/stop tarvitsee todellisen Modbus-vastauksen,
+        eikä pelkkää taustajonoon lisäämistä. ModbusHandler sarjallistaa tämän
+        worker-säikeen liikenteen kanssa samalla I/O-lukolla.
+        """
+        if self.dev_mode_modbus:
+            return True
+
+        modbus_handler = self._get_opta_modbus_handler_or_none()
+
+        if not modbus_handler:
+            return False
+
+        try:
+            result = modbus_handler.write_register(address, value)
+        except Exception:
+            return False
+
+        if not result:
+            return False
+
+        if hasattr(result, "isError") and result.isError():
+            return False
+
+        return True
+
     # ------------------------------------------------------------
     # Ympäristöanturit
     # ------------------------------------------------------------
@@ -212,17 +267,9 @@ class HardwareService(QObject):
         if self.dev_mode_modbus:
             return None
 
-        opta_modbus_manager = self._get_opta_modbus_manager_or_none()
+        modbus_handler = self._get_opta_modbus_handler_or_none()
 
-        if not opta_modbus_manager:
-            return None
-
-        if not hasattr(opta_modbus_manager, "modbus_handler"):
-            return None
-
-        modbus_handler = opta_modbus_manager.modbus_handler
-
-        if not modbus_handler or not modbus_handler.connected:
+        if not modbus_handler:
             return None
 
         try:
@@ -256,14 +303,76 @@ class HardwareService(QObject):
     # Arduino Opta / jig-sekvenssit
     # ------------------------------------------------------------
 
+    def _read_jig_sequence_state_raw(self):
+        result = self.read_registers_direct(
+            JIG_SEQUENCE_STATUS_REGISTER,
+            JIG_SEQUENCE_STATE_REGISTER_COUNT,
+        )
+
+        if not result or not hasattr(result, "registers"):
+            return None
+
+        if len(result.registers) < 3:
+            return None
+
+        return {
+            "status": result.registers[0],
+            "step": result.registers[1],
+            "error": result.registers[2],
+        }
+
+    def _clear_active_jig_sequence(self):
+        self.active_jig_sequence_name = None
+        self.active_jig_sequence_deadline = None
+
+    def _make_jig_error_state(self, error_code):
+        return {
+            "status": JIG_SEQUENCE_STATUS_ERROR,
+            "step": 0,
+            "error": error_code,
+        }
+
+    def _wait_for_jig_running(self, sequence_name):
+        started_at = time.monotonic()
+        deadline = started_at + JIG_START_CONFIRM_TIMEOUT_S
+
+        while time.monotonic() < deadline:
+            state = self._read_jig_sequence_state_raw()
+
+            if state:
+                status = state.get("status")
+
+                if status == JIG_SEQUENCE_STATUS_RUNNING:
+                    self.active_jig_sequence_name = sequence_name
+                    self.active_jig_sequence_deadline = (
+                        time.monotonic() + JIG_SEQUENCE_MAX_RUNTIME_S
+                    )
+                    return True, f"{sequence_name} -SEKVENSSI KÄYNNISSÄ"
+
+                if (
+                    status == JIG_SEQUENCE_STATUS_ERROR
+                    and time.monotonic() - started_at >= 0.25
+                ):
+                    error = state.get("error")
+                    return False, f"{sequence_name} - Opta ilmoitti virheen {error}"
+
+            time.sleep(0.05)
+
+        self._write_register_direct(JIG_SEQUENCE_STOP_REGISTER, 1)
+        self._clear_active_jig_sequence()
+        return (
+            False,
+            f"{sequence_name} - RUNNING-kuittausta ei saatu "
+            f"{JIG_START_CONFIRM_TIMEOUT_S:.0f} sekunnissa",
+        )
+
     def _start_jig_sequence(self, command, sequence_name):
         """
-        Käynnistää Optan jig-sekvenssin.
+        Käynnistää Optan jig-sekvenssin varmennetusti.
 
-        Dualtest ei aja ajoituksia.
-        Dualtest vain lähettää Optalle:
-        19200 = command
-        19201 = 1
+        Ensin command- ja start-rekisterit kirjoitetaan synkronisesti ja
+        niiden Modbus-vastaukset tarkistetaan. Onnistuminen palautetaan vasta,
+        kun Opta on oikeasti ilmoittanut JIG_SEQUENCE_STATUS_RUNNING.
         """
         if self.dev_mode_modbus:
             self.dev_jig_sequence_status = JIG_SEQUENCE_STATUS_DONE
@@ -271,26 +380,27 @@ class HardwareService(QObject):
             self.dev_jig_sequence_error = JIG_SEQUENCE_ERROR_NONE
             return True, f"DEV OPTA MODBUS: {sequence_name} -SEKVENSSI KÄYNNISTETTY"
 
-        opta_modbus_manager = self._get_opta_modbus_manager_or_none()
-
-        if not opta_modbus_manager:
+        if not self._get_opta_modbus_handler_or_none():
             return False, "Opta ModbusManager ei ole käytössä"
 
-        try:
-            self.write_register(
-                JIG_SEQUENCE_COMMAND_REGISTER,
-                command,
-            )
+        current_state = self._read_jig_sequence_state_raw()
 
-            self.write_register(
-                JIG_SEQUENCE_START_REGISTER,
-                1,
-            )
+        if not current_state:
+            return False, f"{sequence_name} - Optan jig-tilaa ei voitu lukea"
 
-            return True, f"{sequence_name} -SEKVENSSI KÄYNNISTETTY"
+        if current_state.get("status") == JIG_SEQUENCE_STATUS_RUNNING:
+            return False, "Optan jig-sekvenssi on jo käynnissä"
 
-        except Exception as e:
-            return False, f"{sequence_name} -sekvenssin käynnistys epäonnistui: {e}"
+        self._clear_active_jig_sequence()
+
+        if not self._write_register_direct(JIG_SEQUENCE_COMMAND_REGISTER, command):
+            return False, f"{sequence_name} - komentorekisterin kirjoitus epäonnistui"
+
+        if not self._write_register_direct(JIG_SEQUENCE_START_REGISTER, 1):
+            self._write_register_direct(JIG_SEQUENCE_COMMAND_REGISTER, 0)
+            return False, f"{sequence_name} - start-rekisterin kirjoitus epäonnistui"
+
+        return self._wait_for_jig_running(sequence_name)
 
     def start_jig_part_clamp_sequence(self):
         return self._start_jig_sequence(
@@ -321,32 +431,25 @@ class HardwareService(QObject):
             self.dev_jig_sequence_status = JIG_SEQUENCE_STATUS_IDLE
             self.dev_jig_sequence_step = 0
             self.dev_jig_sequence_error = JIG_SEQUENCE_ERROR_NONE
+            self._clear_active_jig_sequence()
             return True, "DEV OPTA MODBUS: JIG-SEKVENSSI KESKEYTETTY"
 
-        opta_modbus_manager = self._get_opta_modbus_manager_or_none()
-
-        if not opta_modbus_manager:
+        if not self._get_opta_modbus_handler_or_none():
             return False, "Opta ModbusManager ei ole käytössä"
 
-        try:
-            self.write_register(JIG_SEQUENCE_STOP_REGISTER, 1)
-            return True, "JIG-SEKVENSSI KESKEYTETTY"
+        if not self._write_register_direct(JIG_SEQUENCE_STOP_REGISTER, 1):
+            return False, "Jig-sekvenssin keskeytys epäonnistui"
 
-        except Exception as e:
-            return False, f"Jig-sekvenssin keskeytys epäonnistui: {e}"
+        self._clear_active_jig_sequence()
+        return True, "JIG-SEKVENSSI KESKEYTETTY"
 
     def read_jig_sequence_state(self):
         """
-        Lukee Optan jig-sekvenssin tilan.
+        Lukee Optan jig-sekvenssin tilan ja valvoo jo RUNNING-kuitattua ajoa.
 
-        Palauttaa:
-        {
-            "status": 0...3,
-            "step": vaihe,
-            "error": virhekoodi
-        }
-
-        tai None, jos luku epäonnistui.
+        Jos kuitattu sekvenssi putoaa IDLE-tilaan ilman DONE-tilaa tai jää
+        RUNNING-tilaan yli 15 sekunniksi, palautetaan hallittu ERROR. Tällöin
+        StationController purkaa automaattiajon eikä jää odottamaan ikuisesti.
         """
         if self.dev_mode_modbus:
             return {
@@ -355,22 +458,47 @@ class HardwareService(QObject):
                 "error": self.dev_jig_sequence_error,
             }
 
-        result = self.read_registers_direct(
-            JIG_SEQUENCE_STATUS_REGISTER,
-            JIG_SEQUENCE_STATE_REGISTER_COUNT,
-        )
+        state = self._read_jig_sequence_state_raw()
 
-        if not result or not hasattr(result, "registers"):
+        if not self.active_jig_sequence_name:
+            return state
+
+        if not state:
+            if (
+                self.active_jig_sequence_deadline is not None
+                and time.monotonic() >= self.active_jig_sequence_deadline
+            ):
+                self._write_register_direct(JIG_SEQUENCE_STOP_REGISTER, 1)
+                self._clear_active_jig_sequence()
+                return self._make_jig_error_state(
+                    JIG_SYNTHETIC_ERROR_RUNTIME_TIMEOUT
+                )
+
             return None
 
-        if len(result.registers) < 3:
-            return None
+        status = state.get("status")
 
-        return {
-            "status": result.registers[0],
-            "step": result.registers[1],
-            "error": result.registers[2],
-        }
+        if status in (JIG_SEQUENCE_STATUS_DONE, JIG_SEQUENCE_STATUS_ERROR):
+            self._clear_active_jig_sequence()
+            return state
+
+        if status == JIG_SEQUENCE_STATUS_IDLE:
+            self._clear_active_jig_sequence()
+            return self._make_jig_error_state(
+                JIG_SYNTHETIC_ERROR_STATE_LOST
+            )
+
+        if (
+            self.active_jig_sequence_deadline is not None
+            and time.monotonic() >= self.active_jig_sequence_deadline
+        ):
+            self._write_register_direct(JIG_SEQUENCE_STOP_REGISTER, 1)
+            self._clear_active_jig_sequence()
+            return self._make_jig_error_state(
+                JIG_SYNTHETIC_ERROR_RUNTIME_TIMEOUT
+            )
+
+        return state
 
     def read_emergency_stop_status(self):
         if self.dev_mode_modbus:
@@ -421,7 +549,6 @@ class HardwareService(QObject):
 
         return self.opta_modbus_manager.is_connected()
 
-
     # ------------------------------------------------------------
     # Arduino Opta / käsikäytön releohjaus
     # ------------------------------------------------------------
@@ -469,6 +596,8 @@ class HardwareService(QObject):
     # ------------------------------------------------------------
 
     def cleanup(self):
+        self._clear_active_jig_sequence()
+
         if self.opta_modbus_manager:
             self.opta_modbus_manager.cleanup()
 
