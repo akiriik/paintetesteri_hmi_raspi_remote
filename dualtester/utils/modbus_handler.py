@@ -1,4 +1,6 @@
 # utils/modbus_handler.py
+from threading import RLock
+
 from pymodbus.client import ModbusSerialClient
 
 
@@ -12,6 +14,10 @@ class ModbusHandler:
     Laitekohtaiset osoitteet ja komennot kuuluvat ylemmille tasoille:
     - Opta: ModbusManager / HardwareService / config/modbus_config.py
     - ForTest: ForTestHandler / ForTestService / config/fortest_config.py
+
+    Sama ModbusSerialClient voi saada kutsuja sekä worker-säikeestä että
+    synkronisista HardwareService-luvuista. RLock varmistaa, ettei samalla
+    sarjaportilla tehdä päällekkäisiä pyyntöjä.
     """
 
     def __init__(self, port=None, baudrate=19200):
@@ -22,6 +28,7 @@ class ModbusHandler:
         self.baudrate = baudrate
         self.client = None
         self.connected = False
+        self._io_lock = RLock()
 
         self.setup_modbus()
 
@@ -54,10 +61,11 @@ class ModbusHandler:
             return False
 
         try:
-            result = self.client.write_register(
-                address=address,
-                value=value,
-            )
+            with self._io_lock:
+                result = self.client.write_register(
+                    address=address,
+                    value=value,
+                )
 
             return result
 
@@ -75,10 +83,11 @@ class ModbusHandler:
             return None
 
         try:
-            result = self.client.read_holding_registers(
-                address=address,
-                count=count,
-            )
+            with self._io_lock:
+                result = self.client.read_holding_registers(
+                    address=address,
+                    count=count,
+                )
 
             return result
 
@@ -102,10 +111,11 @@ class ModbusHandler:
             else:
                 value_to_write = 0x0000
 
-            result = self.client.write_coil(
-                address=address,
-                value=value_to_write,
-            )
+            with self._io_lock:
+                result = self.client.write_coil(
+                    address=address,
+                    value=value_to_write,
+                )
 
             success = not result.isError() if hasattr(result, "isError") else bool(result)
             return success
@@ -116,4 +126,5 @@ class ModbusHandler:
 
     def close(self):
         if self.client:
-            self.client.close()
+            with self._io_lock:
+                self.client.close()
