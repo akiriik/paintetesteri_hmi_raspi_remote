@@ -67,12 +67,12 @@ class ForTestWorker(QObject):
                 "ForTest-ohjelman vaihto epäonnistui",
             )
         except Exception as e:
+            self.connectionStateChanged.emit(False, str(e))
             self.resultReady.emit(
                 False,
                 5,
                 f"Virhe ohjelman vaihdossa: {e}",
             )
-            self.connectionStateChanged.emit(False, str(e))
 
     @pyqtSlot()
     def start_test(self):
@@ -84,12 +84,12 @@ class ForTestWorker(QObject):
                 "ForTest-testin käynnistys epäonnistui",
             )
         except Exception as e:
+            self.connectionStateChanged.emit(False, str(e))
             self.resultReady.emit(
                 False,
                 1,
                 f"Virhe testin käynnistyksessä: {e}",
             )
-            self.connectionStateChanged.emit(False, str(e))
 
     @pyqtSlot()
     def abort_test(self):
@@ -101,12 +101,12 @@ class ForTestWorker(QObject):
                 "ForTest-testin keskeytys epäonnistui",
             )
         except Exception as e:
+            self.connectionStateChanged.emit(False, str(e))
             self.resultReady.emit(
                 False,
                 2,
                 f"Virhe testin keskeytyksessä: {e}",
             )
-            self.connectionStateChanged.emit(False, str(e))
 
     @pyqtSlot()
     def read_status(self):
@@ -118,12 +118,12 @@ class ForTestWorker(QObject):
                 "ForTest-statuksen luku epäonnistui",
             )
         except Exception as e:
+            self.connectionStateChanged.emit(False, str(e))
             self.resultReady.emit(
                 None,
                 3,
                 f"Virhe testin tilan lukemisessa: {e}",
             )
-            self.connectionStateChanged.emit(False, str(e))
 
     @pyqtSlot()
     def read_results(self):
@@ -135,12 +135,12 @@ class ForTestWorker(QObject):
                 "ForTest-tulosten luku epäonnistui",
             )
         except Exception as e:
+            self.connectionStateChanged.emit(False, str(e))
             self.resultReady.emit(
                 None,
                 4,
                 f"Virhe testin tulosten lukemisessa: {e}",
             )
-            self.connectionStateChanged.emit(False, str(e))
 
     @pyqtSlot()
     def cleanup(self):
@@ -165,6 +165,7 @@ class ForTestManager(QObject):
     def __init__(self, port="/dev/ttyUSB1", baudrate=19200):
         super().__init__()
 
+        self.port = port
         self.thread = QThread()
         self.worker = ForTestWorker(port, baudrate)
 
@@ -193,7 +194,7 @@ class ForTestManager(QObject):
 
         if previous != self._connected:
             state_text = "YHTEYS PALAUTUI" if self._connected else "YHTEYS KATKESI"
-            print(f"ForTest: {state_text}")
+            print(f"ForTest {self.port}: {state_text}")
 
     def handle_result(self, result, op_code, error_msg):
         self._busy = False
