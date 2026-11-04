@@ -53,8 +53,9 @@ class ForTestWorker(QObject):
         else:
             error_msg = connection_error or fallback_error
 
-        self.resultReady.emit(result, op_code, error_msg)
+        # Päivitä managerin yhteystila ennen kuin tulos käsitellään UI:ssa.
         self.connectionStateChanged.emit(connected, connection_error)
+        self.resultReady.emit(result, op_code, error_msg)
 
     @pyqtSlot(int)
     def write_program(self, program_number):
