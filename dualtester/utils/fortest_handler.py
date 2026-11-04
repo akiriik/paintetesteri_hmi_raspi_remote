@@ -41,6 +41,7 @@ class ForTestHandler:
         self.last_success_monotonic = None
         self.last_error = ""
         self.last_operation_ok = False
+        self.connection_verified = False
 
         self._open_connection(initial=True)
 
@@ -59,6 +60,7 @@ class ForTestHandler:
         if self.modbus.connected:
             self.consecutive_failures = 0
             self.next_reconnect_time = 0.0
+            self.connection_verified = False
             self.last_error = ""
             if not initial:
                 print(f"ForTest {self.port}: serial-yhteys avattu uudelleen")
@@ -67,6 +69,7 @@ class ForTestHandler:
         self.next_reconnect_time = time.monotonic() + RECONNECT_INTERVAL_S
         self.last_error = f"ForTest {self.port}: yhteyttä ei saatu"
         self.last_operation_ok = False
+        self.connection_verified = False
 
         if not initial:
             print(
@@ -110,6 +113,7 @@ class ForTestHandler:
         self.last_success_monotonic = time.monotonic()
         self.last_error = ""
         self.last_operation_ok = True
+        self.connection_verified = True
 
     def _mark_failure(self, operation_name):
         self.consecutive_failures += 1
@@ -135,6 +139,7 @@ class ForTestHandler:
 
             self.modbus.connected = False
 
+        self.connection_verified = False
         self.next_reconnect_time = time.monotonic() + RECONNECT_INTERVAL_S
 
     def _execute(self, operation_name, callback, failure_value=None):
@@ -161,6 +166,7 @@ class ForTestHandler:
         return bool(
             self.modbus
             and self.modbus.connected
+            and self.connection_verified
             and self.consecutive_failures < DISCONNECT_AFTER_FAILURES
         )
 
@@ -231,6 +237,7 @@ class ForTestHandler:
 
             self.modbus.connected = False
 
+        self.connection_verified = False
         self.last_operation_ok = False
 
 
