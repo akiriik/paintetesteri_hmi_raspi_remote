@@ -198,13 +198,15 @@ class ForTestManager(QObject):
     def handle_result(self, result, op_code, error_msg):
         self._busy = False
 
+        # Käyttäjän START/STOP/ohjelmanvaihto saa etusijan ennen kuin
+        # statusvastauksen käsittely ehtii pyytää uusia pollausoperaatioita.
+        self._dispatch_pending_control()
+
         self.resultReady.emit(
             result,
             op_code,
             error_msg,
         )
-
-        self._dispatch_pending_control()
 
     def _invoke_worker(self, method_name, program_number=None):
         if self._busy:
