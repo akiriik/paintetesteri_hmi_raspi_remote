@@ -872,15 +872,23 @@ class StationController(QObject):
             self.refresh_station_state()
             return
 
-        self.fortest_service.read_status(self.station_id)
-
+        # Jos valmis testitulos odottaa lukua, anna uusintatulospyynnölle
+        # etusija ennen normaalia statuspollia. Näin yhden operaation
+        # jonosuoja ei estä tuloksen uusintalukua.
         if self.waiting_result_from_finished_test:
             self.results_read_counter += 1
 
             if self.results_read_counter >= 2:
-                self.fortest_service.read_results(self.station_id)
-                self.results_read_counter = 0
+                request_sent = self.fortest_service.read_results(
+                    self.station_id
+                )
 
+                if request_sent:
+                    self.results_read_counter = 0
+                    self.refresh_station_state()
+                    return
+
+        self.fortest_service.read_status(self.station_id)
         self.refresh_station_state()
 
     def update_status_from_fortest(self, result):
