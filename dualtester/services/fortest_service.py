@@ -112,14 +112,20 @@ class ForTestService(QObject):
             return False
 
         try:
-            return (
-                hasattr(fortest_manager, "worker")
-                and hasattr(fortest_manager.worker, "fortest")
-                and hasattr(fortest_manager.worker.fortest, "modbus")
-                and fortest_manager.worker.fortest.modbus.connected
-            )
+            return fortest_manager.is_connected()
         except Exception:
             return False
+
+    def get_connection_error(self, station_id):
+        fortest_manager = self.get_manager(station_id)
+
+        if not fortest_manager:
+            return "ForTest-manageria ei ole"
+
+        try:
+            return fortest_manager.get_last_connection_error()
+        except Exception:
+            return ""
 
     # ------------------------------------------------------------
     # ForTest-ohjelma
@@ -132,8 +138,7 @@ class ForTestService(QObject):
             return False
 
         try:
-            fortest_manager.write_program(program_number)
-            return True
+            return bool(fortest_manager.write_program(program_number))
         except Exception as e:
             print(f"Virhe ForTest {station_id} ohjelmanvaihdossa: {e}")
             return False
@@ -146,13 +151,17 @@ class ForTestService(QObject):
         fortest_manager = self._get_fortest_manager_or_warn(station_id, "start_test")
 
         if fortest_manager:
-            fortest_manager.start_test()
+            return bool(fortest_manager.start_test())
+
+        return False
 
     def abort_test(self, station_id):
         fortest_manager = self._get_fortest_manager_or_warn(station_id, "abort_test")
 
         if fortest_manager:
-            fortest_manager.abort_test()
+            return bool(fortest_manager.abort_test())
+
+        return False
 
     # ------------------------------------------------------------
     # ForTest-luennat
@@ -162,13 +171,17 @@ class ForTestService(QObject):
         fortest_manager = self._get_fortest_manager_or_warn(station_id, "read_status")
 
         if fortest_manager:
-            fortest_manager.read_status()
+            return bool(fortest_manager.read_status())
+
+        return False
 
     def read_results(self, station_id):
         fortest_manager = self._get_fortest_manager_or_warn(station_id, "read_results")
 
         if fortest_manager:
-            fortest_manager.read_results()
+            return bool(fortest_manager.read_results())
+
+        return False
 
     # ------------------------------------------------------------
     # Sulkeminen
