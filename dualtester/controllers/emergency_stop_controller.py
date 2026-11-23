@@ -36,6 +36,11 @@ class EmergencyStopController:
         self.emergency_dialog_open = False
         self._emergency_dialog = None
 
+        # Signaali saapuu käyttöliittymään ilman sarjaportin odottamista.
+        self.hardware_service.emergencyStatusReady.connect(
+            self.handle_emergency_status
+        )
+
         self.timer = QTimer(main_window)
         self.timer.timeout.connect(self.check_emergency_stop)
         self.timer.start(poll_interval_ms)
@@ -51,18 +56,19 @@ class EmergencyStopController:
             return
 
         try:
-            status = self.hardware_service.read_emergency_stop_status()
-
-            if status == 1 and self.emergency_dialog_open:
-                self.close_emergency_dialog()
-                return
-
-            if status == 0 and not self.emergency_dialog_open:
-                self.open_emergency_dialog()
-
+            self.hardware_service.request_emergency_stop_status()
         except Exception as e:
-            print(f"Virhe hätäseistilan tarkistuksessa: {e}")
-            self.stop()
+            print(f"Virhe hätäseistilan lukupyynnössä: {e}")
+
+    def handle_emergency_status(self, status):
+        # Tila 0/1 hyväksytään vain onnistuneesta workerin Modbus-vastauksesta.
+        # None / virhe ei kuittaa aktiivista hätäseis-tilaa.
+        if status == 1 and self.emergency_dialog_open:
+            self.close_emergency_dialog()
+            return
+
+        if status == 0 and not self.emergency_dialog_open:
+            self.open_emergency_dialog()
 
     def open_emergency_dialog(self):
         self.stop_all_stations()
