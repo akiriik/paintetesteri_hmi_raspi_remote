@@ -35,8 +35,6 @@ JIG_SYNTHETIC_ERROR_RUNTIME_TIMEOUT = 103
 
 
 class HardwareService(QObject):
-    emergencyStatusReady = pyqtSignal(object)
-
     """
     Yhteiset fyysiset I/O-rajapinnat.
 
@@ -57,6 +55,8 @@ class HardwareService(QObject):
     ForTest-laitteet eivät kuulu tähän serviceen.
     ForTest 1 ja ForTest 2 kuuluvat ForTestServiceen.
     """
+
+    emergencyStatusReady = pyqtSignal(object)
 
     def __init__(
         self,
