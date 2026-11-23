@@ -84,6 +84,7 @@ class IdleShutdownController:
         self.main_window = main_window
         self.last_test_activity_at = time.monotonic()
         self.shutdown_started = False
+        self.shutdown_blocked_by_active_test = False
 
         self.overlay = IdleShutdownWarningOverlay(main_window)
         self.overlay.cancel_button.clicked.connect(self.cancel_shutdown_warning)
@@ -95,6 +96,7 @@ class IdleShutdownController:
     def register_test_activity(self):
         self.last_test_activity_at = time.monotonic()
         self.shutdown_started = False
+        self.shutdown_blocked_by_active_test = False
         self.hide_warning()
 
     def cancel_shutdown_warning(self):
@@ -121,7 +123,27 @@ class IdleShutdownController:
 
         if remaining <= 0:
             if self.is_system_busy():
-                self.register_test_activity()
+                # Älä nollaa käyttöajastinta jokaisella tarkistuksella.
+                # Tuntemattomassa testi-/jigitilassa ei sammuteta laitetta
+                # automaattisesti, mutta este kirjataan vain kerran.
+                if not self.shutdown_blocked_by_active_test:
+                    print(
+                        "Automaattisammutus estetty: testi, tulosluku tai "
+                        "jig-sekvenssi on edelleen aktiivinen"
+                    )
+                    self.shutdown_blocked_by_active_test = True
+                return
+
+            if self.shutdown_blocked_by_active_test:
+                # Kun epävarma tila poistuu, näytä vielä 30 min varoitus
+                # ennen sammutusta eikä sammuta välittömästi.
+                self.last_test_activity_at = (
+                    time.monotonic()
+                    - IDLE_SHUTDOWN_TIMEOUT_S
+                    + IDLE_SHUTDOWN_WARNING_S
+                )
+                self.shutdown_blocked_by_active_test = False
+                self.show_warning(IDLE_SHUTDOWN_WARNING_S)
                 return
 
             self.shutdown_started = True
