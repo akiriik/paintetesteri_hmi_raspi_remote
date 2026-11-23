@@ -9,6 +9,7 @@ from ui.screens.program_selection_screen import ProgramSelectionScreen
 from ui.components.environment_status_bar import EnvironmentStatusBar
 
 from utils.program_manager import ProgramManager
+from utils.ui_freeze_watchdog import UiFreezeWatchdog
 
 from services.hardware_service import HardwareService
 from services.fortest_service import ForTestService
@@ -52,6 +53,11 @@ class MainWindow(QWidget):
         self.create_services()
         self.create_station_controllers()
         self.create_controllers()
+        try:
+            self.ui_freeze_watchdog = UiFreezeWatchdog(self)
+        except Exception as e:
+            self.ui_freeze_watchdog = None
+            print(f"UI-jumivalvonnan alustus epäonnistui: {e}")
 
     def setup_window(self):
         self.setWindowTitle("Painetestaus")
@@ -313,6 +319,9 @@ class MainWindow(QWidget):
         self.showFullScreen()
 
     def closeEvent(self, event):
+        if getattr(self, "ui_freeze_watchdog", None):
+            self.ui_freeze_watchdog.cleanup()
+
         if hasattr(self, "idle_shutdown_controller") and self.idle_shutdown_controller:
             self.idle_shutdown_controller.cleanup()
 
