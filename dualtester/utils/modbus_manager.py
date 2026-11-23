@@ -172,6 +172,7 @@ class ModbusManager(QObject):
         self.baudrate = baudrate
         self._emergency_read_pending = False
         self._last_emergency_status = None
+        self._emergency_last_error = ""
 
         self.modbus_handler = ModbusHandler(
             port=self.port,
@@ -191,8 +192,14 @@ class ModbusManager(QObject):
         if op_code == 4:
             self._emergency_read_pending = False
             self._last_emergency_status = result
-            if error_msg:
+
+            # Lokiin vain virhetilan muutos, ei samaa virhettä 1 s välein.
+            if error_msg and error_msg != self._emergency_last_error:
                 print(f"Opta: {error_msg}")
+            elif not error_msg and self._emergency_last_error:
+                print("Opta: hätäseistilan luku palautui")
+
+            self._emergency_last_error = error_msg
             self.emergencyStatusReady.emit(result)
             return
 
