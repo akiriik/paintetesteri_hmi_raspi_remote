@@ -9,6 +9,12 @@ class EmergencyStopDialog(QDialog):
         super().__init__(parent)
 
         self.hardware_service = hardware_service
+        self._waiting_reset_status = False
+
+        if self.hardware_service:
+            self.hardware_service.emergencyStatusReady.connect(
+                self._handle_reset_status
+            )
 
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setModal(True)
@@ -103,22 +109,30 @@ class EmergencyStopDialog(QDialog):
         if not self.hardware_service:
             return
 
-        status = self.hardware_service.read_emergency_stop_status()
+        self._waiting_reset_status = True
+        self.hardware_service.request_emergency_stop_status()
+
+    def _handle_reset_status(self, status):
+        if not self._waiting_reset_status:
+            return
+
+        self._waiting_reset_status = False
 
         if status == 1:
             self.accept()
-        else:
-            self.reset_button.setText("EI VOI KUITATA\nHÄTÄSEIS AKTIIVINEN!")
-            self.reset_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #FFC107;
-                    color: black;
-                    border-radius: 20px;
-                    font-size: 18px;
-                    font-weight: bold;
-                    border: none;
-                }
-            """)
+            return
+
+        self.reset_button.setText("EI VOI KUITATA\nHÄTÄSEIS AKTIIVINEN!")
+        self.reset_button.setStyleSheet("""
+            QPushButton {
+                background-color: #FFC107;
+                color: black;
+                border-radius: 20px;
+                font-size: 18px;
+                font-weight: bold;
+                border: none;
+            }
+        """)
 
     def closeEvent(self, event):
         if self.blink_timer:
