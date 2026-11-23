@@ -95,6 +95,32 @@ class ModbusWorker(QObject):
         except Exception as e:
             self.resultReady.emit(False, 2, f"Virhe rekisterin kirjoittamisessa: {str(e)}")
 
+    @pyqtSlot()
+    def read_emergency_stop_status_async(self):
+        """Lue hätäseis vain Modbus-workerissä, ei Qt:n pääsäikeessä."""
+        if not self.modbus or not self.modbus.connected:
+            self.resultReady.emit(None, 4, "Opta Modbus ei yhteydessä")
+            return
+
+        try:
+            response = self.modbus.read_holding_registers(
+                EMERGENCY_STATUS_REGISTER,
+                EMERGENCY_STATUS_REGISTER_COUNT,
+            )
+
+            if (
+                not response
+                or (hasattr(response, "isError") and response.isError())
+                or not hasattr(response, "registers")
+                or len(response.registers) < 1
+            ):
+                self.resultReady.emit(None, 4, "Hätäseistilan Modbus-luku epäonnistui")
+                return
+
+            self.resultReady.emit(response.registers[0], 4, "")
+        except Exception as e:
+            self.resultReady.emit(None, 4, f"Hätäseistilan lukuvirhe: {e}")
+
     @pyqtSlot(int, int)
     def toggle_relay(self, relay_num, state):
         """
@@ -134,6 +160,7 @@ class ModbusManager(QObject):
     """
 
     resultReady = pyqtSignal(object, int, str)  # tulos, operaatiokoodi, virheviesti
+    emergencyStatusReady = pyqtSignal(object)
 
     def __init__(self, port=None, baudrate=19200):
         super().__init__()
@@ -143,6 +170,8 @@ class ModbusManager(QObject):
 
         self.port = port
         self.baudrate = baudrate
+        self._emergency_read_pending = False
+        self._last_emergency_status = None
 
         self.modbus_handler = ModbusHandler(
             port=self.port,
@@ -158,9 +187,15 @@ class ModbusManager(QObject):
         self.thread.start()
 
     def handle_result(self, result, op_code, error_msg):
-        """
-        Välitä tulos eteenpäin.
-        """
+        """Välitä workerin vastaus oikeaan vastaanottajaan."""
+        if op_code == 4:
+            self._emergency_read_pending = False
+            self._last_emergency_status = result
+            if error_msg:
+                print(f"Opta: {error_msg}")
+            self.emergencyStatusReady.emit(result)
+            return
+
         self.resultReady.emit(result, op_code, error_msg)
 
     def read_register(self, address, count=1):
@@ -199,31 +234,35 @@ class ModbusManager(QObject):
             Q_ARG(int, value),
         )
 
-    def read_emergency_stop_status(self):
-        """
-        Lue hätäseispiirin tila Optan Modbus-väylältä.
-
-        Palautus:
-        - 1 = hätäseis pois päältä
-        - 0 = hätäseistila
-        - None = ei yhteyttä / lukuvirhe
-        """
+    def request_emergency_stop_status(self):
+        """Tilaa hätäseisluenta taustasäikeestä; enintään yksi pyyntö jonossa."""
         if not self.modbus_handler.connected:
-            return None
+            self._last_emergency_status = None
+            self.emergencyStatusReady.emit(None)
+            return False
+
+        if self._emergency_read_pending:
+            return False
+
+        self._emergency_read_pending = True
 
         try:
-            result = self.modbus_handler.read_holding_registers(
-                EMERGENCY_STATUS_REGISTER,
-                EMERGENCY_STATUS_REGISTER_COUNT,
+            QMetaObject.invokeMethod(
+                self.worker,
+                "read_emergency_stop_status_async",
+                Qt.QueuedConnection,
             )
+            return True
+        except Exception as e:
+            self._emergency_read_pending = False
+            print(f"Opta: hätäseisluennan jonotus epäonnistui: {e}")
+            self.emergencyStatusReady.emit(None)
+            return False
 
-            if result and hasattr(result, "registers") and len(result.registers) > 0:
-                return result.registers[0]
-
-            return None
-
-        except Exception:
-            return None
+    def read_emergency_stop_status(self):
+        """Vanha API: palauta viimeisin luettu tila ilman pääsäikeen I/O:ta."""
+        self.request_emergency_stop_status()
+        return self._last_emergency_status
 
     def toggle_relay(self, relay_num, state):
         """
