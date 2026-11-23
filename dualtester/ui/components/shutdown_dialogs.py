@@ -3,6 +3,7 @@ from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 import os
 import sys
+import subprocess
 
 
 class ConfirmShutdownDialog(QDialog):
@@ -269,7 +270,15 @@ class ShutdownController:
 
     @staticmethod
     def _shutdown_raspberry():
-        os.system("sudo shutdown -h now")
+        # Ei odoteta sudo/shutdown-komennon valmistumista Qt:n pääsäikeessä.
+        # -n estää mahdollista salasanakyselyä jumittamasta kosketusnäyttöä.
+        try:
+            subprocess.Popen(
+                ["sudo", "-n", "shutdown", "-h", "now"],
+                stdin=subprocess.DEVNULL,
+            )
+        except Exception as e:
+            print(f"Raspberryn sammutuskomento epäonnistui: {e}")
 
     @staticmethod
     def restart_application(parent):
