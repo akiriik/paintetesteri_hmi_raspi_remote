@@ -152,6 +152,12 @@ class IdleShutdownController:
             return
 
         if remaining <= IDLE_SHUTDOWN_WARNING_S:
+            # Kesken olevan testin päällä ei näytetä kosketuksen estävää
+            # koko ruudun shutdown-overlayta.
+            if self.is_system_busy():
+                self.hide_warning()
+                return
+
             self.show_warning(remaining)
             return
 
