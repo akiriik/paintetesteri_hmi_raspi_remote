@@ -1,7 +1,7 @@
 # services/hardware_service.py
 import time
 
-from PyQt5.QtCore import QObject, QTimer
+from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
 from config.modbus_config import (
     SHUTDOWN_REQUEST_REGISTER,
@@ -35,6 +35,8 @@ JIG_SYNTHETIC_ERROR_RUNTIME_TIMEOUT = 103
 
 
 class HardwareService(QObject):
+    emergencyStatusReady = pyqtSignal(object)
+
     """
     Yhteiset fyysiset I/O-rajapinnat.
 
@@ -115,6 +117,10 @@ class HardwareService(QObject):
                 self.opta_modbus_manager.resultReady.connect(
                     self.parent_window.handle_modbus_result
                 )
+
+            self.opta_modbus_manager.emergencyStatusReady.connect(
+                self.emergencyStatusReady.emit
+            )
 
         except Exception as e:
             print(f"Varoitus: Opta Modbus -alustus epäonnistui: {e}")
@@ -500,16 +506,30 @@ class HardwareService(QObject):
 
         return state
 
+    def request_emergency_stop_status(self):
+        """Tilaa hätäseistilan luku taustasäikeeseen (ei blokkaa UI:ta)."""
+        if self.dev_mode_modbus:
+            self.emergencyStatusReady.emit(self.dev_emergency_stop_status)
+            return True
+
+        manager = self._get_opta_modbus_manager_or_none()
+
+        if not manager:
+            self.emergencyStatusReady.emit(None)
+            return False
+
+        return manager.request_emergency_stop_status()
+
     def read_emergency_stop_status(self):
+        """Yhteensopivuusmetodi: vain välimuistissa oleva arvo."""
         if self.dev_mode_modbus:
             return self.dev_emergency_stop_status
 
-        opta_modbus_manager = self._get_opta_modbus_manager_or_none()
+        manager = self._get_opta_modbus_manager_or_none()
+        if not manager:
+            return None
 
-        if opta_modbus_manager:
-            return opta_modbus_manager.read_emergency_stop_status()
-
-        return None
+        return manager.read_emergency_stop_status()
 
     def get_connection_status_text(self):
         """
