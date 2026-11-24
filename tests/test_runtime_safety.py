@@ -124,6 +124,30 @@ class SafetyRegressionTests(unittest.TestCase):
         StationController._continue_start_test(stub, 5)
         self.assertIn("purku", events)
 
+    def test_old_auto_restart_timer_cannot_start_after_stop(self):
+        calls = []
+        stub = SimpleNamespace(
+            _auto_restart_generation=6,
+            auto_part_change_enabled=False,
+            auto_part_change_in_progress=False,
+            auto_cycle_phase="IDLE",
+            has_selected_program=lambda: True,
+            is_jakotukki_station_and_program=lambda: True,
+            start_test=lambda: calls.append("START"),
+        )
+        StationController._automatic_restart_if_allowed(stub, 5)
+        self.assertEqual(calls, [])
+        StationController._automatic_restart_if_allowed(stub, 6)
+        self.assertEqual(calls, [])
+        stub.auto_part_change_enabled = True
+        StationController._automatic_restart_if_allowed(stub, 6)
+        self.assertEqual(calls, ["START"])
+
+    def test_old_jig_delay_cannot_run_after_stop(self):
+        stub = SimpleNamespace(_auto_cycle_generation=12)
+        StationController._start_auto_remove_after_delay(stub, 11)
+        StationController._start_auto_release_after_delay(stub, 11)
+
     def test_fortest_program_ack_error_is_not_discarded(self):
         calls = []
         station = SimpleNamespace(
