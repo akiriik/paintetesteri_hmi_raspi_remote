@@ -55,11 +55,15 @@ class ProgramManager(QObject):
                 if program_id in program_ids:
                     raise ValueError(f"Duplikaatti ohjelma-ID: {program_id}")
 
+                name = program.get("name")
+                if not isinstance(name, str) or not name.strip():
+                    raise ValueError(f"Ohjelman {program_id} nimi puuttuu")
+
                 program_ids.add(program_id)
 
             self.program_data = data
             self.programs = [
-                program.get("name", f"Ohjelma {program['id']}")
+                program["name"]
                 for program in entries
             ]
         except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
