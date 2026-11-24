@@ -1,5 +1,6 @@
 # services/hardware_service.py
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
@@ -58,6 +59,10 @@ class HardwareService(QObject):
 
     emergencyStatusReady = pyqtSignal(object)
     writeAcknowledged = pyqtSignal(int, int, bool, str)
+    jigStartFinished = pyqtSignal(int, bool, str)
+    jigStateReady = pyqtSignal(int, object)
+    jigStopFinished = pyqtSignal(int, bool, str)
+    _jigJobComplete = pyqtSignal(str, int, object)
 
     def __init__(
         self,
@@ -94,6 +99,18 @@ class HardwareService(QObject):
 
         self.active_jig_sequence_name = None
         self.active_jig_sequence_deadline = None
+
+        # Kaikki jig-operaatiot suoritetaan järjestyksessä omassa workerissä.
+        # Qt-pääsäikeeseen ei tehdä yhtään suoraa jig-Modbus-operaatiota.
+        self._jig_executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="opta-jig",
+        )
+        self._jig_owner_station = None
+        self._jig_operation_pending = False
+        self._jig_state_pending = False
+        self._jig_stop_pending = False
+        self._jigJobComplete.connect(self._handle_jig_job_complete)
 
         self._init_opta_modbus()
         self._init_raspberry_gpio_outputs()
@@ -314,6 +331,135 @@ class HardwareService(QObject):
         except Exception as e:
             print(f"Hätäseis-kuittaus epäonnistui: {e}")
             return None
+
+    # ------------------------------------------------------------
+    # Asynkroninen jigin omistajuus ja tehtäväjono
+    # ------------------------------------------------------------
+
+    def _submit_jig_job(self, kind, station_id, method):
+        try:
+            future = self._jig_executor.submit(method)
+            def complete(f):
+                try:
+                    result = f.result()
+                except Exception as exc:
+                    result = (
+                        (False, f"Optan jig-worker: {exc}")
+                        if kind != "state"
+                        else None
+                    )
+                self._jigJobComplete.emit(kind, station_id, result)
+            future.add_done_callback(complete)
+            return True
+        except Exception as exc:
+            print(f"Optan jig-tehtävän jonotusvirhe: {exc}")
+            return False
+
+    def request_jig_start(self, station_id, hardware_method_name):
+        """Jigin voi varata vain yksi asema kerrallaan."""
+        if hardware_method_name not in {
+            "start_jig_part_clamp_sequence",
+            "start_jig_part_release_sequence",
+            "start_jig_part_remove_sequence",
+        }:
+            return False, "Tuntematon jig-sekvenssi"
+
+        if (
+            self._jig_owner_station is not None
+            and self._jig_owner_station != station_id
+        ):
+            return False, f"Jigi on käytössä asemalla {self._jig_owner_station}"
+
+        if self._jig_operation_pending or self._jig_stop_pending:
+            return False, "Edellinen jig-komento on vielä käsittelyssä"
+
+        self._jig_owner_station = station_id
+        self._jig_operation_pending = True
+
+        method = getattr(self, hardware_method_name)
+        if not self._submit_jig_job("start", station_id, method):
+            self._jig_operation_pending = False
+            return False, "Optan jig-komennon jonotus epäonnistui"
+
+        return True, "JIG-KOMENTO LÄHETETTY - ODOTETAAN RUNNING-KUITTAUSTA"
+
+    def request_jig_state(self, station_id):
+        if self._jig_owner_station != station_id:
+            return False
+        if self._jig_state_pending or self._jig_operation_pending or self._jig_stop_pending:
+            return False
+
+        self._jig_state_pending = True
+        if not self._submit_jig_job(
+            "state", station_id, self.read_jig_sequence_state
+        ):
+            self._jig_state_pending = False
+            return False
+        return True
+
+    def _stop_jig_confirmed(self):
+        success, message = self.stop_jig_sequence()
+        if not success:
+            return False, message
+
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline:
+            state = self._read_jig_sequence_state_raw()
+            if state and state.get("status") != JIG_SEQUENCE_STATUS_RUNNING:
+                return True, "JIG PYSÄYTETTY JA OPTA KUITANNUT"
+            time.sleep(0.1)
+
+        return False, "Optan jig-pysäytyksen tilakuittaus puuttuu"
+
+    def request_jig_stop(self, station_id):
+        if self._jig_owner_station not in (None, station_id):
+            return False, "Toinen asema varaa jigin"
+        if self._jig_stop_pending:
+            return True, "JIG STOP JO JONOSSA"
+
+        self._jig_stop_pending = True
+        self._jig_owner_station = station_id
+
+        if not self._submit_jig_job(
+            "stop", station_id, self._stop_jig_confirmed
+        ):
+            self._jig_stop_pending = False
+            return False, "JIG STOP EI MENNYT JONOON"
+
+        return True, "JIG STOP JONOSSA"
+
+    def _handle_jig_job_complete(self, kind, station_id, result):
+        if kind == "start":
+            self._jig_operation_pending = False
+            success, message = result
+            self.jigStartFinished.emit(station_id, bool(success), message)
+            if not success:
+                # Vikatilassa omistajuutta ei vapauteta ilman pysäytyskuittausta.
+                print(f"Opta jig-asema {station_id}: {message}")
+            return
+
+        if kind == "state":
+            self._jig_state_pending = False
+            self.jigStateReady.emit(station_id, result)
+            if (
+                result
+                and result.get("status") in (
+                    JIG_SEQUENCE_STATUS_DONE,
+                    JIG_SEQUENCE_STATUS_ERROR,
+                )
+                and self._jig_owner_station == station_id
+                and not self._jig_operation_pending
+                and not self._jig_stop_pending
+            ):
+                self._jig_owner_station = None
+            return
+
+        if kind == "stop":
+            self._jig_stop_pending = False
+            success, message = result
+            if success and self._jig_owner_station == station_id:
+                self._jig_owner_station = None
+            self.jigStopFinished.emit(station_id, bool(success), message)
 
     # ------------------------------------------------------------
     # Arduino Opta / jig-sekvenssit
@@ -626,6 +772,7 @@ class HardwareService(QObject):
     # ------------------------------------------------------------
 
     def cleanup(self):
+        self._jig_executor.shutdown(wait=False, cancel_futures=True)
         self._clear_active_jig_sequence()
 
         if self.opta_modbus_manager:
