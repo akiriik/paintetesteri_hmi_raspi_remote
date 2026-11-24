@@ -81,6 +81,24 @@ class SafetyRegressionTests(unittest.TestCase):
         )
         self.assertFalse(manager._queue_control("start_test"))
 
+    def test_stop_dispatch_precedes_status_callback(self):
+        events = []
+        manager = FakeForTestManager()
+        manager._pending_controls.append(("abort_test", None))
+
+        class Recorder:
+            def emit(self, *args):
+                events.append("status")
+
+        manager.resultReady = Recorder()
+        def dispatch(method, arg=None):
+            events.append(method)
+            manager._busy = True
+            return True
+        manager._invoke_worker = dispatch
+        ForTestManager.handle_result(manager, None, 3, "")
+        self.assertEqual(events[:2], ["abort_test", "status"])
+
     def test_valve_is_only_confirmed_after_modbus_ack(self):
         hw = FakeOpta()
         valve = TestValveController(hw)
@@ -90,6 +108,17 @@ class SafetyRegressionTests(unittest.TestCase):
         self.assertEqual(hw.writes[-1], (18092, 0))
         hw.writeAcknowledged.emit(18092, 0, True, "")
         self.assertTrue(valve.is_closed_confirmed(1))
+
+    def test_purge_timer_begins_only_after_open_ack(self):
+        hw = FakeOpta()
+        valve = TestValveController(hw)
+        valve.release_pressure_after_stop(1)
+        self.assertFalse(valve.pressure_release_timers[1].isActive())
+        self.assertEqual(hw.writes[-1], (18092, 1))
+        hw.writeAcknowledged.emit(18092, 1, True, "")
+        self.assertTrue(valve.pressure_release_timers[1].isActive())
+        self.assertFalse(valve.is_pressure_release_complete(1))
+        valve.pressure_release_timers[1].stop()
 
     def test_valve_failure_does_not_cache_closed(self):
         hw = FakeOpta()
