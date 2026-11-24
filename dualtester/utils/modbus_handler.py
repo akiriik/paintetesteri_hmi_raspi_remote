@@ -1,4 +1,5 @@
 # utils/modbus_handler.py
+import time
 from threading import RLock
 
 from pymodbus.client import ModbusSerialClient
@@ -6,33 +7,44 @@ from pymodbus.client import ModbusSerialClient
 
 class ModbusHandler:
     """
-    Yleinen matalan tason Modbus RTU -käsittelijä.
+    Yleinen Modbus RTU -sarjaliikenne.
 
-    Tämä luokka ei tunne Optaa, ForTestiä, rekisterikarttoja,
-    releitä, hätäseisejä tai muita laitekohtaisia asioita.
-
-    Laitekohtaiset osoitteet ja komennot kuuluvat ylemmille tasoille:
-    - Opta: ModbusManager / HardwareService / config/modbus_config.py
-    - ForTest: ForTestHandler / ForTestService / config/fortest_config.py
-
-    Sama ModbusSerialClient voi saada kutsuja sekä worker-säikeestä että
-    synkronisista HardwareService-luvuista. RLock varmistaa, ettei samalla
-    sarjaportilla tehdä päällekkäisiä pyyntöjä.
+    ModbusManager (Opta) käyttää auto_reconnect=True.
+    ForTestHandler hoitaa oman reconnectinsa, joten se käyttää oletusta
+    auto_reconnect=False. Kaikki clientin avaukset, sulut, luvut ja
+    kirjoitukset ovat saman RLockin sisällä.
     """
 
-    def __init__(self, port=None, baudrate=19200):
+    RECONNECT_INTERVAL_S = 2.0
+    MAX_TRANSPORT_ERRORS = 2
+
+    def __init__(self, port=None, baudrate=19200, auto_reconnect=False):
         if not port:
             raise ValueError("Modbus-portti puuttuu")
 
         self.port = port
         self.baudrate = baudrate
+        self.auto_reconnect = bool(auto_reconnect)
         self.client = None
         self.connected = False
         self._io_lock = RLock()
+        self._next_reconnect_at = 0.0
+        self._consecutive_transport_errors = 0
 
         self.setup_modbus()
 
-    def setup_modbus(self):
+    def _close_locked(self):
+        if self.client:
+            try:
+                self.client.close()
+            except Exception as e:
+                print(f"Modbus {self.port}: sulkuvirhe {e}")
+        self.client = None
+        self.connected = False
+
+    def _connect_locked(self):
+        self._close_locked()
+
         try:
             self.client = ModbusSerialClient(
                 port=self.port,
@@ -42,89 +54,120 @@ class ModbusHandler:
                 stopbits=1,
                 timeout=1,
             )
-
-            self.connected = self.client.connect()
-            print(f"Modbus-yhteys ({self.port}): {'Onnistui' if self.connected else 'Epäonnistui'}")
-
+            self.connected = bool(self.client.connect())
         except Exception as e:
+            print(f"Modbus {self.port}: avausvirhe {e}")
             self.connected = False
-            print(f"Modbus-virhe: {e}")
+
+        if self.connected:
+            self._next_reconnect_at = 0.0
+            self._consecutive_transport_errors = 0
+            print(f"Modbus-yhteys ({self.port}): Onnistui")
+        else:
+            self._next_reconnect_at = (
+                time.monotonic() + self.RECONNECT_INTERVAL_S
+            )
+            print(f"Modbus-yhteys ({self.port}): Ei yhteyttä")
+
+        return self.connected
+
+    def setup_modbus(self):
+        with self._io_lock:
+            return self._connect_locked()
+
+    def _ensure_connected_locked(self):
+        if self.connected:
+            return True
+
+        if not self.auto_reconnect:
+            return False
+
+        if time.monotonic() < self._next_reconnect_at:
+            return False
+
+        print(f"Modbus {self.port}: reconnect-yritys")
+        return self._connect_locked()
+
+    def _record_transport_failure_locked(self):
+        if not self.auto_reconnect:
+            return
+
+        self._consecutive_transport_errors += 1
+
+        if self._consecutive_transport_errors < self.MAX_TRANSPORT_ERRORS:
+            return
+
+        print(
+            f"Modbus {self.port}: {self.MAX_TRANSPORT_ERRORS} "
+            "peräkkäistä siirtovirhettä, suljetaan yhteys"
+        )
+        self._close_locked()
+        self._next_reconnect_at = (
+            time.monotonic() + self.RECONNECT_INTERVAL_S
+        )
+
+    def _record_response_locked(self, response):
+        if response is None or response is False:
+            self._record_transport_failure_locked()
+        else:
+            # ForTest palauttaa itse virheen ylätason ForTestHandlerille.
+            # Vastaanotettu Modbus-poikkeusvastaukseen ei liity USB-katkoon.
+            self._consecutive_transport_errors = 0
+        return response
 
     def write_register(self, address, value):
-        """
-        Kirjoita arvo Modbus holding registeriin.
+        with self._io_lock:
+            if not self._ensure_connected_locked():
+                return False
 
-        Palauttaa pymodbus-vastausobjektin tai False.
-        Ylempi taso päättää, mitä osoite tarkoittaa.
-        """
-        if not self.connected:
-            return False
-
-        try:
-            with self._io_lock:
+            try:
                 result = self.client.write_register(
-                    address=address,
-                    value=value,
+                    address=address, value=value
                 )
-
-            return result
-
-        except Exception as e:
-            print(f"Rekisterin kirjoitusvirhe: {e}")
-            return False
+                return self._record_response_locked(result)
+            except Exception as e:
+                print(f"Rekisterin kirjoitusvirhe ({self.port}): {e}")
+                self._record_transport_failure_locked()
+                return False
 
     def read_holding_registers(self, address, count):
-        """
-        Lue Modbus holding register -alue.
+        with self._io_lock:
+            if not self._ensure_connected_locked():
+                return None
 
-        Ylempi taso päättää, mitä osoite ja lukumäärä tarkoittavat.
-        """
-        if not self.connected:
-            return None
-
-        try:
-            with self._io_lock:
+            try:
                 result = self.client.read_holding_registers(
-                    address=address,
-                    count=count,
+                    address=address, count=count
                 )
-
-            return result
-
-        except Exception as e:
-            print(f"Rekisterien lukuvirhe: {e}")
-            return None
+                return self._record_response_locked(result)
+            except Exception as e:
+                print(f"Rekisterien lukuvirhe ({self.port}): {e}")
+                self._record_transport_failure_locked()
+                return None
 
     def write_coil(self, address, value):
-        """
-        Kirjoita Modbus coil.
+        # Säilytetään vanha ForTestin 0xFF00 / 0x0000 -koodaus.
+        value_to_write = 0xFF00 if value else 0x0000
 
-        Säilytetty vanhan toimivan version mukainen True/False-arvon
-        muunnos 0xFF00 / 0x0000 -arvoksi.
-        """
-        if not self.connected:
-            return False
+        with self._io_lock:
+            if not self._ensure_connected_locked():
+                return False
 
-        try:
-            if value:
-                value_to_write = 0xFF00
-            else:
-                value_to_write = 0x0000
-
-            with self._io_lock:
+            try:
                 result = self.client.write_coil(
-                    address=address,
-                    value=value_to_write,
+                    address=address, value=value_to_write
                 )
-
-            success = not result.isError() if hasattr(result, "isError") else bool(result)
-            return success
-
-        except Exception as e:
-            print(f"Coil-kirjoitusvirhe: {e}")
-            return False
+                self._record_response_locked(result)
+                return (
+                    not result.isError()
+                    if hasattr(result, "isError")
+                    else bool(result)
+                )
+            except Exception as e:
+                print(f"Coil-kirjoitusvirhe ({self.port}): {e}")
+                self._record_transport_failure_locked()
+                return False
 
     def close(self):
-        if self.client:
-            with self._io_lock:
-                self.client.close()
+        with self._io_lock:
+            self._close_locked()
