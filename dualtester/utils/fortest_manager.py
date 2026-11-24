@@ -200,8 +200,15 @@ class ForTestManager(QObject):
     def handle_result(self, result, op_code, error_msg):
         self._busy = False
 
-        # Käsittele kuittaus ensin. Erityisesti ohjelmanvaihdon kuittaus
-        # ratkaisee, saako seuraava START lähteä ForTestille.
+        # STOP on aina etusijalla, myös jos statusvastauksen käsittelijä
+        # lähettäisi heti uuden tuloslukupyynnön.
+        if (
+            self._pending_controls
+            and self._pending_controls[0][0] == "abort_test"
+        ):
+            self._dispatch_pending_control()
+
+        # Muut kuittaukset on käsiteltävä ennen seuraavaa ohjauskomentoa.
         self.resultReady.emit(result, op_code, error_msg)
         self._dispatch_pending_control()
 
