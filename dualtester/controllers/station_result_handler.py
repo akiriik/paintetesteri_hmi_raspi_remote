@@ -274,8 +274,8 @@ class StationResultHandler:
                 int(minutes),
                 int(seconds),
             )
-        except Exception:
-            result_datetime = datetime.now()
+        except (ValueError, TypeError, OverflowError):
+            return None, None, None
 
         return (
             result_datetime.isoformat(timespec="seconds"),
@@ -318,6 +318,17 @@ class StationResultHandler:
             seconds,
         )
 
+        if timestamp is None:
+            controller.update_status(
+                "TULOSTA EI TALLENNETTU: FORTEST-AIKALEIMA VIRHEELLINEN",
+                "ERROR",
+            )
+            print(
+                f"ForTest {controller.station_id}: virheellinen tulosaikaleima "
+                f"{year}-{month}-{day} {hours}:{minutes}:{seconds}"
+            )
+            return
+
         data = {
             "timestamp": timestamp,
             "date": date_text,
@@ -346,7 +357,11 @@ class StationResultHandler:
             },
         }
 
-        storage_service.save_test_result(data)
+        if not storage_service.save_test_result(data):
+            controller.update_status(
+                "TIETOKANTATALLENNUS ODOTTAA UUSINTAYRITYSTÄ",
+                "ERROR",
+            )
 
     def create_dev_result(self):
         controller = self.controller
