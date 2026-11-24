@@ -1,6 +1,10 @@
 # controllers/modbus_result_controller.py
 
-from config.modbus_config import EMERGENCY_RESET_REGISTER
+from config.modbus_config import (
+    EMERGENCY_RESET_REGISTER,
+    FORTEST1_TEST_VALVE_REGISTER,
+    FORTEST2_TEST_VALVE_REGISTER,
+)
 
 
 class ModbusResultController:
@@ -21,6 +25,7 @@ class ModbusResultController:
     def __init__(self, station_controllers, emergency_stop_controller=None):
         self.station_controllers = station_controllers
         self.emergency_stop_controller = emergency_stop_controller
+        self._last_generic_error = None
 
     def set_emergency_stop_controller(self, emergency_stop_controller):
         self.emergency_stop_controller = emergency_stop_controller
@@ -32,12 +37,33 @@ class ModbusResultController:
         if self._should_ignore_during_emergency_dialog(op_code):
             return
 
+        # NC VXA -venttiilien kirjoituskuittaukset ohjataan jo suoraan
+        # TestValveControllerille, joka ilmoittaa varsinaisen virheen
+        # oikealle asemalle. Älä ylikirjoita Tester 1:n tilariviä
+        # toistuvalla yleisellä Opta/Modbus-virheellä.
+        if (
+            op_code == 2
+            and getattr(result, "address", None)
+            in (FORTEST1_TEST_VALVE_REGISTER, FORTEST2_TEST_VALVE_REGISTER)
+        ):
+            if error_msg:
+                print(f"Opta: venttiiliohjauksen virhe: {error_msg}")
+            return
+
         station = self.station_controllers.get(1)
 
         if error_msg:
-            if station:
-                station.update_status(error_msg, "ERROR")
+            # Muut virheet säilyvät näkyvissä mutta samaa ilmoitusta ei
+            # kirjoiteta jatkuvasti testin tilatekstin päälle.
+            fingerprint = (op_code, getattr(result, "address", None), error_msg)
+            if fingerprint != self._last_generic_error:
+                self._last_generic_error = fingerprint
+                print(f"Opta: {error_msg}")
+                if station:
+                    station.update_status(error_msg, "ERROR")
             return
+
+        self._last_generic_error = None
 
         if not result:
             return
