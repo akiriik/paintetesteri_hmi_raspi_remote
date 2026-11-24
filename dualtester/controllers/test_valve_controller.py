@@ -50,6 +50,8 @@ class TestValveController(QObject):
         self.hardware_service = hardware_service
         self.desired_closed_by_station = {1: None, 2: None}
         self.pending_closed_by_station = {1: None, 2: None}
+        self.release_completed_by_station = {1: False, 2: False}
+        self._write_sequence_by_station = {1: 0, 2: 0}
         if self.hardware_service:
             self.hardware_service.writeAcknowledged.connect(
                 self._handle_write_ack
@@ -84,6 +86,19 @@ class TestValveController(QObject):
             self.last_closed_state_by_station.get(station_id) is True
             and self.pending_closed_by_station.get(station_id) is None
         )
+
+    def is_pressure_release_complete(self, station_id):
+        """Vain ajastettu purku ja sulkukirjoitus, ei painemittaus."""
+        timer = self._get_pressure_release_timer(station_id)
+        return bool(
+            self.release_completed_by_station.get(station_id)
+            and not self.pressure_release_active_by_station.get(station_id)
+            and not (timer and timer.isActive())
+            and self.is_closed_confirmed(station_id)
+        )
+
+    def reset_release_for_new_test(self, station_id):
+        self.release_completed_by_station[station_id] = False
 
     def _write_closed_state(self, station_id, closed):
         register = self._get_register(station_id)
@@ -121,14 +136,18 @@ class TestValveController(QObject):
             self.commandFailed.emit(station_id, error)
             return False, error
 
+        self._write_sequence_by_station[station_id] += 1
+        token = self._write_sequence_by_station[station_id]
         QTimer.singleShot(
             3000,
-            lambda sid=station_id, expected=closed:
-                self._handle_write_timeout(sid, expected),
+            lambda sid=station_id, expected=closed, seq=token:
+                self._handle_write_timeout(sid, expected, seq),
         )
         return True, ""
 
-    def _handle_write_timeout(self, station_id, expected_closed):
+    def _handle_write_timeout(self, station_id, expected_closed, sequence):
+        if sequence != self._write_sequence_by_station.get(station_id):
+            return
         if self.pending_closed_by_station.get(station_id) != expected_closed:
             return
 
@@ -189,6 +208,7 @@ class TestValveController(QObject):
 
     def _close_after_pressure_release(self, station_id):
         self.pressure_release_active_by_station[station_id] = False
+        self.release_completed_by_station[station_id] = True
         self._write_closed_state(station_id, True)
 
     def set_closed(self, station_id, closed):
@@ -208,6 +228,7 @@ class TestValveController(QObject):
 
     def release_pressure_after_stop(self, station_id):
         self._cancel_pressure_release_timer(station_id)
+        self.release_completed_by_station[station_id] = False
         self.pressure_release_active_by_station[station_id] = True
 
         success, message = self._open_for_pressure_release(station_id)
@@ -235,6 +256,7 @@ class TestValveController(QObject):
             return self._open_for_pressure_release(station_id)
 
         if status_value in (1, 2):
+            self.release_completed_by_station[station_id] = False
             return self.close_valve(station_id)
 
         if status_value == 3:
@@ -247,6 +269,7 @@ class TestValveController(QObject):
             # suorassa 1->0 tai 2->0 siirtymässä, koska ForTestin lyhyt
             # PURKU=3 voi jäädä yhden sekunnin statuskyselyjen väliin.
             if previous_status in (1, 2, 3):
+                self.release_completed_by_station[station_id] = False
                 self.pressure_release_active_by_station[station_id] = True
                 success, message = self._open_for_pressure_release(station_id)
                 if (
