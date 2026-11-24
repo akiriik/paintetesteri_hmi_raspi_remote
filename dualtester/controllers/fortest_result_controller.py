@@ -19,6 +19,7 @@ class ForTestResultController:
     OP_ABORT_ACK = 2
     OP_STATUS_READ = 3
     OP_RESULTS_READ = 4
+    OP_PROGRAM_WRITE_ACK = 5
     OP_CONNECTION_ERROR = 999
 
     def __init__(self, station_controllers):
@@ -35,13 +36,18 @@ class ForTestResultController:
             station.refresh_station_state()
             return
 
-        if error_msg:
-            station.update_status(error_msg, "ERROR")
-            station.refresh_station_state()
+        # Ohjauskuittaukset käsitellään myös virheellisissä vastauksissa,
+        # jotta tilakone ei jää pysyvästi START/ohjelmanvaihtotilaan.
+        if op_code == self.OP_PROGRAM_WRITE_ACK:
+            station.handle_program_write_ack(bool(result) and not error_msg, error_msg)
             return
 
         if op_code == self.OP_START_ACK:
-            station.update_status("FORTEST START KUITATTU", "SUCCESS")
+            station.handle_start_ack(bool(result) and not error_msg, error_msg)
+            return
+
+        if error_msg:
+            station.update_status(error_msg, "ERROR")
             station.refresh_station_state()
             return
 
