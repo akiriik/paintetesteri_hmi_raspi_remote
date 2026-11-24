@@ -154,8 +154,11 @@ class StationController(QObject):
         if not program_data:
             return
 
-        if self.is_running or self._start_request_pending:
-            self.update_status("OHJELMAA EI VOI VAIHTAA TESTIN AIKANA", "ERROR")
+        if (
+            self.is_running or self._start_request_pending
+            or self.auto_part_change_in_progress or self._manual_jig_in_progress
+        ):
+            self.update_status("OHJELMAA EI VOI VAIHTAA TESTIN TAI JIGILIIKKEEN AIKANA", "ERROR")
             return
 
         if self._pending_program_number is not None:
@@ -294,7 +297,7 @@ class StationController(QObject):
         if not self.has_selected_program():
             return False
 
-        if self.is_running or self._start_request_pending:
+        if self.is_running or self._start_request_pending or self._manual_jig_in_progress:
             return False
 
         if self.auto_part_change_in_progress:
@@ -378,6 +381,8 @@ class StationController(QObject):
         if (
             self.is_running
             or self._start_request_pending
+            or self.auto_part_change_in_progress
+            or self._manual_jig_in_progress
             or self.waiting_result_from_finished_test
             or self.test_valve_controller.pressure_release_active_by_station.get(
                 self.station_id, False
@@ -933,7 +938,7 @@ class StationController(QObject):
         return success
 
     def start_test(self):
-        if self.is_running or self._start_request_pending:
+        if self.is_running or self._start_request_pending or self._manual_jig_in_progress:
             return
 
         if self.auto_part_change_in_progress:
@@ -1195,7 +1200,11 @@ class StationController(QObject):
         ready = self.check_ready_to_start()
 
         self.station_widget.update_running_state(
-            is_running=self.is_running or self._start_request_pending,
+            is_running=(
+                self.is_running or self._start_request_pending
+                or self._manual_jig_in_progress
+                or self.auto_part_change_in_progress
+            ),
             ready=ready,
         )
 
