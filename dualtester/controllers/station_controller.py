@@ -303,6 +303,9 @@ class StationController(QObject):
         if self.auto_part_change_in_progress:
             return False
 
+        if self.hardware_service and self.hardware_service.is_jig_busy():
+            return False
+
         if self.auto_cycle_phase in [
             AUTO_PHASE_WAIT_MISSING_PART_CLAMP,
             AUTO_PHASE_WAIT_FAIL_REMOVE,
@@ -958,6 +961,11 @@ class StationController(QObject):
 
         if not self.has_selected_program():
             self.update_status("VIRHE: VALITSE OHJELMA", "ERROR")
+            self.refresh_station_state()
+            return
+
+        if self.hardware_service and self.hardware_service.is_jig_busy():
+            self.update_status("ODOTA: JIGI LIIKKUU / ODOTTAA KUITTAUSTA", "WARNING")
             self.refresh_station_state()
             return
 
