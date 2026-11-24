@@ -213,18 +213,21 @@ class ForTestManager(QObject):
 
         try:
             if program_number is None:
-                QMetaObject.invokeMethod(
+                dispatched = QMetaObject.invokeMethod(
                     self.worker,
                     method_name,
                     Qt.QueuedConnection,
                 )
             else:
-                QMetaObject.invokeMethod(
+                dispatched = QMetaObject.invokeMethod(
                     self.worker,
                     method_name,
                     Qt.QueuedConnection,
                     Q_ARG(int, int(program_number)),
                 )
+
+            if dispatched is False:
+                raise RuntimeError("Qt-worker ei hyväksynyt kutsua")
 
             return True
 
