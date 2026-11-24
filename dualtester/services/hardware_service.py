@@ -398,6 +398,9 @@ class HardwareService(QObject):
         return True
 
     def _stop_jig_confirmed(self):
+        if self.dev_mode_modbus:
+            return self.stop_jig_sequence()
+
         success, message = self.stop_jig_sequence()
         if not success:
             return False, message
@@ -583,9 +586,12 @@ class HardwareService(QObject):
         )
 
     def start_jig_auto_part_change_sequence(self):
-        return self._start_jig_sequence(
-            JIG_SEQUENCE_COMMAND_AUTO_PART_CHANGE,
-            "AUTOMAATTINEN KAPPALEENVAIHTO",
+        # Optan firmware tukee yksittäiset REMOVE ja CLAMP -komennot;
+        # koko automaattinen kappaleenvaihto on StationControllerin tilakone.
+        # Ei lähetetä firmwarelle tukematonta komentoa 5.
+        return False, (
+            "AUTOMAATTINEN KAPPALEENVAIHTO TOTEUTETAAN "
+            "RASPILLA REMOVE + CLAMP -SEKVENSSINÄ"
         )
 
     def stop_jig_sequence(self):
