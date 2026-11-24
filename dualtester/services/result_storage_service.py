@@ -126,10 +126,15 @@ class ResultStorageService(QObject):
         except Exception as e:
             print(f"SQLite-varajonon lukeminen epäonnistui: {e}")
 
-        # Älä poista tai korvaa vioittunutta varajonotiedostoa.
-        raise RuntimeError(
-            f"SQLite-varajonoa ei voitu lukea turvallisesti: {self.pending_path}"
+        # Säilytä alkuperäinen tiedosto tutkimista varten, mutta salli
+        # uusien tulosten varajonotallennus uuteen tiedostoon.
+        preserved = (
+            self.pending_path + ".corrupt-"
+            + datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         )
+        os.replace(self.pending_path, preserved)
+        print(f"SQLite-varajono talletettu tarkastettavaksi: {preserved}")
+        return []
 
     def _save_pending_results(self):
         folder = os.path.dirname(self.pending_path)
@@ -187,9 +192,12 @@ class ResultStorageService(QObject):
         if not isinstance(data, dict):
             return False
 
-        timestamp = data.get("timestamp") or datetime.now().isoformat(timespec="seconds")
-        date = data.get("date") or timestamp[:10]
-        time = data.get("time") or timestamp[11:19]
+        timestamp = data.get("timestamp")
+        date = data.get("date")
+        time = data.get("time")
+        if not timestamp or not date or not time:
+            print("SQLite: aikaleima/päivä/kellonaika puuttuu, tallennus hylätty")
+            return False
 
         raw_result = data.get("raw_result")
 
