@@ -1,6 +1,6 @@
 # controllers/test_valve_controller.py
 
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
 from config.modbus_config import (
     FORTEST1_TEST_VALVE_REGISTER,
@@ -11,7 +11,10 @@ from config.modbus_config import (
 PRESSURE_RELEASE_HOLD_MS = 10000
 
 
-class TestValveController:
+class TestValveController(QObject):
+    stateConfirmed = pyqtSignal(int, bool)
+    commandFailed = pyqtSignal(int, str)
+
     """
     ForTest-kohtaisten testiventtiilien ohjaus.
 
@@ -43,7 +46,14 @@ class TestValveController:
     }
 
     def __init__(self, hardware_service):
+        super().__init__()
         self.hardware_service = hardware_service
+        self.desired_closed_by_station = {1: None, 2: None}
+        self.pending_closed_by_station = {1: None, 2: None}
+        if self.hardware_service:
+            self.hardware_service.writeAcknowledged.connect(
+                self._handle_write_ack
+            )
         self.last_closed_state_by_station = {
             1: None,
             2: None,
@@ -59,7 +69,7 @@ class TestValveController:
         self.pressure_release_timers = {}
 
         for station_id in self.TEST_VALVE_REGISTER_BY_STATION:
-            timer = QTimer()
+            timer = QTimer(self)
             timer.setSingleShot(True)
             timer.timeout.connect(
                 lambda sid=station_id: self._close_after_pressure_release(sid)
@@ -69,31 +79,96 @@ class TestValveController:
     def _get_register(self, station_id):
         return self.TEST_VALVE_REGISTER_BY_STATION.get(station_id)
 
+    def is_closed_confirmed(self, station_id):
+        return (
+            self.last_closed_state_by_station.get(station_id) is True
+            and self.pending_closed_by_station.get(station_id) is None
+        )
+
     def _write_closed_state(self, station_id, closed):
         register = self._get_register(station_id)
 
         if register is None:
-            return False, f"ForTest {station_id}: testiventtiilille ei ole määritelty rekisteriä"
-
-        closed_bool = bool(closed)
-
-        if self.last_closed_state_by_station.get(station_id) == closed_bool:
-            return True, ""
+            return False, f"ForTest {station_id}: venttiilirekisteri puuttuu"
 
         if not self.hardware_service:
             return False, "HardwareService ei ole käytössä"
 
-        # Molemmat testerit käyttävät samanlaista NC VXA -venttiiliä:
-        # rele OFF (0) = kiinni, rele ON (1) = auki / purku.
-        value = 0 if closed_bool else 1
+        closed = bool(closed)
+        self.desired_closed_by_station[station_id] = closed
 
-        try:
-            self.hardware_service.write_register(register, value)
-            self.last_closed_state_by_station[station_id] = closed_bool
+        if self.pending_closed_by_station[station_id] is not None:
+            # Vastauksen jälkeen käsitellään uusin haluttu tila.
             return True, ""
 
+        if self.last_closed_state_by_station[station_id] == closed:
+            return True, ""
+
+        self.pending_closed_by_station[station_id] = closed
+        value = 0 if closed else 1
+
+        try:
+            queued = bool(self.hardware_service.write_register(register, value))
         except Exception as e:
-            return False, f"ForTest {station_id}: testiventtiilin ohjaus epäonnistui: {e}"
+            queued = False
+            error = str(e)
+        else:
+            error = f"Opta-venttiilirekisteriä {register} ei voitu jonottaa"
+
+        if not queued:
+            self.pending_closed_by_station[station_id] = None
+            self.last_closed_state_by_station[station_id] = None
+            self.commandFailed.emit(station_id, error)
+            return False, error
+
+        QTimer.singleShot(
+            3000,
+            lambda sid=station_id, expected=closed:
+                self._handle_write_timeout(sid, expected),
+        )
+        return True, ""
+
+    def _handle_write_timeout(self, station_id, expected_closed):
+        if self.pending_closed_by_station.get(station_id) != expected_closed:
+            return
+
+        self.pending_closed_by_station[station_id] = None
+        self.last_closed_state_by_station[station_id] = None
+        self.commandFailed.emit(
+            station_id,
+            "Optan venttiiliohjauksen kuittausta ei saatu 3 sekunnissa",
+        )
+
+    def _handle_write_ack(self, address, value, success, error_msg):
+        for station_id, register in self.TEST_VALVE_REGISTER_BY_STATION.items():
+            if address != register:
+                continue
+
+            expected = self.pending_closed_by_station.get(station_id)
+            if expected is None or (0 if expected else 1) != value:
+                return  # vanha tai toisen komennon kuittaus
+
+            self.pending_closed_by_station[station_id] = None
+            if success:
+                self.last_closed_state_by_station[station_id] = expected
+                if self.desired_closed_by_station[station_id] == expected:
+                    self.stateConfirmed.emit(station_id, expected)
+                    if (
+                        not expected
+                        and self.pressure_release_active_by_station[station_id]
+                    ):
+                        self._start_pressure_release_hold(station_id)
+            else:
+                self.last_closed_state_by_station[station_id] = None
+                self.commandFailed.emit(
+                    station_id,
+                    error_msg or "Optan venttiilikirjoitus epäonnistui",
+                )
+
+            desired = self.desired_closed_by_station[station_id]
+            if desired is not None and desired != expected:
+                self._write_closed_state(station_id, desired)
+            return
 
     def _get_pressure_release_timer(self, station_id):
         return self.pressure_release_timers.get(station_id)
@@ -109,8 +184,7 @@ class TestValveController:
 
     def _start_pressure_release_hold(self, station_id):
         timer = self._get_pressure_release_timer(station_id)
-
-        if timer:
+        if timer and not timer.isActive():
             timer.start(PRESSURE_RELEASE_HOLD_MS)
 
     def _close_after_pressure_release(self, station_id):
@@ -137,12 +211,13 @@ class TestValveController:
         self.pressure_release_active_by_station[station_id] = True
 
         success, message = self._open_for_pressure_release(station_id)
-
-        if success:
-            self._start_pressure_release_hold(station_id)
-        else:
+        if not success:
             self.pressure_release_active_by_station[station_id] = False
-
+        elif (
+            self.last_closed_state_by_station[station_id] is False
+            and self.pending_closed_by_station[station_id] is None
+        ):
+            self._start_pressure_release_hold(station_id)
         return success, message
 
     def update_from_fortest_status(self, station_id, status_value):
@@ -172,11 +247,14 @@ class TestValveController:
             # suorassa 1->0 tai 2->0 siirtymässä, koska ForTestin lyhyt
             # PURKU=3 voi jäädä yhden sekunnin statuskyselyjen väliin.
             if previous_status in (1, 2, 3):
+                self.pressure_release_active_by_station[station_id] = True
                 success, message = self._open_for_pressure_release(station_id)
-
-                if success:
+                if (
+                    success
+                    and self.pending_closed_by_station[station_id] is None
+                    and self.last_closed_state_by_station[station_id] is False
+                ):
                     self._start_pressure_release_hold(station_id)
-
                 return success, message
 
             timer = self._get_pressure_release_timer(station_id)
