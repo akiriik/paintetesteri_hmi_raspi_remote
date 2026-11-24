@@ -47,7 +47,8 @@ class ModbusResultWrapper:
 
 
 class ModbusWorker(QObject):
-    resultReady = pyqtSignal(object, int, str)  # tulos, operaatiokoodi, virheviesti
+    resultReady = pyqtSignal(object, int, str)
+    writeAcknowledged = pyqtSignal(int, int, bool, str)  # tulos, operaatiokoodi, virheviesti
 
     def __init__(self, modbus_handler):
         super().__init__()
@@ -79,21 +80,25 @@ class ModbusWorker(QObject):
 
     @pyqtSlot(int, int)
     def write_register(self, address, value):
-        """
-        Kirjoita rekisteri taustasäikeessä.
-        """
+        """Kirjoita rekisteri ja ilmoita myös todellinen Modbus-kuittaus."""
         if not self.modbus or not self.modbus.connected:
-            self.resultReady.emit(False, 2, "Modbus ei yhteydessä")
+            error = "Modbus ei yhteydessä"
+            self.writeAcknowledged.emit(address, value, False, error)
+            self.resultReady.emit(False, 2, error)
             return
 
         try:
             result = self.modbus.write_register(address, value)
             wrapped_result = self._wrap_result(result, address)
+            success = bool(wrapped_result)
+            error = "" if success else f"Opta rekisteri {address}: kirjoitusta ei kuitattu"
 
-            self.resultReady.emit(wrapped_result, 2, "")
-
+            self.writeAcknowledged.emit(address, value, success, error)
+            self.resultReady.emit(wrapped_result, 2, error)
         except Exception as e:
-            self.resultReady.emit(False, 2, f"Virhe rekisterin kirjoittamisessa: {str(e)}")
+            error = f"Rekisterin {address} kirjoitusvirhe: {e}"
+            self.writeAcknowledged.emit(address, value, False, error)
+            self.resultReady.emit(False, 2, error)
 
     @pyqtSlot()
     def read_emergency_stop_status_async(self):
@@ -161,6 +166,7 @@ class ModbusManager(QObject):
 
     resultReady = pyqtSignal(object, int, str)  # tulos, operaatiokoodi, virheviesti
     emergencyStatusReady = pyqtSignal(object)
+    writeAcknowledged = pyqtSignal(int, int, bool, str)
 
     def __init__(self, port=None, baudrate=19200):
         super().__init__()
@@ -184,6 +190,7 @@ class ModbusManager(QObject):
 
         self.worker.moveToThread(self.thread)
         self.worker.resultReady.connect(self.handle_result)
+        self.worker.writeAcknowledged.connect(self.writeAcknowledged.emit)
 
         self.thread.start()
 
@@ -224,22 +231,24 @@ class ModbusManager(QObject):
         )
 
     def write_register(self, address, value):
-        """
-        Kirjoita rekisteri taustasäikeessä.
+        """Palauta True vain jos kirjoitus saatiin työntekijän jonoon.
 
-        Tätä käytetään Opta-väylän yksittäisiin rekisterikirjoituksiin.
+        Varsinainen kuittaus tulee writeAcknowledged-signaalista.
         """
         if not self.modbus_handler.connected:
-            self.resultReady.emit(False, 2, "Modbus ei yhteydessä")
-            return
+            return False
 
-        QMetaObject.invokeMethod(
-            self.worker,
-            "write_register",
-            Qt.QueuedConnection,
-            Q_ARG(int, address),
-            Q_ARG(int, value),
-        )
+        try:
+            return bool(QMetaObject.invokeMethod(
+                self.worker,
+                "write_register",
+                Qt.QueuedConnection,
+                Q_ARG(int, int(address)),
+                Q_ARG(int, int(value)),
+            ))
+        except Exception as e:
+            print(f"Opta Modbus kirjoituksen jonotusvirhe: {e}")
+            return False
 
     def request_emergency_stop_status(self):
         """Tilaa hätäseisluenta taustasäikeestä; enintään yksi pyyntö jonossa."""
