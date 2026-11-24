@@ -317,6 +317,11 @@ class StationController(QObject):
         if self.dev_mode_fortest:
             return True
 
+        # VXA-venttiili ohjataan Optalla: ilman Opta-yhteyttä ei
+        # voida varmistaa uuden testin turvallista käynnistystä.
+        if not self.hardware_service or not self.hardware_service.is_modbus_connected():
+            return False
+
         return self.fortest_service.is_connected(self.station_id)
 
     def get_jakotukki_program_number(self):
@@ -1002,6 +1007,12 @@ class StationController(QObject):
             self.refresh_station_state()
             return
 
+        if not self.hardware_service or not self.hardware_service.is_modbus_connected():
+            if not getattr(self.hardware_service, "dev_mode_modbus", False):
+                self.update_status("OPTA EI YHTEYTTÄ: START ESTETTY", "ERROR")
+                self.refresh_station_state()
+                return
+
         if self.auto_part_change_enabled:
             if not self.is_jakotukki_station_and_program():
                 self.disable_auto_part_change("AUTOMAATTI POIS: VÄÄRÄ ASEMA TAI OHJELMA")
@@ -1038,10 +1049,13 @@ class StationController(QObject):
         self.refresh_station_state()
 
     def _handle_valve_state_confirmed(self, station_id, closed):
-        if station_id != self.station_id or not closed:
+        if station_id != self.station_id:
             return
 
-        if self._start_request_pending:
+        # Onnistunut kuittaus lopettaa tilan taustavirheen muistamisen.
+        self._last_idle_valve_error = None
+
+        if closed and self._start_request_pending:
             self._schedule_start_after_valve(self._start_generation)
 
     def _handle_valve_command_failed(self, station_id, error_msg):
@@ -1049,9 +1063,28 @@ class StationController(QObject):
             return
 
         if self._start_request_pending:
+            # START on estettävä aina, jos sulku ei saanut kuittausta.
             self.handle_start_ack(False, error_msg)
-        else:
+            return
+
+        if (
+            self.is_running
+            or self.auto_part_change_in_progress
+            or self._manual_jig_in_progress
+            or self.test_valve_controller.pressure_release_active_by_station.get(
+                station_id, False
+            )
+        ):
+            # Testin, jigin tai paineenpurun aikainen virhe on olennainen.
             self.update_status(error_msg, "ERROR")
+            return
+
+        # Tyhjäkäynnillä tapahtuva automaattinen venttiilin tilan palautus
+        # ei saa peittää ForTestin viimeistä tulosta kerran sekunnissa.
+        # Opta-yhteyden tilan näkee edelleen yläpalkissa.
+        if error_msg != getattr(self, "_last_idle_valve_error", None):
+            self._last_idle_valve_error = error_msg
+            print(f"ForTest {station_id}: Optan lepotilan venttiilivirhe: {error_msg}")
 
     def _schedule_start_after_valve(self, generation):
         if not self._start_request_pending:
