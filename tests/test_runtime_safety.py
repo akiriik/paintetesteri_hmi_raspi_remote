@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dualtester"))
 from PyQt5.QtCore import QObject, QCoreApplication, pyqtSignal
 
 from controllers.fortest_result_controller import ForTestResultController
+from controllers.modbus_result_controller import ModbusResultController
 from controllers.station_controller import StationController
 from controllers.station_result_handler import StationResultHandler
 from controllers.test_valve_controller import TestValveController
@@ -177,6 +178,52 @@ class SafetyRegressionTests(unittest.TestCase):
         stub = SimpleNamespace(_auto_cycle_generation=12)
         StationController._start_auto_remove_after_delay(stub, 11)
         StationController._start_auto_release_after_delay(stub, 11)
+
+    def test_opta_valve_error_is_handled_by_valve_controller_only(self):
+        displayed = []
+        station = SimpleNamespace(
+            update_status=lambda *args: displayed.append(args)
+        )
+        controller = ModbusResultController({1: station})
+        failed_write = SimpleNamespace(address=18092)
+        controller.handle_result(
+            failed_write, 2, "Opta rekisteri 18092: kirjoitusta ei kuitattu"
+        )
+        self.assertEqual(displayed, [])
+
+    def test_generic_opta_error_is_not_repainted_repeatedly(self):
+        displayed = []
+        station = SimpleNamespace(
+            update_status=lambda *args: displayed.append(args)
+        )
+        controller = ModbusResultController({1: station})
+        for _ in range(3):
+            controller.handle_result(False, 2, "Opta yhteysvirhe")
+        self.assertEqual(displayed, [("Opta yhteysvirhe", "ERROR")])
+
+    def test_idle_valve_error_does_not_replace_last_test_result(self):
+        displayed = []
+        station = SimpleNamespace(
+            station_id=1,
+            _start_request_pending=False,
+            is_running=False,
+            auto_part_change_in_progress=False,
+            _manual_jig_in_progress=False,
+            test_valve_controller=SimpleNamespace(
+                pressure_release_active_by_station={1: False}
+            ),
+            update_status=lambda *args: displayed.append(args),
+        )
+        StationController._handle_valve_command_failed(
+            station, 1, "Opta ei yhteydessä"
+        )
+        self.assertEqual(displayed, [])
+
+        station.is_running = True
+        StationController._handle_valve_command_failed(
+            station, 1, "Opta ei yhteydessä"
+        )
+        self.assertEqual(displayed, [("Opta ei yhteydessä", "ERROR")])
 
     def test_fortest_program_ack_error_is_not_discarded(self):
         calls = []
