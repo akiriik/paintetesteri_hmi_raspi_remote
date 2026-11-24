@@ -65,6 +65,8 @@ class StationController(QObject):
         self._pending_program_number = None
         self._start_request_pending = False
         self._start_generation = 0
+        self._auto_cycle_generation = 0
+        self._auto_restart_generation = 0
 
         self.is_running = False
         self.results_started = False
@@ -510,6 +512,8 @@ class StationController(QObject):
         self.refresh_station_state()
 
     def disable_auto_part_change(self, message=None, show_message=True):
+        self._auto_cycle_generation += 1
+        self._auto_restart_generation += 1
         jig_was_running = (
             self.auto_part_change_in_progress
             and self.auto_cycle_phase in {
@@ -559,6 +563,8 @@ class StationController(QObject):
         if not self.can_start_auto_part_change_after_result():
             return
 
+        self._auto_cycle_generation += 1
+        generation = self._auto_cycle_generation
         self.auto_part_change_in_progress = True
         self.auto_cycle_phase = AUTO_PHASE_WAIT_BEFORE_REMOVE
         self.auto_restart_after_manual_clamp = True
@@ -571,10 +577,13 @@ class StationController(QObject):
 
         QTimer.singleShot(
             AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS,
-            self._start_auto_remove_after_delay,
+            lambda gen=generation: self._start_auto_remove_after_delay(gen),
         )
 
-    def _start_auto_remove_after_delay(self):
+    def _start_auto_remove_after_delay(self, generation):
+        if generation != self._auto_cycle_generation:
+            return
+
         if not self.auto_part_change_enabled:
             return
 
@@ -803,7 +812,7 @@ class StationController(QObject):
                 return
 
             self.update_status("KAPPALE KIINNI - ODOTETAAN 3s ENNEN UUTTA TESTIÄ", "INFO")
-            QTimer.singleShot(AUTO_RESTART_AFTER_CLAMP_DELAY_MS, self.start_test)
+            self._schedule_automatic_restart()
             self.refresh_station_state()
             return
 
@@ -820,7 +829,7 @@ class StationController(QObject):
 
             if self.auto_restart_after_manual_clamp:
                 self.update_status("KAPPALE KIINNI - TESTI JATKUU AUTOMAATTISESTI", "INFO")
-                QTimer.singleShot(AUTO_RESTART_AFTER_CLAMP_DELAY_MS, self.start_test)
+                self._schedule_automatic_restart()
             else:
                 self.update_status("KAPPALE KIINNI - KÄYNNISTÄ ENSIMMÄINEN TESTI VIHREÄSTÄ NAPISTA", "SUCCESS")
 
@@ -830,6 +839,25 @@ class StationController(QObject):
         if self.auto_cycle_phase == AUTO_PHASE_FAIL_REMOVE:
             self.enter_missing_part_wait_state(auto_restart_after_clamp=True)
             return
+
+    def _schedule_automatic_restart(self):
+        self._auto_restart_generation += 1
+        generation = self._auto_restart_generation
+        QTimer.singleShot(
+            AUTO_RESTART_AFTER_CLAMP_DELAY_MS,
+            lambda gen=generation: self._automatic_restart_if_allowed(gen),
+        )
+
+    def _automatic_restart_if_allowed(self, generation):
+        if generation != self._auto_restart_generation:
+            return
+        if not self.auto_part_change_enabled:
+            return
+        if self.auto_part_change_in_progress or self.auto_cycle_phase != AUTO_PHASE_IDLE:
+            return
+        if not self.has_selected_program() or not self.is_jakotukki_station_and_program():
+            return
+        self.start_test()
 
     def handle_result_for_automatic_cycle(self, test_result):
         self.is_running = False
@@ -847,6 +875,8 @@ class StationController(QObject):
             self.start_auto_part_change_after_result()
             return
 
+        self._auto_cycle_generation += 1
+        generation = self._auto_cycle_generation
         self.auto_part_change_in_progress = True
         self.auto_cycle_phase = AUTO_PHASE_WAIT_BEFORE_RELEASE
         self.auto_restart_after_manual_clamp = True
@@ -859,10 +889,13 @@ class StationController(QObject):
 
         QTimer.singleShot(
             AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS,
-            self._start_auto_release_after_delay,
+            lambda gen=generation: self._start_auto_release_after_delay(gen),
         )
 
-    def _start_auto_release_after_delay(self):
+    def _start_auto_release_after_delay(self, generation):
+        if generation != self._auto_cycle_generation:
+            return
+
         if not self.auto_part_change_in_progress:
             return
 
