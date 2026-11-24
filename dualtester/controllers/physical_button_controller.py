@@ -87,7 +87,7 @@ class PhysicalButtonController(QObject):
             if handled:
                 return
 
-        if station.is_running:
+        if station.is_running or getattr(station, "_start_request_pending", False):
             station.stop_test()
         else:
             station.start_test()
