@@ -2,13 +2,14 @@
 import json
 import os
 import sqlite3
+from PyQt5.QtCore import QObject, QTimer
 from datetime import datetime
 
 
 DEFAULT_DATABASE_PATH = "/home/akiriik/painetesteri_hmi/data/test_results.db"
 
 
-class ResultStorageService:
+class ResultStorageService(QObject):
     """
     Testitulosten pysyvä SQLite-tallennus.
 
@@ -17,13 +18,24 @@ class ResultStorageService:
     """
 
     def __init__(self, parent=None, database_path=DEFAULT_DATABASE_PATH):
+        super().__init__(parent)
         self.parent = parent
         self.database_path = database_path
-        self._ensure_database()
+        self.pending_path = self.database_path + ".pending.json"
+        self._pending_results = self._load_pending_results()
+
+        try:
+            self._ensure_database()
+        except Exception as e:
+            print(f"SQLite-alustus epäonnistui, varajono käytössä: {e}")
+
+        self.retry_timer = QTimer(self)
+        self.retry_timer.timeout.connect(self._retry_pending_results)
+        self.retry_timer.start(5000)
 
     def _connect(self):
         os.makedirs(os.path.dirname(self.database_path), exist_ok=True)
-        connection = sqlite3.connect(self.database_path, timeout=5)
+        connection = sqlite3.connect(self.database_path, timeout=0.3)
         connection.execute("PRAGMA journal_mode=WAL")
         connection.execute("PRAGMA synchronous=NORMAL")
         return connection
@@ -101,7 +113,77 @@ class ResultStorageService:
                 """
             )
 
+    def _load_pending_results(self):
+        if not os.path.isfile(self.pending_path):
+            return []
+
+        try:
+            with open(self.pending_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list) and all(isinstance(x, dict) for x in data):
+                print(f"SQLite: palautetaan {len(data)} odottavaa tulosta")
+                return data
+        except Exception as e:
+            print(f"SQLite-varajonon lukeminen epäonnistui: {e}")
+
+        # Älä poista tai korvaa vioittunutta varajonotiedostoa.
+        raise RuntimeError(
+            f"SQLite-varajonoa ei voitu lukea turvallisesti: {self.pending_path}"
+        )
+
+    def _save_pending_results(self):
+        folder = os.path.dirname(self.pending_path)
+        os.makedirs(folder, exist_ok=True)
+        tmp_path = self.pending_path + ".tmp"
+
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(self._pending_results, f, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+
+        os.replace(tmp_path, self.pending_path)
+
     def save_test_result(self, data):
+        if not isinstance(data, dict):
+            return False
+
+        if self._save_test_result_once(data):
+            return True
+
+        self._pending_results.append(dict(data))
+        try:
+            self._save_pending_results()
+            print("SQLite: tulos lisätty pysyvään uusintajonoon")
+        except Exception as e:
+            print(f"VAKAVA: SQLite-varajonon tallennus epäonnistui: {e}")
+
+        return False
+
+    def _retry_pending_results(self):
+        if not self._pending_results:
+            return
+
+        succeeded = 0
+        remaining = []
+        for index, result in enumerate(self._pending_results):
+            if index >= 3:
+                remaining.append(result)
+                continue
+
+            if self._save_test_result_once(result):
+                succeeded += 1
+            else:
+                remaining.append(result)
+
+        if succeeded:
+            self._pending_results = remaining
+            try:
+                self._save_pending_results()
+            except Exception as e:
+                print(f"VAKAVA: SQLite-varajonon päivitys epäonnistui: {e}")
+            print(f"SQLite: {succeeded} odottavaa tulosta tallennettu")
+
+    def _save_test_result_once(self, data):
         if not isinstance(data, dict):
             return False
 
@@ -144,6 +226,23 @@ class ResultStorageService:
 
         try:
             with self._connect() as connection:
+                # Uusintajono on idempotentti myös sähkökatkon jälkeen:
+                # jo tallentunut sama ForTest-tulos ei päädy kahdeksi riviksi.
+                existing = connection.execute(
+                    """
+                    SELECT 1 FROM test_results
+                    WHERE station_id = :station_id
+                      AND timestamp = :timestamp
+                      AND program_number = :program_number
+                      AND result_code = :result_code
+                      AND raw_result_json = :raw_result_json
+                    LIMIT 1
+                    """,
+                    values,
+                ).fetchone()
+                if existing:
+                    return True
+
                 connection.execute(
                     """
                     INSERT INTO test_results (
@@ -206,4 +305,10 @@ class ResultStorageService:
             return False
 
     def cleanup(self):
-        pass
+        if hasattr(self, "retry_timer"):
+            self.retry_timer.stop()
+        if self._pending_results:
+            try:
+                self._save_pending_results()
+            except Exception as e:
+                print(f"SQLite-varajonon sulkutallennus epäonnistui: {e}")
