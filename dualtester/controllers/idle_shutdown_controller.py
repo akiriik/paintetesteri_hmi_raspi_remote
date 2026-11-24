@@ -85,6 +85,7 @@ class IdleShutdownController:
         self.last_test_activity_at = time.monotonic()
         self.shutdown_started = False
         self.shutdown_blocked_by_active_test = False
+        self.next_shutdown_retry_at = 0.0
 
         self.overlay = IdleShutdownWarningOverlay(main_window)
         self.overlay.cancel_button.clicked.connect(self.cancel_shutdown_warning)
@@ -122,6 +123,9 @@ class IdleShutdownController:
         remaining = IDLE_SHUTDOWN_TIMEOUT_S - elapsed
 
         if remaining <= 0:
+            if time.monotonic() < self.next_shutdown_retry_at:
+                return
+
             if self.is_system_busy():
                 # Älä nollaa käyttöajastinta jokaisella tarkistuksella.
                 # Tuntemattomassa testi-/jigitilassa ei sammuteta laitetta
@@ -146,9 +150,12 @@ class IdleShutdownController:
                 self.show_warning(IDLE_SHUTDOWN_WARNING_S)
                 return
 
-            self.shutdown_started = True
             self.show_warning(0)
-            ShutdownController.shutdown_system(self.main_window)
+            self.shutdown_started = bool(
+                ShutdownController.shutdown_system(self.main_window)
+            )
+            if not self.shutdown_started:
+                self.next_shutdown_retry_at = time.monotonic() + 60.0
             return
 
         if remaining <= IDLE_SHUTDOWN_WARNING_S:
