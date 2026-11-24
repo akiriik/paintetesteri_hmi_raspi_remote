@@ -1,0 +1,26 @@
+name: Painetesterin regressiotestit
+
+on:
+  push:
+    branches:
+      - main
+      - "fix/**"
+  pull_request:
+
+jobs:
+  python-safety:
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONPATH: dualtester
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: python -m pip install PyQt5 pymodbus
+      - name: Python syntax validation
+        run: python -m compileall -q dualtester tests tools
+      - name: Runtime regression tests
+        run: python -m unittest discover -s tests -v
