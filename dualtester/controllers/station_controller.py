@@ -80,6 +80,12 @@ class StationController(QObject):
         self.auto_restart_after_manual_clamp = False
 
         self.test_valve_controller = TestValveController(self.hardware_service)
+        self.test_valve_controller.stateConfirmed.connect(
+            self._handle_valve_state_confirmed
+        )
+        self.test_valve_controller.commandFailed.connect(
+            self._handle_valve_command_failed
+        )
         self.result_handler = StationResultHandler(self)
         self.status_handler = StationStatusHandler(self)
 
@@ -862,25 +868,65 @@ class StationController(QObject):
             self.refresh_station_state()
             return
 
-        valve_ok = self.close_test_valve()
-
-        if not valve_ok:
-            self.is_running = False
-            self.refresh_station_state()
-            return
-
-        self.register_test_activity()
         self._start_request_pending = True
         self._start_generation += 1
         generation = self._start_generation
+
+        valve_ok = self.close_test_valve()
+        if not valve_ok:
+            self.handle_start_ack(False, "OPTA-VENTTIILIÄ EI VOITU OHJATA KIINNI")
+            return
+
+        self.register_test_activity()
+
+        if self.test_valve_controller.is_closed_confirmed(self.station_id):
+            self._schedule_start_after_valve(generation)
+        else:
+            self.update_status("ODOTETAAN TESTIVENTTIILIN SULKUKUITTAUSTA", "INFO")
+
+        QTimer.singleShot(
+            4000,
+            lambda gen=generation: self._start_valve_ack_timeout(gen),
+        )
+        self.refresh_station_state()
+
+    def _handle_valve_state_confirmed(self, station_id, closed):
+        if station_id != self.station_id or not closed:
+            return
+
+        if self._start_request_pending:
+            self._schedule_start_after_valve(self._start_generation)
+
+    def _handle_valve_command_failed(self, station_id, error_msg):
+        if station_id != self.station_id:
+            return
+
+        if self._start_request_pending:
+            self.handle_start_ack(False, error_msg)
+        else:
+            self.update_status(error_msg, "ERROR")
+
+    def _schedule_start_after_valve(self, generation):
+        if not self._start_request_pending:
+            return
         QTimer.singleShot(
             200,
             lambda gen=generation: self._continue_start_test(gen),
         )
-        self.refresh_station_state()
+
+    def _start_valve_ack_timeout(self, generation):
+        if generation != self._start_generation or not self._start_request_pending:
+            return
+        if not self.test_valve_controller.is_closed_confirmed(self.station_id):
+            self.handle_start_ack(
+                False, "TESTIVENTTIILIN SULKUKUITTAUS PUUTTUU"
+            )
 
     def _continue_start_test(self, generation):
         if generation != self._start_generation or not self._start_request_pending:
+            return
+
+        if not self.test_valve_controller.is_closed_confirmed(self.station_id):
             return
 
         if not self.dev_mode_fortest and not self.fortest_service.is_connected(self.station_id):
