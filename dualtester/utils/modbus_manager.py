@@ -84,7 +84,7 @@ class ModbusWorker(QObject):
         if not self.modbus or not self.modbus.connected:
             error = "Modbus ei yhteydessä"
             self.writeAcknowledged.emit(address, value, False, error)
-            self.resultReady.emit(False, 2, error)
+            self.resultReady.emit(self._wrap_result(False, address), 2, error)
             return
 
         try:
@@ -98,7 +98,7 @@ class ModbusWorker(QObject):
         except Exception as e:
             error = f"Rekisterin {address} kirjoitusvirhe: {e}"
             self.writeAcknowledged.emit(address, value, False, error)
-            self.resultReady.emit(False, 2, error)
+            self.resultReady.emit(self._wrap_result(False, address), 2, error)
 
     @pyqtSlot()
     def read_emergency_stop_status_async(self):
