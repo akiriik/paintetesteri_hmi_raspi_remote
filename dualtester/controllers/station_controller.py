@@ -320,7 +320,10 @@ class StationController(QObject):
         if jakotukki_program_number is None:
             return False
 
-        return self.program_number == jakotukki_program_number
+        return (
+            self.program_number == jakotukki_program_number
+            and self.program_written_to_fortest
+        )
 
     def update_jig_controls_visibility(self):
         visible = self.is_jakotukki_station_and_program()
@@ -376,9 +379,23 @@ class StationController(QObject):
             self.is_running
             or self._start_request_pending
             or self.waiting_result_from_finished_test
+            or self.test_valve_controller.pressure_release_active_by_station.get(
+                self.station_id, False
+            )
+            or self.status_handler.last_status != 0
         ):
-            self.update_status("JIGIÄ EI SAA OHJATA TESTIN AIKANA", "ERROR")
+            self.update_status("JIGIÄ EI SAA OHJATA TESTIN / PURUN AIKANA", "ERROR")
             return False
+
+        for other_id, other in self.main_window.station_controllers.items():
+            if other_id == self.station_id:
+                continue
+            if (
+                other.is_running or other._start_request_pending
+                or other.waiting_result_from_finished_test
+            ):
+                self.update_status("TOINEN TESTERI ON KÄYNNISSÄ", "ERROR")
+                return False
 
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(False)
@@ -485,6 +502,16 @@ class StationController(QObject):
         self.refresh_station_state()
 
     def disable_auto_part_change(self, message=None, show_message=True):
+        jig_was_running = (
+            self.auto_part_change_in_progress
+            and self.auto_cycle_phase in {
+                AUTO_PHASE_REMOVE, AUTO_PHASE_CLAMP, AUTO_PHASE_RELEASE,
+                AUTO_PHASE_MISSING_PART_CLAMP, AUTO_PHASE_FAIL_REMOVE,
+            }
+        )
+        if jig_was_running and self.hardware_service:
+            self.hardware_service.request_jig_stop(self.station_id)
+
         self.auto_part_change_enabled = False
         self.auto_cycle_started_by_user = False
         self.auto_part_change_in_progress = False
@@ -555,6 +582,12 @@ class StationController(QObject):
 
         if not self.hardware_service:
             self.disable_auto_part_change("AUTOMAATTI POIS: OPTA-OHJAUS PUUTTUU")
+            return
+
+        if not self.test_valve_controller.is_pressure_release_complete(self.station_id):
+            self.disable_auto_part_change(
+                "AUTOMAATTI POIS: PAINEENPURUN AJASTUS / VENTTIILIKUITTAUS PUUTTUU"
+            )
             return
 
         self.auto_cycle_phase = AUTO_PHASE_REMOVE
@@ -832,6 +865,12 @@ class StationController(QObject):
             self.disable_auto_part_change("AUTOMAATTI POIS: VÄÄRÄ ASEMA TAI OHJELMA")
             return
 
+        if not self.test_valve_controller.is_pressure_release_complete(self.station_id):
+            self.disable_auto_part_change(
+                "AUTOMAATTI POIS: PAINEENPURUN AJASTUS / VENTTIILIKUITTAUS PUUTTUU"
+            )
+            return
+
         self.auto_cycle_phase = AUTO_PHASE_RELEASE
         self.update_status("NOK-TULOS - AJETAAN KAPPALE IRTI", "ERROR")
 
@@ -933,6 +972,7 @@ class StationController(QObject):
         self._start_generation += 1
         generation = self._start_generation
 
+        self.test_valve_controller.reset_release_for_new_test(self.station_id)
         valve_ok = self.close_test_valve()
         if not valve_ok:
             self.handle_start_ack(False, "OPTA-VENTTIILIÄ EI VOITU OHJATA KIINNI")
@@ -1007,7 +1047,20 @@ class StationController(QObject):
             return
 
         self.update_status("ODOTETAAN FORTEST START -KUITTAUSTA", "INFO")
+        QTimer.singleShot(
+            6000,
+            lambda gen=generation: self._start_ack_timeout(gen),
+        )
         self.refresh_station_state()
+
+    def _start_ack_timeout(self, generation):
+        if generation != self._start_generation or not self._start_request_pending:
+            return
+        self.handle_start_ack(
+            False, "FORTEST START -KUITTAUSTA EI SAATU 6 SEKUNNISSA"
+        )
+        if not self.dev_mode_fortest:
+            self.fortest_service.abort_test(self.station_id)
 
     def stop_test(self):
         # Invalidoi myös jo ajastettu 200 ms START.
