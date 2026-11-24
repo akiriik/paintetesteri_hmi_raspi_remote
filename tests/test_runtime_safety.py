@@ -20,6 +20,7 @@ from controllers.station_controller import StationController
 from controllers.station_result_handler import StationResultHandler
 from controllers.test_valve_controller import TestValveController
 from services.result_storage_service import ResultStorageService
+from utils.program_manager import ProgramManager
 from utils.fortest_manager import ForTestManager
 
 
@@ -157,6 +158,21 @@ class SafetyRegressionTests(unittest.TestCase):
         receiver = ForTestResultController({1: station})
         receiver.handle_result(1, False, 5, "Ohjelmanvaihto epäonnistui")
         self.assertEqual(calls, [(False, "Ohjelmanvaihto epäonnistui")])
+
+    def test_missing_program_json_does_not_create_fake_programs(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "missing_programs.json"
+            manager = ProgramManager(str(path))
+            self.assertEqual(manager.get_program_list(), [])
+            self.assertFalse(path.exists())
+
+    def test_invalid_program_json_is_rejected_without_defaults(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "programs.json"
+            path.write_text('{"programs":[{"id":1,"name":"A"},{"id":1,"name":"B"}]}')
+            manager = ProgramManager(str(path))
+            self.assertEqual(manager.get_program_list(), [])
+            self.assertEqual(manager.get_program_by_index(0), None)
 
     def test_invalid_fortest_timestamp_is_not_guessed(self):
         result = StationResultHandler._get_result_datetime_parts(
