@@ -78,6 +78,17 @@ class StationController(QObject):
         self.auto_cycle_started_by_user = False
         self.auto_cycle_phase = AUTO_PHASE_IDLE
         self.auto_restart_after_manual_clamp = False
+        self._manual_jig_in_progress = False
+
+        self.hardware_service.jigStartFinished.connect(
+            self._handle_jig_start_finished
+        )
+        self.hardware_service.jigStateReady.connect(
+            self._handle_jig_state_ready
+        )
+        self.hardware_service.jigStopFinished.connect(
+            self._handle_jig_stop_finished
+        )
 
         self.test_valve_controller = TestValveController(self.hardware_service)
         self.test_valve_controller.stateConfirmed.connect(
@@ -361,27 +372,56 @@ class StationController(QObject):
             self.update_status("JIG-SEKVENSSIN OHJAUS PUUTTUU HARDWARE SERVICESTÄ", "ERROR")
             return False
 
+        if (
+            self.is_running
+            or self._start_request_pending
+            or self.waiting_result_from_finished_test
+        ):
+            self.update_status("JIGIÄ EI SAA OHJATA TESTIN AIKANA", "ERROR")
+            return False
+
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(False)
 
         self.update_status(f"KÄYNNISTETÄÄN {sequence_name} -SEKVENSSI...", "INFO")
+        success, message = self.hardware_service.request_jig_start(
+            self.station_id, hardware_method_name
+        )
+        self._manual_jig_in_progress = bool(success)
 
-        hardware_method = getattr(self.hardware_service, hardware_method_name)
-        success, message = hardware_method()
-
-        if success:
-            self.update_status(message, "INFO")
-
-            if not keep_buttons_disabled:
-                QTimer.singleShot(MANUAL_JIG_BUTTON_RELEASE_DELAY_MS, self._release_manual_jig_buttons)
-        else:
-            self.update_status(message, "ERROR")
-
-            if hasattr(self.station_widget, "set_jig_controls_enabled"):
-                self.station_widget.set_jig_controls_enabled(True)
+        self.update_status(message, "INFO" if success else "ERROR")
+        if not success and hasattr(self.station_widget, "set_jig_controls_enabled"):
+            self.station_widget.set_jig_controls_enabled(True)
 
         self.refresh_station_state()
         return bool(success)
+
+    def _handle_jig_start_finished(self, station_id, success, message):
+        if station_id != self.station_id:
+            return
+        if not self.auto_part_change_in_progress and not self._manual_jig_in_progress:
+            return
+        if not success:
+            self._manual_jig_in_progress = False
+            if self.auto_part_change_in_progress:
+                self.disable_auto_part_change(
+                    "AUTOMAATTI POIS: JIG-KÄYNNISTYS EPÄONNISTUI",
+                    show_message=False,
+                )
+            if hasattr(self.station_widget, "set_jig_controls_enabled"):
+                self.station_widget.set_jig_controls_enabled(True)
+            # RUNNING ei vahvistunut: lähetä STOP ennen seuraavaa komentoa.
+            self.hardware_service.request_jig_stop(self.station_id)
+            self.update_status(message, "ERROR")
+        else:
+            self.update_status(message, "INFO")
+        self.refresh_station_state()
+
+    def _handle_jig_stop_finished(self, station_id, success, message):
+        if station_id != self.station_id:
+            return
+        if not success:
+            self.update_status(message, "ERROR")
 
     def start_jig_part_clamp_sequence(self):
         if self.auto_cycle_phase == AUTO_PHASE_WAIT_MISSING_PART_CLAMP:
@@ -520,7 +560,9 @@ class StationController(QObject):
         self.auto_cycle_phase = AUTO_PHASE_REMOVE
         self.update_status("AUTOMAATTI: KAPPALEEN POISTO", "INFO")
 
-        success, message = self.hardware_service.start_jig_part_remove_sequence()
+        success, message = self.hardware_service.request_jig_start(
+            self.station_id, "start_jig_part_remove_sequence"
+        )
 
         if success:
             self.update_status(message, "INFO")
@@ -574,7 +616,9 @@ class StationController(QObject):
             self.station_widget.set_jig_controls_enabled(False)
 
         self.update_status("KAPPALE KIINNI -SEKVENSSI KÄYNNISSÄ", "INFO")
-        success, message = self.hardware_service.start_jig_part_clamp_sequence()
+        success, message = self.hardware_service.request_jig_start(
+                self.station_id, "start_jig_part_clamp_sequence"
+            )
 
         if success:
             self.update_status(message, "INFO")
@@ -603,7 +647,9 @@ class StationController(QObject):
             self.station_widget.set_jig_controls_enabled(False)
 
         self.update_status("KAPPALEEN POISTO -SEKVENSSI KÄYNNISSÄ", "INFO")
-        success, message = self.hardware_service.start_jig_part_remove_sequence()
+        success, message = self.hardware_service.request_jig_start(
+            self.station_id, "start_jig_part_remove_sequence"
+        )
 
         if success:
             self.update_status(message, "INFO")
@@ -628,18 +674,29 @@ class StationController(QObject):
         return False
 
     def poll_auto_part_change_state(self):
+        if not self.auto_part_change_in_progress and not self._manual_jig_in_progress:
+            return
+        if self.hardware_service:
+            self.hardware_service.request_jig_state(self.station_id)
+
+    def _handle_jig_state_ready(self, station_id, state):
+        if station_id != self.station_id or not state:
+            return
+
+        if self._manual_jig_in_progress:
+            status = state.get("status")
+            if status in (JIG_SEQUENCE_STATUS_DONE, JIG_SEQUENCE_STATUS_ERROR):
+                self._manual_jig_in_progress = False
+                if hasattr(self.station_widget, "set_jig_controls_enabled"):
+                    self.station_widget.set_jig_controls_enabled(True)
+                if status == JIG_SEQUENCE_STATUS_ERROR:
+                    self.update_status(
+                        f"JIG-SEKVENSSIN VIRHE {state.get('error')}", "ERROR"
+                    )
+                self.refresh_station_state()
+            return
+
         if not self.auto_part_change_in_progress:
-            return
-
-        if not self.hardware_service:
-            return
-
-        if not hasattr(self.hardware_service, "read_jig_sequence_state"):
-            return
-
-        state = self.hardware_service.read_jig_sequence_state()
-
-        if not state:
             return
 
         status = state.get("status")
@@ -677,7 +734,9 @@ class StationController(QObject):
             self.auto_cycle_phase = AUTO_PHASE_CLAMP
             self.update_status("AUTOMAATTI: KAPPALE KIINNI", "INFO")
 
-            success, message = self.hardware_service.start_jig_part_clamp_sequence()
+            success, message = self.hardware_service.request_jig_start(
+                self.station_id, "start_jig_part_clamp_sequence"
+            )
 
             if success:
                 self.update_status(message, "INFO")
@@ -777,7 +836,9 @@ class StationController(QObject):
         self.update_status("NOK-TULOS - AJETAAN KAPPALE IRTI", "ERROR")
 
         if self.hardware_service and hasattr(self.hardware_service, "start_jig_part_release_sequence"):
-            success, message = self.hardware_service.start_jig_part_release_sequence()
+            success, message = self.hardware_service.request_jig_start(
+                self.station_id, "start_jig_part_release_sequence"
+            )
 
             if success:
                 self.update_status(message, "INFO")
@@ -962,10 +1023,9 @@ class StationController(QObject):
                 show_message=True,
             )
 
-        if was_auto_running and self.hardware_service:
-            # Optan pysäytys välttämätön myös silloin, kun ForTest-testi
-            # on jo päättynyt mutta jig-sekvenssi on edelleen käynnissä.
-            self.hardware_service.stop_jig_sequence()
+        if (was_auto_running or self._manual_jig_in_progress) and self.hardware_service:
+            self.hardware_service.request_jig_stop(self.station_id)
+            self._manual_jig_in_progress = False
 
         self.is_running = False
         self.results_started = False
