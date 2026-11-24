@@ -62,6 +62,9 @@ class StationController(QObject):
         self.selected_program = None
         self.program_number = 0
         self.program_written_to_fortest = False
+        self._pending_program_number = None
+        self._start_request_pending = False
+        self._start_generation = 0
 
         self.is_running = False
         self.results_started = False
@@ -134,6 +137,14 @@ class StationController(QObject):
         if not program_data:
             return
 
+        if self.is_running or self._start_request_pending:
+            self.update_status("OHJELMAA EI VOI VAIHTAA TESTIN AIKANA", "ERROR")
+            return
+
+        if self._pending_program_number is not None:
+            self.update_status("ODOTA EDELLISEN OHJELMANVAIHDON KUITTAUSTA", "WARNING")
+            return
+
         program_id = program_data.get("id", 0)
         program_number = int(program_id) if program_id else 0
 
@@ -171,7 +182,8 @@ class StationController(QObject):
                 self.refresh_station_state()
                 return
 
-            self.program_written_to_fortest = True
+            # Vasta työskentelysäikeen ForTest-kuittaus vahvistaa ohjelman.
+            self._pending_program_number = program_number
         else:
             self.program_written_to_fortest = True
 
@@ -207,8 +219,51 @@ class StationController(QObject):
             decay_text=decay_text,
         )
 
-        self.update_status("OHJELMA VALITTU", "SUCCESS")
+        if self._pending_program_number is not None:
+            self.update_status("ODOTETAAN FORTEST-OHJELMANVAIHDON KUITTAUSTA", "INFO")
+        else:
+            self.update_status("OHJELMA VALITTU", "SUCCESS")
+
         self.update_jig_controls_visibility()
+        self.refresh_station_state()
+
+    def handle_program_write_ack(self, success, error_msg=""):
+        """ForTestManagerin operaation 5 kuittaus."""
+        if self._pending_program_number is None:
+            return
+
+        pending = self._pending_program_number
+        self._pending_program_number = None
+
+        if success and self.program_number == pending:
+            self.program_written_to_fortest = True
+            self.update_status("FORTEST-OHJELMA KUITATTU", "SUCCESS")
+        else:
+            self.program_written_to_fortest = False
+            self.selected_program = None
+            self.program_number = 0
+            self.update_status(
+                error_msg or "FORTEST-OHJELMANVAIHTO EPÄONNISTUI",
+                "ERROR",
+            )
+
+        self.refresh_station_state()
+
+    def handle_start_ack(self, success, error_msg=""):
+        """Hyväksy testi käynnissä olevaksi vain ForTestin kuittauksesta."""
+        if not self._start_request_pending:
+            return
+
+        self._start_request_pending = False
+
+        if success:
+            self.is_running = True
+            self.update_status("FORTEST START KUITATTU", "SUCCESS")
+        else:
+            self.is_running = False
+            self.open_test_valve()
+            self.update_status(error_msg or "FORTEST START EPÄONNISTUI", "ERROR")
+
         self.refresh_station_state()
 
     def has_selected_program(self):
@@ -222,7 +277,7 @@ class StationController(QObject):
         if not self.has_selected_program():
             return False
 
-        if self.is_running:
+        if self.is_running or self._start_request_pending:
             return False
 
         if self.auto_part_change_in_progress:
@@ -772,7 +827,7 @@ class StationController(QObject):
         return success
 
     def start_test(self):
-        if self.is_running:
+        if self.is_running or self._start_request_pending:
             return
 
         if self.auto_part_change_in_progress:
@@ -815,39 +870,67 @@ class StationController(QObject):
             return
 
         self.register_test_activity()
-        QTimer.singleShot(200, self._continue_start_test)
+        self._start_request_pending = True
+        self._start_generation += 1
+        generation = self._start_generation
+        QTimer.singleShot(
+            200,
+            lambda gen=generation: self._continue_start_test(gen),
+        )
+        self.refresh_station_state()
 
-    def _continue_start_test(self):
+    def _continue_start_test(self, generation):
+        if generation != self._start_generation or not self._start_request_pending:
+            return
+
+        if not self.dev_mode_fortest and not self.fortest_service.is_connected(self.station_id):
+            self.handle_start_ack(False, "FORTEST-YHTEYS KATKESI ENNEN STARTIA")
+            return
+
         self.results_started = False
         self.test_has_reached_active_status = False
         self.waiting_result_from_finished_test = False
-        self.is_running = True
 
-        self.update_status("TESTI KÄYNNISTETTY", "INFO")
+        if self.dev_mode_fortest:
+            self.handle_start_ack(True)
+            return
 
-        if not self.dev_mode_fortest:
-            self.fortest_service.start_test(self.station_id)
+        if not self.fortest_service.start_test(self.station_id):
+            self.handle_start_ack(False, "FORTEST START -KOMENTOA EI VOITU JONOTTAA")
+            return
 
+        self.update_status("ODOTETAAN FORTEST START -KUITTAUSTA", "INFO")
         self.refresh_station_state()
 
     def stop_test(self):
-        if not self.is_running:
-            self.release_test_pressure_after_stop()
-            self.refresh_station_state()
-            return
+        # Invalidoi myös jo ajastettu 200 ms START.
+        was_starting = self._start_request_pending
+        was_running = self.is_running
+        was_auto_running = self.auto_part_change_in_progress
+        self._start_generation += 1
+        self._start_request_pending = False
 
-        self.disable_auto_part_change("STOP PAINETTU - AUTOMAATTI POIS", show_message=True)
+        if self.auto_part_change_enabled or was_auto_running:
+            self.disable_auto_part_change(
+                "STOP PAINETTU - AUTOMAATTI POIS",
+                show_message=True,
+            )
+
+        if was_auto_running and self.hardware_service:
+            # Optan pysäytys välttämätön myös silloin, kun ForTest-testi
+            # on jo päättynyt mutta jig-sekvenssi on edelleen käynnissä.
+            self.hardware_service.stop_jig_sequence()
 
         self.is_running = False
         self.results_started = False
         self.test_has_reached_active_status = False
         self.waiting_result_from_finished_test = False
-        self.update_status("TESTI PYSÄYTETTY", "INFO")
 
-        if not self.dev_mode_fortest:
+        if not self.dev_mode_fortest and (was_running or was_starting):
             self.fortest_service.abort_test(self.station_id)
 
         self.release_test_pressure_after_stop()
+        self.update_status("TESTI / AUTOMAATTI PYSÄYTETTY", "INFO")
         self.refresh_station_state()
 
     def finish_test(self, status_message=None, level="INFO"):
@@ -953,7 +1036,7 @@ class StationController(QObject):
         ready = self.check_ready_to_start()
 
         self.station_widget.update_running_state(
-            is_running=self.is_running,
+            is_running=self.is_running or self._start_request_pending,
             ready=ready,
         )
 
