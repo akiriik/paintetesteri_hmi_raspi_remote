@@ -103,8 +103,8 @@ class ModbusWorker(QObject):
     @pyqtSlot()
     def read_emergency_stop_status_async(self):
         """Lue hätäseis vain Modbus-workerissä, ei Qt:n pääsäikeessä."""
-        if not self.modbus or not self.modbus.connected:
-            self.resultReady.emit(None, 4, "Opta Modbus ei yhteydessä")
+        if not self.modbus:
+            self.resultReady.emit(None, 4, "Opta Modbus-handler puuttuu")
             return
 
         try:
@@ -183,6 +183,7 @@ class ModbusManager(QObject):
         self.modbus_handler = ModbusHandler(
             port=self.port,
             baudrate=self.baudrate,
+            auto_reconnect=True,
         )
 
         self.thread = QThread()
@@ -252,11 +253,8 @@ class ModbusManager(QObject):
 
     def request_emergency_stop_status(self):
         """Tilaa hätäseisluenta taustasäikeestä; enintään yksi pyyntö jonossa."""
-        if not self.modbus_handler.connected:
-            self._last_emergency_status = None
-            self.emergencyStatusReady.emit(None)
-            return False
-
+        # Workerin ModbusHandler saa yrittää reconnectia myös silloin,
+        # kun connected=False. Muutoin Opta ei palautu koskaan.
         if self._emergency_read_pending:
             return False
 
