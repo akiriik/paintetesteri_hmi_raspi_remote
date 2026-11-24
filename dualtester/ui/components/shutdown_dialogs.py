@@ -1,9 +1,9 @@
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QProcess
 from PyQt5.QtGui import QFont
 import os
 import sys
-import subprocess
+import time
 
 
 class ConfirmShutdownDialog(QDialog):
@@ -247,9 +247,18 @@ class ShutdownController:
     @staticmethod
     def shutdown_system(parent):
         main_window = ShutdownController._get_main_window(parent)
-        ShutdownController._write_shutdown_register(main_window)
+        if not ShutdownController._write_shutdown_register(main_window):
+            ShutdownController._notify_shutdown_error(
+                main_window, "Optan sammutuspyyntöä ei voitu jonottaa"
+            )
+            return False
 
-        QTimer.singleShot(2000, ShutdownController._shutdown_raspberry)
+        QTimer.singleShot(
+            2000,
+            lambda window=main_window:
+                ShutdownController._shutdown_raspberry(window),
+        )
+        return True
 
     @staticmethod
     def _get_main_window(parent):
@@ -264,21 +273,54 @@ class ShutdownController:
     @staticmethod
     def _write_shutdown_register(main_window):
         if not main_window or not hasattr(main_window, "hardware_service"):
-            return
+            return False
 
-        main_window.hardware_service.request_system_shutdown()
+        return bool(main_window.hardware_service.request_system_shutdown())
 
     @staticmethod
-    def _shutdown_raspberry():
-        # Ei odoteta sudo/shutdown-komennon valmistumista Qt:n pääsäikeessä.
-        # -n estää mahdollista salasanakyselyä jumittamasta kosketusnäyttöä.
-        try:
-            subprocess.Popen(
-                ["sudo", "-n", "shutdown", "-h", "now"],
-                stdin=subprocess.DEVNULL,
-            )
-        except Exception as e:
-            print(f"Raspberryn sammutuskomento epäonnistui: {e}")
+    def _notify_shutdown_error(main_window, message):
+        print(f"VAKAVA: Raspberryn sammutus epäonnistui: {message}")
+        if not main_window:
+            return
+
+        idle = getattr(main_window, "idle_shutdown_controller", None)
+        if idle:
+            idle.shutdown_started = False
+            idle.next_shutdown_retry_at = time.monotonic() + 60.0
+
+        station = getattr(main_window, "station_controllers", {}).get(1)
+        if station:
+            station.update_status(f"SAMMUTUSVIRHE: {message}", "ERROR")
+
+    @staticmethod
+    def _shutdown_raspberry(main_window):
+        """Käynnistä sudo -n QProcessilla, älä blokkaa Qt-eventloopia."""
+        if not main_window:
+            return
+
+        process = QProcess(main_window)
+        main_window._shutdown_process = process
+        process.setProcessChannelMode(QProcess.MergedChannels)
+
+        def finished(exit_code, exit_status):
+            if exit_code != 0 or exit_status != QProcess.NormalExit:
+                detail = bytes(process.readAllStandardOutput()).decode(
+                    "utf-8", errors="replace"
+                ).strip()
+                ShutdownController._notify_shutdown_error(
+                    main_window,
+                    detail or f"sudo shutdown palautti virheen {exit_code}",
+                )
+
+        def process_error(error):
+            if error == QProcess.FailedToStart:
+                ShutdownController._notify_shutdown_error(
+                    main_window, "sudo-prosessia ei voitu käynnistää"
+                )
+
+        process.finished.connect(finished)
+        process.errorOccurred.connect(process_error)
+        process.start("sudo", ["-n", "shutdown", "-h", "now"])
 
     @staticmethod
     def restart_application(parent):
