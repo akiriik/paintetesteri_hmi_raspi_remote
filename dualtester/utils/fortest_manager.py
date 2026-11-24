@@ -1,4 +1,5 @@
 # utils/fortest_manager.py
+from collections import deque
 from PyQt5.QtCore import (
     QObject,
     QThread,
@@ -170,7 +171,7 @@ class ForTestManager(QObject):
         self.worker = ForTestWorker(port, baudrate)
 
         self._busy = False
-        self._pending_control = None
+        self._pending_controls = deque()
         self._connected = False
         self._last_connection_error = ""
 
@@ -199,15 +200,10 @@ class ForTestManager(QObject):
     def handle_result(self, result, op_code, error_msg):
         self._busy = False
 
-        # Käyttäjän START/STOP/ohjelmanvaihto saa etusijan ennen kuin
-        # statusvastauksen käsittely ehtii pyytää uusia pollausoperaatioita.
+        # Käsittele kuittaus ensin. Erityisesti ohjelmanvaihdon kuittaus
+        # ratkaisee, saako seuraava START lähteä ForTestille.
+        self.resultReady.emit(result, op_code, error_msg)
         self._dispatch_pending_control()
-
-        self.resultReady.emit(
-            result,
-            op_code,
-            error_msg,
-        )
 
     def _invoke_worker(self, method_name, program_number=None):
         if self._busy:
@@ -238,46 +234,37 @@ class ForTestManager(QObject):
             return False
 
     def _queue_control(self, method_name, program_number=None):
-        if not self._busy:
-            return self._invoke_worker(
-                method_name,
-                program_number,
-            )
-
-        # Pollauksia ei jonoteta. Käyttäjän ohjauskomennosta säilytetään
-        # vain viimeisin. STOP saa aina korvata aiemman odottavan komennon.
+        """Säilytä ohjauskäskyt järjestyksessä; STOP syrjäyttää jonon."""
         if method_name == "abort_test":
-            self._pending_control = (
-                method_name,
-                program_number,
-            )
+            # STOP ei saa jäädä odottavan STARTin/ohjelmanvaihdon taakse.
+            # Jo suorituksessa olevaa sarjaliikennettä ei voi keskeyttää.
+            self._pending_controls.clear()
+            if not self._busy:
+                return self._invoke_worker("abort_test")
+            self._pending_controls.append(("abort_test", None))
             return True
 
-        if (
-            self._pending_control is None
-            or self._pending_control[0] != "abort_test"
-        ):
-            self._pending_control = (
-                method_name,
-                program_number,
-            )
+        if any(method == "abort_test" for method, _ in self._pending_controls):
+            return False
 
+        if not self._busy and not self._pending_controls:
+            return self._invoke_worker(method_name, program_number)
+
+        # Hallitusti rajattu jono: ei hiljaista komentojen korvaamista.
+        if len(self._pending_controls) >= 4:
+            print(f"ForTest {self.port}: ohjausjono täynnä ({method_name})")
+            return False
+
+        self._pending_controls.append((method_name, program_number))
         return True
 
     def _dispatch_pending_control(self):
-        if self._busy:
+        if self._busy or not self._pending_controls:
             return
 
-        if not self._pending_control:
-            return
-
-        method_name, program_number = self._pending_control
-        self._pending_control = None
-
-        self._invoke_worker(
-            method_name,
-            program_number,
-        )
+        method_name, program_number = self._pending_controls.popleft()
+        if not self._invoke_worker(method_name, program_number):
+            print(f"ForTest {self.port}: odottavan komennon lähetys epäonnistui")
 
     def is_connected(self):
         return bool(self._connected)
@@ -299,30 +286,26 @@ class ForTestManager(QObject):
 
     def read_status(self):
         # Statuspollaus jätetään väliin, jos mikä tahansa operaatio on kesken.
-        if self._busy or self._pending_control:
+        if self._busy or self._pending_controls:
             return False
 
         return self._invoke_worker("read_status")
 
     def read_results(self):
         # Tulospyyntöä ei jonoteta vanhojen pyyntöjen perään.
-        if self._busy or self._pending_control:
+        if self._busy or self._pending_controls:
             return False
 
         return self._invoke_worker("read_results")
 
     def cleanup(self):
-        self._pending_control = None
-
+        self._pending_controls.clear()
         if self.thread.isRunning():
+            # Älä blokkaa käyttöliittymää ikuisesti, jos sarjaportti on jumissa.
             try:
-                QMetaObject.invokeMethod(
-                    self.worker,
-                    "cleanup",
-                    Qt.BlockingQueuedConnection,
-                )
+                QMetaObject.invokeMethod(self.worker, "cleanup", Qt.QueuedConnection)
             except Exception:
                 pass
-
             self.thread.quit()
-            self.thread.wait()
+            if not self.thread.wait(2000):
+                print(f"ForTest {self.port}: worker ei sulkeutunut 2 sekunnissa")
