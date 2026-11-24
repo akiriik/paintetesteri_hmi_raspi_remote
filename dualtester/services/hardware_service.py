@@ -355,8 +355,20 @@ class HardwareService(QObject):
             print(f"Optan jig-tehtävän jonotusvirhe: {exc}")
             return False
 
+    def is_jig_busy(self):
+        """Varattu jigi estää molempien asemien uuden paineistuksen."""
+        return self._jig_owner_station is not None
+
     def request_jig_start(self, station_id, hardware_method_name):
         """Jigin voi varata vain yksi asema kerrallaan."""
+        stations = getattr(self.parent_window, "station_controllers", {}) or {}
+        for other_id, station in stations.items():
+            if (
+                station.is_running
+                or getattr(station, "_start_request_pending", False)
+                or getattr(station, "waiting_result_from_finished_test", False)
+            ):
+                return False, f"JIGI ESTETTY: TESTI KÄYNNISSÄ ASEMALLA {other_id}"
         if hardware_method_name not in {
             "start_jig_part_clamp_sequence",
             "start_jig_part_release_sequence",
