@@ -57,6 +57,7 @@ class HardwareService(QObject):
     """
 
     emergencyStatusReady = pyqtSignal(object)
+    writeAcknowledged = pyqtSignal(int, int, bool, str)
 
     def __init__(
         self,
@@ -120,6 +121,9 @@ class HardwareService(QObject):
 
             self.opta_modbus_manager.emergencyStatusReady.connect(
                 self.emergencyStatusReady.emit
+            )
+            self.opta_modbus_manager.writeAcknowledged.connect(
+                self.writeAcknowledged.emit
             )
 
         except Exception as e:
@@ -253,15 +257,21 @@ class HardwareService(QObject):
     # ------------------------------------------------------------
 
     def write_register(self, address, value):
+        """Jonota Opta-kirjoitus; paluuarvo ei tarkoita laitteen kuittausta."""
         if self.dev_mode_modbus:
+            QTimer.singleShot(
+                0,
+                lambda: self.writeAcknowledged.emit(
+                    int(address), int(value), True, ""
+                ),
+            )
             return True
 
-        opta_modbus_manager = self._get_opta_modbus_manager_or_none()
+        manager = self._get_opta_modbus_manager_or_none()
+        if not manager:
+            return False
 
-        if not opta_modbus_manager:
-            return None
-
-        return opta_modbus_manager.write_register(address, value)
+        return bool(manager.write_register(address, value))
 
     def read_registers_direct(self, address, count=1):
         """
