@@ -52,9 +52,8 @@ class EmergencyStopController:
         )
 
     def check_emergency_stop(self):
-        if not self.hardware_service.is_modbus_connected():
-            return
-
+        # Pyyntö toimitetaan workerille myös yhteyden ollessa poikki;
+        # samalla se käynnistää Optan reconnect-yritykset.
         try:
             self.hardware_service.request_emergency_stop_status()
         except Exception as e:
