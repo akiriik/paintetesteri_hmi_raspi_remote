@@ -2,7 +2,7 @@
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from PyQt5.QtCore import QObject, QTimer, pyqtSignal
+from PyQt5.QtCore import QObject, QTimer, pyqtSignal, Qt
 
 from config.modbus_config import (
     SHUTDOWN_REQUEST_REGISTER,
@@ -110,7 +110,11 @@ class HardwareService(QObject):
         self._jig_operation_pending = False
         self._jig_state_pending = False
         self._jig_stop_pending = False
-        self._jigJobComplete.connect(self._handle_jig_job_complete)
+        # Aina queued: myös välittömästi valmistuvan futuren kuittaus
+        # käsitellään vasta, kun pyynnön lähettäjä on asettanut oman tilansa.
+        self._jigJobComplete.connect(
+            self._handle_jig_job_complete, Qt.QueuedConnection
+        )
 
         self._init_opta_modbus()
         self._init_raspberry_gpio_outputs()
