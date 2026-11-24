@@ -138,6 +138,11 @@ void startJigSequence(uint16_t command) {
     return;
   }
 
+  if (!getD1608EExpansion()) {
+    abortJigSequence(JIG_SEQUENCE_ERROR_EXPANSION_MISSING);
+    return;
+  }
+
   jigSequenceCommand = command;
   jigSequenceRunning = true;
 
@@ -349,6 +354,11 @@ void updatePartRemoveSequence() {
 
 void updateJigSequenceManager() {
   if (!jigSequenceRunning) {
+    return;
+  }
+
+  if (!getD1608EExpansion()) {
+    abortJigSequence(JIG_SEQUENCE_ERROR_EXPANSION_MISSING);
     return;
   }
 
