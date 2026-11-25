@@ -9,6 +9,7 @@ from config.modbus_config import (
 
 
 PRESSURE_RELEASE_HOLD_MS = 10000
+JAKOTUKKI_PRESSURE_RELEASE_HOLD_MS = 5000
 
 
 class TestValveController(QObject):
@@ -51,6 +52,14 @@ class TestValveController(QObject):
         self.desired_closed_by_station = {1: None, 2: None}
         self.pending_closed_by_station = {1: None, 2: None}
         self.release_completed_by_station = {1: False, 2: False}
+        self.automatic_release_hold_ms_by_station = {
+            1: PRESSURE_RELEASE_HOLD_MS,
+            2: PRESSURE_RELEASE_HOLD_MS,
+        }
+        self.active_release_hold_ms_by_station = {
+            1: PRESSURE_RELEASE_HOLD_MS,
+            2: PRESSURE_RELEASE_HOLD_MS,
+        }
         self._write_sequence_by_station = {1: 0, 2: 0}
         if self.hardware_service:
             self.hardware_service.writeAcknowledged.connect(
@@ -99,6 +108,20 @@ class TestValveController(QObject):
 
     def reset_release_for_new_test(self, station_id):
         self.release_completed_by_station[station_id] = False
+
+    def configure_automatic_release_hold(self, station_id, hold_ms):
+        """Aseta vain valmiiksi päättyvän testin purkuaika.
+
+        Manuaalinen STOP käyttää edelleen 10 sekunnin purkua.
+        """
+        if station_id not in self.TEST_VALVE_REGISTER_BY_STATION:
+            raise ValueError(f"Tuntematon ForTest-asema: {station_id}")
+        if hold_ms not in (
+            PRESSURE_RELEASE_HOLD_MS,
+            JAKOTUKKI_PRESSURE_RELEASE_HOLD_MS,
+        ):
+            raise ValueError(f"Virheellinen purkuaika: {hold_ms}")
+        self.automatic_release_hold_ms_by_station[station_id] = hold_ms
 
     def _write_closed_state(self, station_id, closed):
         register = self._get_register(station_id)
@@ -204,7 +227,7 @@ class TestValveController(QObject):
     def _start_pressure_release_hold(self, station_id):
         timer = self._get_pressure_release_timer(station_id)
         if timer and not timer.isActive():
-            timer.start(PRESSURE_RELEASE_HOLD_MS)
+            timer.start(self.active_release_hold_ms_by_station[station_id])
 
     def _close_after_pressure_release(self, station_id):
         self.pressure_release_active_by_station[station_id] = False
@@ -228,6 +251,8 @@ class TestValveController(QObject):
 
     def release_pressure_after_stop(self, station_id):
         self._cancel_pressure_release_timer(station_id)
+        # STOP-painikkeen paineenpurkua ei lyhennetä.
+        self.active_release_hold_ms_by_station[station_id] = PRESSURE_RELEASE_HOLD_MS
         self.release_completed_by_station[station_id] = False
         self.pressure_release_active_by_station[station_id] = True
 
@@ -269,6 +294,11 @@ class TestValveController(QObject):
             # suorassa 1->0 tai 2->0 siirtymässä, koska ForTestin lyhyt
             # PURKU=3 voi jäädä yhden sekunnin statuskyselyjen väliin.
             if previous_status in (1, 2, 3):
+                # ABB JAKOTUKKI 5 s, muut testiohjelmat 10 s.
+                # ForTestin PURKU/VALMIS-siirtymä on edelleen edellytys.
+                self.active_release_hold_ms_by_station[station_id] = (
+                    self.automatic_release_hold_ms_by_station[station_id]
+                )
                 self.release_completed_by_station[station_id] = False
                 self.pressure_release_active_by_station[station_id] = True
                 success, message = self._open_for_pressure_release(station_id)
