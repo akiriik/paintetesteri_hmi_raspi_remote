@@ -1415,7 +1415,10 @@ class StationController(QObject):
         self.test_has_reached_active_status = False
         self.waiting_result_from_finished_test = False
 
-        if not self.dev_mode_fortest and (was_running or was_starting):
+        if not self.dev_mode_fortest and (
+            was_running or was_starting
+            or self.status_handler.last_status in (1, 2, 3)
+        ):
             self.fortest_service.abort_test(self.station_id)
 
         self.release_test_pressure_after_stop()
