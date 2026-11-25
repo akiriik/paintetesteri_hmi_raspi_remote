@@ -3,6 +3,7 @@
 import time
 
 from PyQt5.QtCore import QObject, QTimer
+from utils.runtime_diagnostics import record_event
 
 from config.gpio_config import (
     STATION_BUTTON_MAP,
@@ -81,6 +82,12 @@ class PhysicalButtonController(QObject):
         if not station:
             print(f"Fyysinen nappi: asemaa {station_id} ei löydy")
             return
+
+        record_event(
+            "physical_button_pressed", station=station_id,
+            program=getattr(station, "program_number", None),
+            phase=getattr(station, "auto_cycle_phase", None),
+        )
 
         if hasattr(station, "handle_physical_button_press"):
             handled = station.handle_physical_button_press()
