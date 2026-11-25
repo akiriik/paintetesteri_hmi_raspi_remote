@@ -1,4 +1,5 @@
 # controllers/station_status_handler.py
+from utils.runtime_diagnostics import record_event
 
 
 class StationStatusHandler:
@@ -31,6 +32,17 @@ class StationStatusHandler:
             return
 
         status_value = result.registers[1]
+
+        if status_value != self.last_status:
+            record_event(
+                "fortest_status_changed",
+                station=controller.station_id,
+                program=controller.program_number,
+                previous_status=self.last_status,
+                status=status_value,
+                running=controller.is_running,
+                waiting_result=controller.waiting_result_from_finished_test,
+            )
 
         controller.update_test_valve_from_fortest_status(status_value)
 
