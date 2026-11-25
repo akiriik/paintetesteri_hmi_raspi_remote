@@ -1,4 +1,6 @@
 # controllers/station_controller.py
+import time
+
 from PyQt5.QtCore import QObject, QTimer
 
 from controllers.station_result_handler import StationResultHandler
@@ -22,6 +24,10 @@ JAKOTUKKI_PROGRAM_BY_STATION = {
 FORTEST_RESULT_OK = 1
 
 AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS = 10000
+# Sulkukuit­taus voi saapua vasta 10 sekunnin purkuajan jälkeen.
+# Odota valmistumista rajatusti sen sijaan, että poistaisit automaatin heti.
+AUTO_PRESSURE_RELEASE_CONFIRM_GRACE_MS = 12000
+AUTO_PRESSURE_RELEASE_RECHECK_MS = 250
 AUTO_RESTART_AFTER_CLAMP_DELAY_MS = 3000
 MANUAL_JIG_BUTTON_RELEASE_DELAY_MS = 1000
 
@@ -67,6 +73,7 @@ class StationController(QObject):
         self._start_generation = 0
         self._auto_cycle_generation = 0
         self._auto_restart_generation = 0
+        self._auto_pressure_release_deadline = None
 
         self.is_running = False
         self.results_started = False
@@ -518,6 +525,7 @@ class StationController(QObject):
 
     def disable_auto_part_change(self, message=None, show_message=True):
         self._auto_cycle_generation += 1
+        self._auto_pressure_release_deadline = None
         self._auto_restart_generation += 1
         jig_was_running = (
             self.auto_part_change_in_progress
@@ -573,6 +581,13 @@ class StationController(QObject):
         self.auto_part_change_in_progress = True
         self.auto_cycle_phase = AUTO_PHASE_WAIT_BEFORE_REMOVE
         self.auto_restart_after_manual_clamp = True
+        self._auto_pressure_release_deadline = (
+            time.monotonic()
+            + (
+                AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS
+                + AUTO_PRESSURE_RELEASE_CONFIRM_GRACE_MS
+            ) / 1000.0
+        )
 
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(False)
@@ -584,6 +599,29 @@ class StationController(QObject):
             AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS,
             lambda gen=generation: self._start_auto_remove_after_delay(gen),
         )
+
+    def _auto_pressure_release_ready_or_wait(self, generation, retry_method):
+        """Odota purun ajastusta JA venttiilin sulkukuittausta rajatusti.
+
+        Tämä ei mittaa kappaleen painetta: Modbus-kuittaus ei ole
+        fyysisen paineettomuuden tai venttiilin asennon vahvistus.
+        """
+        if self.test_valve_controller.is_pressure_release_complete(self.station_id):
+            self._auto_pressure_release_deadline = None
+            return True
+
+        deadline = self._auto_pressure_release_deadline
+        if deadline is None or time.monotonic() >= deadline:
+            self.disable_auto_part_change(
+                "AUTOMAATTI POIS: PAINEENPURUN / VENTTIILIKUITTAUKSEN AIKAKATKAISU"
+            )
+            return False
+
+        QTimer.singleShot(
+            AUTO_PRESSURE_RELEASE_RECHECK_MS,
+            lambda gen=generation: retry_method(gen),
+        )
+        return False
 
     def _start_auto_remove_after_delay(self, generation):
         if generation != self._auto_cycle_generation:
@@ -606,10 +644,9 @@ class StationController(QObject):
             self.disable_auto_part_change("AUTOMAATTI POIS: OPTA-OHJAUS PUUTTUU")
             return
 
-        if not self.test_valve_controller.is_pressure_release_complete(self.station_id):
-            self.disable_auto_part_change(
-                "AUTOMAATTI POIS: PAINEENPURUN AJASTUS / VENTTIILIKUITTAUS PUUTTUU"
-            )
+        if not self._auto_pressure_release_ready_or_wait(
+            generation, self._start_auto_remove_after_delay
+        ):
             return
 
         self.auto_cycle_phase = AUTO_PHASE_REMOVE
@@ -885,6 +922,13 @@ class StationController(QObject):
         self.auto_part_change_in_progress = True
         self.auto_cycle_phase = AUTO_PHASE_WAIT_BEFORE_RELEASE
         self.auto_restart_after_manual_clamp = True
+        self._auto_pressure_release_deadline = (
+            time.monotonic()
+            + (
+                AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS
+                + AUTO_PRESSURE_RELEASE_CONFIRM_GRACE_MS
+            ) / 1000.0
+        )
 
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(False)
@@ -911,10 +955,9 @@ class StationController(QObject):
             self.disable_auto_part_change("AUTOMAATTI POIS: VÄÄRÄ ASEMA TAI OHJELMA")
             return
 
-        if not self.test_valve_controller.is_pressure_release_complete(self.station_id):
-            self.disable_auto_part_change(
-                "AUTOMAATTI POIS: PAINEENPURUN AJASTUS / VENTTIILIKUITTAUS PUUTTUU"
-            )
+        if not self._auto_pressure_release_ready_or_wait(
+            generation, self._start_auto_release_after_delay
+        ):
             return
 
         self.auto_cycle_phase = AUTO_PHASE_RELEASE
