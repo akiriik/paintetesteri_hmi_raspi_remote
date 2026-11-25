@@ -20,7 +20,14 @@ from PyQt5.QtCore import QObject, QCoreApplication, pyqtSignal
 from controllers.fortest_result_controller import ForTestResultController
 from controllers.modbus_result_controller import ModbusResultController
 from controllers.station_controller import (
-    StationController, AUTO_PHASE_WAIT_BEFORE_RELEASE, AUTO_PHASE_WAIT_BEFORE_REMOVE
+    StationController,
+    AUTO_PHASE_WAIT_BEFORE_RELEASE,
+    AUTO_PHASE_WAIT_BEFORE_REMOVE,
+    AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS,
+)
+from controllers.test_valve_controller import (
+    PRESSURE_RELEASE_HOLD_MS,
+    JAKOTUKKI_PRESSURE_RELEASE_HOLD_MS,
 )
 from controllers.station_result_handler import StationResultHandler
 from controllers.test_valve_controller import TestValveController
@@ -124,6 +131,82 @@ class SafetyRegressionTests(unittest.TestCase):
         self.assertTrue(valve.pressure_release_timers[1].isActive())
         self.assertFalse(valve.is_pressure_release_complete(1))
         valve.pressure_release_timers[1].stop()
+
+    def test_abb_jakotukki_5s_is_restricted_to_its_two_programs(self):
+        self.assertEqual(AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS, 5000)
+        self.assertEqual(JAKOTUKKI_PRESSURE_RELEASE_HOLD_MS, 5000)
+        self.assertEqual(PRESSURE_RELEASE_HOLD_MS, 10000)
+
+        for station_id, jakotukki_id in ((1, 32), (2, 3)):
+            hw = FakeOpta()
+            valve = TestValveController(hw)
+            stub = SimpleNamespace(
+                station_id=station_id,
+                program_number=jakotukki_id,
+                program_written_to_fortest=True,
+                test_valve_controller=valve,
+            )
+            stub.get_jakotukki_program_number = MethodType(
+                StationController.get_jakotukki_program_number, stub
+            )
+            stub.is_jakotukki_station_and_program = MethodType(
+                StationController.is_jakotukki_station_and_program, stub
+            )
+
+            StationController._configure_automatic_purge_hold(stub)
+            self.assertEqual(
+                valve.automatic_release_hold_ms_by_station[station_id], 5000
+            )
+
+            stub.program_number = 99
+            StationController._configure_automatic_purge_hold(stub)
+            self.assertEqual(
+                valve.automatic_release_hold_ms_by_station[station_id], 10000
+            )
+            stub.program_number = jakotukki_id
+            stub.program_written_to_fortest = False
+            StationController._configure_automatic_purge_hold(stub)
+            self.assertEqual(
+                valve.automatic_release_hold_ms_by_station[station_id], 10000
+            )
+
+    def test_abb_jakotukki_auto_purge_timers_run_5_seconds(self):
+        for station_id, register in ((1, 18092), (2, 18093)):
+            hw = FakeOpta()
+            valve = TestValveController(hw)
+            valve.configure_automatic_release_hold(
+                station_id, JAKOTUKKI_PRESSURE_RELEASE_HOLD_MS
+            )
+            valve.update_from_fortest_status(station_id, 1)
+            hw.writeAcknowledged.emit(register, 0, True, "")
+            valve.update_from_fortest_status(station_id, 3)
+            hw.writeAcknowledged.emit(register, 1, True, "")
+            valve.update_from_fortest_status(station_id, 0)
+            timer = valve.pressure_release_timers[station_id]
+            self.assertTrue(timer.isActive())
+            self.assertEqual(
+                valve.active_release_hold_ms_by_station[station_id], 5000
+            )
+            self.assertLessEqual(timer.remainingTime(), 5500)
+            self.assertGreater(timer.remainingTime(), 0)
+            timer.stop()
+
+    def test_stop_purge_remains_10_seconds_on_jakotukki(self):
+        for station_id, register in ((1, 18092), (2, 18093)):
+            hw = FakeOpta()
+            valve = TestValveController(hw)
+            valve.configure_automatic_release_hold(
+                station_id, JAKOTUKKI_PRESSURE_RELEASE_HOLD_MS
+            )
+            valve.release_pressure_after_stop(station_id)
+            hw.writeAcknowledged.emit(register, 1, True, "")
+            timer = valve.pressure_release_timers[station_id]
+            self.assertTrue(timer.isActive())
+            self.assertEqual(
+                valve.active_release_hold_ms_by_station[station_id], 10000
+            )
+            self.assertGreater(timer.remainingTime(), 8500)
+            timer.stop()
 
     def test_valve_failure_does_not_cache_closed(self):
         hw = FakeOpta()
