@@ -362,7 +362,7 @@ class HardwareService(QObject):
             return False
 
     def is_jig_busy(self):
-        """Varattu jigi estää molempien asemien uuden paineistuksen."""
+        """Yhteisen Opta-jigin varaustila; EI estä toisen ForTestin testiä."""
         return self._jig_owner_station is not None
 
     def is_jig_owned_by(self, station_id):
