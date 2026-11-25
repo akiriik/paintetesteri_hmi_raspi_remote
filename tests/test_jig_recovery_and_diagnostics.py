@@ -143,6 +143,36 @@ class JigRecoveryTests(unittest.TestCase):
         PhysicalButtonController.toggle_station(fake_controller, 2)
         self.assertEqual(pressed, ["STOP", "START"])
 
+    def test_tester1_hp_coo_running_does_not_disable_tester2_jig_buttons(self):
+        station, widget, hardware = make_station()
+        tester1 = SimpleNamespace(
+            station_id=1, program_number=1, is_running=True,
+            _start_request_pending=False,
+            waiting_result_from_finished_test=False,
+        )
+        station.main_window.station_controllers = {1: tester1, 2: station}
+        StationController.update_jig_controls_visibility(station)
+        self.assertTrue(widget.jig_enabled)
+        self.assertIsNone(station._manual_jig_block_reason())
+
+    def test_other_jig_owner_does_not_block_hp_coo_start_or_program_change(self):
+        station, widget, hardware = make_station()
+        # Tester 1 käyttää HP-COO:ta, Tester 2 varaa yhteisen jigin.
+        station.station_id = 1
+        station.program_number = 1
+        station.dev_mode_fortest = True
+        station.selected_program = {"id": 1, "name": "HP-COO"}
+        station.program_written_to_fortest = True
+        station.has_selected_program = MethodType(
+            StationController.has_selected_program, station
+        )
+        hardware.is_jig_busy = lambda: True
+        hardware.is_jig_owned_by = lambda sid: sid == 2
+        self.assertTrue(StationController.check_ready_to_start(station))
+        # Oman aseman jigi on edelleen START-este.
+        hardware.is_jig_owned_by = lambda sid: sid == 1
+        self.assertFalse(StationController.check_ready_to_start(station))
+
     def test_manual_buttons_work_in_fail_wait_state_if_safe(self):
         station, widget, _ = make_station("WAIT_FAIL_REMOVE")
         StationController.update_jig_controls_visibility(station)
