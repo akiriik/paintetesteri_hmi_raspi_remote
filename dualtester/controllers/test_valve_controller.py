@@ -1,6 +1,7 @@
 # controllers/test_valve_controller.py
 
 from PyQt5.QtCore import QObject, QTimer, pyqtSignal
+from utils.runtime_diagnostics import record_event
 
 from config.modbus_config import (
     FORTEST1_TEST_VALVE_REGISTER,
@@ -156,9 +157,17 @@ class TestValveController(QObject):
         if not queued:
             self.pending_closed_by_station[station_id] = None
             self.last_closed_state_by_station[station_id] = None
+            record_event(
+                "valve_queue_error", station=station_id,
+                register=register, value=value,
+            )
             self.commandFailed.emit(station_id, error)
             return False, error
 
+        record_event(
+            "valve_write_queued", station=station_id,
+            register=register, value=value,
+        )
         self._write_sequence_by_station[station_id] += 1
         token = self._write_sequence_by_station[station_id]
         QTimer.singleShot(
@@ -176,6 +185,11 @@ class TestValveController(QObject):
 
         self.pending_closed_by_station[station_id] = None
         self.last_closed_state_by_station[station_id] = None
+        record_event(
+            "valve_ack_timeout", station=station_id,
+            register=self._get_register(station_id),
+            value=0 if expected_closed else 1,
+        )
         self.commandFailed.emit(
             station_id,
             "Optan venttiiliohjauksen kuittausta ei saatu 3 sekunnissa",
@@ -191,6 +205,11 @@ class TestValveController(QObject):
                 return  # vanha tai toisen komennon kuittaus
 
             self.pending_closed_by_station[station_id] = None
+            record_event(
+                "valve_write_ack" if success else "valve_write_error",
+                station=station_id, register=address,
+                value=value, success=bool(success),
+            )
             if success:
                 self.last_closed_state_by_station[station_id] = expected
                 if self.desired_closed_by_station[station_id] == expected:
@@ -228,8 +247,13 @@ class TestValveController(QObject):
         timer = self._get_pressure_release_timer(station_id)
         if timer and not timer.isActive():
             timer.start(self.active_release_hold_ms_by_station[station_id])
+            record_event(
+                "pressure_release_timer_started", station=station_id,
+                elapsed_ms=self.active_release_hold_ms_by_station[station_id],
+            )
 
     def _close_after_pressure_release(self, station_id):
+        record_event("pressure_release_timer_elapsed", station=station_id)
         self.pressure_release_active_by_station[station_id] = False
         self.release_completed_by_station[station_id] = True
         self._write_closed_state(station_id, True)
