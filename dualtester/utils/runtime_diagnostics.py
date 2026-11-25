@@ -207,13 +207,20 @@ class RuntimeDiagnostics:
         if not token:
             return False
 
-        # Viimeisimmät tunnit ensin; ei saa blokata UI:ta.
+        # Uusin tunti ensin ja aiemmat lähettämättömät tunnit vähitellen.
+        # Tokenin lisääminen myöhemmin ei hukkaa vanhoja paikallisia lokeja.
         files = sorted(
             self.directory.glob("????????-??.jsonl"),
             key=lambda file: file.name,
             reverse=True,
         )
-        for file_path in files[:12]:
+        recent = files[:2]
+        backlog = [
+            file for file in reversed(files[2:])
+            if self._uploaded_hashes.get(file.name)
+            != hashlib.sha256(file.read_bytes()).hexdigest()
+        ]
+        for file_path in recent + backlog[:10]:
             try:
                 self._upload_file(file_path, token)
             except Exception as exc:
