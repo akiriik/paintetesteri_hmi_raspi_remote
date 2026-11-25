@@ -378,17 +378,20 @@ class HardwareService(QObject):
             )
             return False, message
 
+        # Kukin ForTest-asema on riippumaton toisesta. Vain saman
+        # aseman aktiivinen testi estää sen jigiohjauksen. Toisen
+        # aseman HP-COO tai muun testin on voitava jatkua samaan aikaan.
         stations = getattr(self.parent_window, "station_controllers", {}) or {}
-        for other_id, station in stations.items():
-            if (
-                station.is_running
-                or getattr(station, "_start_request_pending", False)
-                or getattr(station, "waiting_result_from_finished_test", False)
-            ):
-                return deny(
-                    "test_active",
-                    f"JIGI ESTETTY: TESTI KÄYNNISSÄ ASEMALLA {other_id}",
-                )
+        station = stations.get(station_id)
+        if station is not None and (
+            station.is_running
+            or getattr(station, "_start_request_pending", False)
+            or getattr(station, "waiting_result_from_finished_test", False)
+        ):
+            return deny(
+                "own_test_active",
+                f"JIGI ESTETTY: TESTI KÄYNNISSÄ ASEMALLA {station_id}",
+            )
 
         if hardware_method_name not in {
             "start_jig_part_clamp_sequence",
