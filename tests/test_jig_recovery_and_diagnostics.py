@@ -29,6 +29,7 @@ from config.modbus_config import (
     JIG_SEQUENCE_STATUS_ERROR,
 )
 from controllers.station_controller import StationController
+from controllers.physical_button_controller import PhysicalButtonController
 from services.hardware_service import HardwareService
 from utils.runtime_diagnostics import RuntimeDiagnostics
 
@@ -119,6 +120,28 @@ class JigRecoveryTests(unittest.TestCase):
         StationController.update_jig_controls_visibility(station)
         self.assertFalse(widget.jig_enabled)
         self.assertEqual(station._manual_jig_block_reason(), "jig_owner_active")
+
+    def test_pending_result_blocks_start_but_physical_button_calls_stop(self):
+        station, widget, hardware = make_station()
+        station.dev_mode_fortest = True
+        station.waiting_result_from_finished_test = True
+        station.has_selected_program = lambda: True
+        station.check_ready_to_start = MethodType(
+            StationController.check_ready_to_start, station
+        )
+        self.assertFalse(station.check_ready_to_start())
+
+        pressed = []
+        station.handle_physical_button_press = lambda: False
+        station.stop_test = lambda: pressed.append("STOP")
+        station.start_test = lambda: pressed.append("START")
+        fake_controller = SimpleNamespace(station_controllers={2: station})
+        PhysicalButtonController.toggle_station(fake_controller, 2)
+        self.assertEqual(pressed, ["STOP"])
+
+        station.waiting_result_from_finished_test = False
+        PhysicalButtonController.toggle_station(fake_controller, 2)
+        self.assertEqual(pressed, ["STOP", "START"])
 
     def test_manual_buttons_work_in_fail_wait_state_if_safe(self):
         station, widget, _ = make_station("WAIT_FAIL_REMOVE")
