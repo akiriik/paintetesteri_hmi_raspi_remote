@@ -6,9 +6,11 @@ from pathlib import Path
 import sqlite3
 import sys
 import tempfile
+import time
 import unittest
+from unittest.mock import patch
 from collections import deque
-from types import SimpleNamespace
+from types import MethodType, SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dualtester"))
@@ -17,7 +19,9 @@ from PyQt5.QtCore import QObject, QCoreApplication, pyqtSignal
 
 from controllers.fortest_result_controller import ForTestResultController
 from controllers.modbus_result_controller import ModbusResultController
-from controllers.station_controller import StationController
+from controllers.station_controller import (
+    StationController, AUTO_PHASE_WAIT_BEFORE_RELEASE, AUTO_PHASE_WAIT_BEFORE_REMOVE
+)
 from controllers.station_result_handler import StationResultHandler
 from controllers.test_valve_controller import TestValveController
 from services.result_storage_service import ResultStorageService
@@ -224,6 +228,105 @@ class SafetyRegressionTests(unittest.TestCase):
             station, 1, "Opta ei yhteydessä"
         )
         self.assertEqual(displayed, [("Opta ei yhteydessä", "ERROR")])
+
+    def _auto_release_test_station(self, phase):
+        class Valve:
+            ready = False
+            def is_pressure_release_complete(self, station_id):
+                return self.ready
+
+        events = []
+        valve = Valve()
+        hw = SimpleNamespace(
+            start_jig_part_release_sequence=lambda: True,
+            request_jig_start=lambda station_id, method: (
+                events.append(("JIG", station_id, method)) or (True, "JIG-OK")
+            ),
+        )
+        stub = SimpleNamespace(
+            _auto_cycle_generation=7,
+            _auto_pressure_release_deadline=time.monotonic() + 20,
+            auto_part_change_enabled=True,
+            auto_part_change_in_progress=True,
+            auto_cycle_phase=phase,
+            station_id=2,
+            is_jakotukki_station_and_program=lambda: True,
+            test_valve_controller=valve,
+            hardware_service=hw,
+            update_status=lambda *args: events.append(("STATUS", *args)),
+            refresh_station_state=lambda: None,
+            disable_auto_part_change=lambda *args: events.append(("DISABLE", *args)),
+        )
+        stub._auto_pressure_release_ready_or_wait = MethodType(
+            StationController._auto_pressure_release_ready_or_wait, stub
+        )
+        stub._start_auto_release_after_delay = MethodType(
+            StationController._start_auto_release_after_delay, stub
+        )
+        stub._start_auto_remove_after_delay = MethodType(
+            StationController._start_auto_remove_after_delay, stub
+        )
+        return stub, valve, events
+
+    def test_nok_jig_waits_for_purge_close_ack_instead_of_disabling(self):
+        station, valve, events = self._auto_release_test_station(
+            AUTO_PHASE_WAIT_BEFORE_RELEASE
+        )
+        scheduled = []
+        with patch(
+            "controllers.station_controller.QTimer.singleShot",
+            side_effect=lambda ms, fn: scheduled.append((ms, fn))
+        ):
+            station._start_auto_release_after_delay(7)
+            self.assertEqual(len(scheduled), 1)
+            self.assertEqual(scheduled[0][0], 250)
+            self.assertFalse(any(x[0] in ("JIG", "DISABLE") for x in events))
+
+            valve.ready = True  # ajastettu purku JA sulkukuittaus valmistuneet
+            scheduled[0][1]()
+            self.assertIn(
+                ("JIG", 2, "start_jig_part_release_sequence"),
+                events
+            )
+            self.assertFalse(any(x[0] == "DISABLE" for x in events))
+
+    def test_ok_jig_waits_for_purge_close_ack_instead_of_disabling(self):
+        station, valve, events = self._auto_release_test_station(
+            AUTO_PHASE_WAIT_BEFORE_REMOVE
+        )
+        scheduled = []
+        with patch(
+            "controllers.station_controller.QTimer.singleShot",
+            side_effect=lambda ms, fn: scheduled.append((ms, fn))
+        ):
+            station._start_auto_remove_after_delay(7)
+            self.assertEqual(len(scheduled), 1)
+            self.assertFalse(any(x[0] in ("JIG", "DISABLE") for x in events))
+
+            valve.ready = True
+            scheduled[0][1]()
+            self.assertIn(
+                ("JIG", 2, "start_jig_part_remove_sequence"),
+                events
+            )
+
+    def test_nok_purge_confirmation_timeout_disables_jig(self):
+        station, _, events = self._auto_release_test_station(
+            AUTO_PHASE_WAIT_BEFORE_RELEASE
+        )
+        station._auto_pressure_release_deadline = time.monotonic() - 1
+        station._start_auto_release_after_delay(7)
+        self.assertTrue(any(x[0] == "DISABLE" for x in events))
+        self.assertFalse(any(x[0] == "JIG" for x in events))
+
+    def test_stale_nok_retry_after_stop_cannot_start_jig(self):
+        station, valve, events = self._auto_release_test_station(
+            AUTO_PHASE_WAIT_BEFORE_RELEASE
+        )
+        station._auto_cycle_generation = 8
+        valve.ready = True
+        station._start_auto_release_after_delay(7)
+        self.assertFalse(any(x[0] == "JIG" for x in events))
 
     def test_fortest_program_ack_error_is_not_discarded(self):
         calls = []
