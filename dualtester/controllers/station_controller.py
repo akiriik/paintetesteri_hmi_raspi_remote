@@ -5,7 +5,11 @@ from PyQt5.QtCore import QObject, QTimer
 
 from controllers.station_result_handler import StationResultHandler
 from controllers.station_status_handler import StationStatusHandler
-from controllers.test_valve_controller import TestValveController
+from controllers.test_valve_controller import (
+    TestValveController,
+    PRESSURE_RELEASE_HOLD_MS,
+    JAKOTUKKI_PRESSURE_RELEASE_HOLD_MS,
+)
 
 from config.modbus_config import (
     JIG_SEQUENCE_STATUS_IDLE,
@@ -23,7 +27,7 @@ JAKOTUKKI_PROGRAM_BY_STATION = {
 
 FORTEST_RESULT_OK = 1
 
-AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS = 10000
+AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS = 5000
 # Sulkukuit­taus voi saapua vasta 10 sekunnin purkuajan jälkeen.
 # Odota valmistumista rajatusti sen sijaan, että poistaisit automaatin heti.
 AUTO_PRESSURE_RELEASE_CONFIRM_GRACE_MS = 12000
@@ -218,6 +222,7 @@ class StationController(QObject):
 
         self.selected_program = program_data
         self.program_number = program_number
+        self._configure_automatic_purge_hold()
 
         program_name = program_data.get("name", f"Ohjelma {program_id}")
         description = program_data.get("description", "")
@@ -276,6 +281,7 @@ class StationController(QObject):
                 "ERROR",
             )
 
+        self._configure_automatic_purge_hold()
         self.refresh_station_state()
 
     def handle_start_ack(self, success, error_msg=""):
@@ -343,6 +349,18 @@ class StationController(QObject):
         return (
             self.program_number == jakotukki_program_number
             and self.program_written_to_fortest
+        )
+
+    def _configure_automatic_purge_hold(self):
+        # Vain ABB JAKOTUKKI -testien OK/NOK-purku on 5 s.
+        # STOP käyttää TestValveControllerissa aina 10 sekuntia.
+        hold_ms = (
+            JAKOTUKKI_PRESSURE_RELEASE_HOLD_MS
+            if self.is_jakotukki_station_and_program()
+            else PRESSURE_RELEASE_HOLD_MS
+        )
+        self.test_valve_controller.configure_automatic_release_hold(
+            self.station_id, hold_ms
         )
 
     def update_jig_controls_visibility(self):
@@ -592,7 +610,7 @@ class StationController(QObject):
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(False)
 
-        self.update_status("OK - ODOTETAAN 10s ENNEN KAPPALEENVAIHTOA", "INFO")
+        self.update_status("OK - ODOTETAAN 5s ENNEN KAPPALEENVAIHTOA", "INFO")
         self.refresh_station_state()
 
         QTimer.singleShot(
@@ -933,7 +951,7 @@ class StationController(QObject):
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(False)
 
-        self.update_status("NOK - ODOTETAAN 10s ENNEN KAPPALE IRTI -AJOA", "ERROR")
+        self.update_status("NOK - ODOTETAAN 5s ENNEN KAPPALE IRTI -AJOA", "ERROR")
         self.refresh_station_state()
 
         QTimer.singleShot(
