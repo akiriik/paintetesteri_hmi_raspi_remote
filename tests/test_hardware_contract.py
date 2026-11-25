@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from types import SimpleNamespace
 import re
 import sys
 import time
@@ -112,6 +113,65 @@ class HardwareContractTests(unittest.TestCase):
             handler.close()
         finally:
             modbus_handler.ModbusSerialClient = original
+
+    def test_tester2_abb_jig_can_start_while_tester1_hp_coo_runs(self):
+        hw = HardwareService(dev_mode_modbus=True, dev_mode_gpio=True)
+        try:
+            # Yhteisen Optan jigikirjoituksen jonotus simuloidaan,
+            # jotta testi ei tarvitse kytkettyä PLC:tä.
+            hw._submit_jig_job = lambda *args: True
+            hw.parent_window = SimpleNamespace(station_controllers={
+                1: SimpleNamespace(
+                    program_number=1,
+                    is_running=True,
+                    _start_request_pending=False,
+                    waiting_result_from_finished_test=False,
+                ),
+                2: SimpleNamespace(
+                    program_number=3,
+                    is_running=False,
+                    _start_request_pending=False,
+                    waiting_result_from_finished_test=False,
+                ),
+            })
+            ok, reason = hw.request_jig_start(
+                2, "start_jig_part_clamp_sequence"
+            )
+            self.assertTrue(ok, reason)
+            self.assertEqual(hw._jig_owner_station, 2)
+
+            # Varsinainen jigikomento pysyy yksikäsitteisenä:
+            # toisen jigin päällekkäinen komento estetään.
+            other_ok, _ = hw.request_jig_start(
+                1, "start_jig_part_release_sequence"
+            )
+            self.assertFalse(other_ok)
+        finally:
+            hw.cleanup()
+
+    def test_same_station_active_test_still_blocks_its_own_jig(self):
+        hw = HardwareService(dev_mode_modbus=True, dev_mode_gpio=True)
+        try:
+            hw._submit_jig_job = lambda *args: True
+            hw.parent_window = SimpleNamespace(station_controllers={
+                1: SimpleNamespace(
+                    is_running=False,
+                    _start_request_pending=False,
+                    waiting_result_from_finished_test=False,
+                ),
+                2: SimpleNamespace(
+                    is_running=True,
+                    _start_request_pending=False,
+                    waiting_result_from_finished_test=False,
+                ),
+            })
+            ok, _ = hw.request_jig_start(
+                2, "start_jig_part_release_sequence"
+            )
+            self.assertFalse(ok)
+            self.assertIsNone(hw._jig_owner_station)
+        finally:
+            hw.cleanup()
 
     def test_only_one_station_can_own_jig(self):
         hw = HardwareService(
