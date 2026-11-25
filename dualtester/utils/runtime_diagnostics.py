@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import socket
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -85,6 +86,7 @@ class RuntimeDiagnostics:
         self._uploaded_hashes_path = self.directory / "uploaded_hashes.json"
         self._uploaded_hashes = self._load_uploaded_hashes()
         self._thread = None
+        self._last_upload_attempt = 0.0
 
         if start_thread:
             self._thread = threading.Thread(
@@ -225,6 +227,13 @@ class RuntimeDiagnostics:
             self._wake_upload.clear()
             if self._stop.is_set():
                 break
+
+            # Vikatilanteiden jatkuvat tapahtumat eivät saa aiheuttaa
+            # GitHubiin satoja committeja tai tiheää verkko-liikennettä.
+            now = time.monotonic()
+            if now - self._last_upload_attempt < 60.0:
+                continue
+            self._last_upload_attempt = now
             self.upload_once()
 
     def close(self):
