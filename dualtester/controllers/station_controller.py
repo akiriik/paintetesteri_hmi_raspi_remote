@@ -181,7 +181,10 @@ class StationController(QObject):
             self.is_running or self._start_request_pending
             or self.auto_part_change_in_progress or self._manual_jig_in_progress
             or self.waiting_result_from_finished_test
-            or (self.hardware_service and self.hardware_service.is_jig_busy())
+            or (
+                self.hardware_service
+                and self.hardware_service.is_jig_owned_by(self.station_id)
+            )
         ):
             self.update_status("OHJELMAA EI VOI VAIHTAA TESTIN TAI JIGILIIKKEEN AIKANA", "ERROR")
             return
@@ -347,7 +350,10 @@ class StationController(QObject):
         if self.auto_part_change_in_progress:
             return False
 
-        if self.hardware_service and self.hardware_service.is_jig_busy():
+        if (
+            self.hardware_service
+            and self.hardware_service.is_jig_owned_by(self.station_id)
+        ):
             return False
 
         if self.auto_cycle_phase in [
@@ -423,17 +429,6 @@ class StationController(QObject):
         if self.hardware_service.is_jig_busy():
             return "jig_owner_active"
 
-        for other_id, other in getattr(
-            self.main_window, "station_controllers", {}
-        ).items():
-            if other_id == self.station_id:
-                continue
-            if (
-                other.is_running
-                or other._start_request_pending
-                or other.waiting_result_from_finished_test
-            ):
-                return "other_test_active"
         return None
 
     def update_jig_controls_visibility(self):
@@ -1228,8 +1223,11 @@ class StationController(QObject):
             self.refresh_station_state()
             return
 
-        if self.hardware_service and self.hardware_service.is_jig_busy():
-            self.update_status("ODOTA: JIGI LIIKKUU / ODOTTAA KUITTAUSTA", "WARNING")
+        if (
+            self.hardware_service
+            and self.hardware_service.is_jig_owned_by(self.station_id)
+        ):
+            self.update_status("ODOTA: OMAN ASEMAN JIGI LIIKKUU", "WARNING")
             self.refresh_station_state()
             return
 
