@@ -509,18 +509,25 @@ class StationController(QObject):
     def _handle_jig_start_finished(self, station_id, success, message):
         if station_id != self.station_id:
             return
+
+        self._trace(
+            "jig_start_ack" if success else "jig_start_error",
+            success=bool(success),
+        )
+
         if not self.auto_part_change_in_progress and not self._manual_jig_in_progress:
             return
+
         if not success:
-            self._manual_jig_in_progress = False
+            # Kun sekvenssin käynnistys epäonnistui, tila ja releet
+            # voivat olla epävarmat. STOP-kuittaus vaaditaan ennen
+            # seuraavaa käsikäyttöä.
+            self._manual_jig_stop_requested = True
             if self.auto_part_change_in_progress:
                 self.disable_auto_part_change(
                     "AUTOMAATTI POIS: JIG-KÄYNNISTYS EPÄONNISTUI",
                     show_message=False,
                 )
-            if hasattr(self.station_widget, "set_jig_controls_enabled"):
-                self.station_widget.set_jig_controls_enabled(True)
-            # RUNNING ei vahvistunut: lähetä STOP ennen seuraavaa komentoa.
             self.hardware_service.request_jig_stop(self.station_id)
             self.update_status(message, "ERROR")
         else:
@@ -530,8 +537,23 @@ class StationController(QObject):
     def _handle_jig_stop_finished(self, station_id, success, message):
         if station_id != self.station_id:
             return
-        if not success:
-            self.update_status(message, "ERROR")
+
+        self._trace(
+            "jig_stop_ack" if success else "jig_stop_error",
+            success=bool(success),
+        )
+        if success:
+            self._manual_jig_in_progress = False
+            self._manual_jig_started_at = None
+            self._manual_jig_stop_requested = False
+        else:
+            # Jigin varaus pysyy lukittuna. STOP-painike mahdollistaa
+            # uuden hallitun pysäytysyrityksen.
+            self.update_status(
+                "JIGIÄ EI VOITU PYSÄYTTÄÄ - TARKISTA OPTA JA PAINA STOP",
+                "ERROR",
+            )
+        self.refresh_station_state()
 
     def start_jig_part_clamp_sequence(self):
         if self.auto_cycle_phase == AUTO_PHASE_WAIT_MISSING_PART_CLAMP:
@@ -839,6 +861,25 @@ class StationController(QObject):
     def poll_auto_part_change_state(self):
         if not self.auto_part_change_in_progress and not self._manual_jig_in_progress:
             return
+
+        if (
+            self._manual_jig_in_progress
+            and self._manual_jig_started_at is not None
+            and not self._manual_jig_stop_requested
+            and time.monotonic() - self._manual_jig_started_at >= MANUAL_JIG_MAX_WAIT_S
+        ):
+            self._manual_jig_stop_requested = True
+            self._trace(
+                "jig_manual_timeout", reason="missing_done_error",
+                elapsed_ms=int(
+                    (time.monotonic() - self._manual_jig_started_at) * 1000
+                ),
+            )
+            self.update_status(
+                "JIGIN TILAKUITTAUS PUUTTUU - PYSÄYTETÄÄN JIGI", "ERROR"
+            )
+            self.hardware_service.request_jig_stop(self.station_id)
+
         if self.hardware_service:
             self.hardware_service.request_jig_state(self.station_id)
 
@@ -848,14 +889,24 @@ class StationController(QObject):
 
         if self._manual_jig_in_progress:
             status = state.get("status")
-            if status in (JIG_SEQUENCE_STATUS_DONE, JIG_SEQUENCE_STATUS_ERROR):
+            if status == JIG_SEQUENCE_STATUS_DONE:
                 self._manual_jig_in_progress = False
-                if hasattr(self.station_widget, "set_jig_controls_enabled"):
-                    self.station_widget.set_jig_controls_enabled(True)
-                if status == JIG_SEQUENCE_STATUS_ERROR:
-                    self.update_status(
-                        f"JIG-SEKVENSSIN VIRHE {state.get('error')}", "ERROR"
+                self._manual_jig_started_at = None
+                self._manual_jig_stop_requested = False
+                self._trace("jig_manual_done", jig_status=status)
+                self.refresh_station_state()
+            elif status == JIG_SEQUENCE_STATUS_ERROR:
+                if not self._manual_jig_stop_requested:
+                    self._manual_jig_stop_requested = True
+                    self._trace(
+                        "jig_manual_error",
+                        jig_status=status, jig_error=state.get("error"),
                     )
+                    self.update_status(
+                        f"JIG-SEKVENSSIN VIRHE {state.get('error')} - PYSÄYTETÄÄN",
+                        "ERROR",
+                    )
+                    self.hardware_service.request_jig_stop(self.station_id)
                 self.refresh_station_state()
             return
 
@@ -872,6 +923,13 @@ class StationController(QObject):
             return
 
         if status == JIG_SEQUENCE_STATUS_ERROR:
+            # ERROR ei saa vapauttaa jigivarausta ilman Optan STOPia.
+            # Myös PART_MISSING -polussa kuittaus varmistetaan.
+            self._trace(
+                "jig_auto_error", jig_status=status, jig_error=error,
+            )
+            self.hardware_service.request_jig_stop(self.station_id)
+
             if error == JIG_SEQUENCE_ERROR_PART_MISSING:
                 self.enter_missing_part_wait_state(auto_restart_after_clamp=True)
                 return
@@ -1269,9 +1327,19 @@ class StationController(QObject):
                 show_message=True,
             )
 
-        if (was_auto_running or self._manual_jig_in_progress) and self.hardware_service:
-            self.hardware_service.request_jig_stop(self.station_id)
-            self._manual_jig_in_progress = False
+        jig_stop_result = None
+        if self.hardware_service and (
+            was_auto_running
+            or self._manual_jig_in_progress
+            or self.hardware_service.is_jig_owned_by(self.station_id)
+        ):
+            jig_stop_result = self.hardware_service.request_jig_stop(self.station_id)
+            self._manual_jig_stop_requested = True
+            self._trace(
+                "jig_stop_requested", reason="operator_stop",
+                success=bool(jig_stop_result[0]),
+            )
+            # Älä vapauta käsikäytön lippua ennen STOP-kuittausta.
 
         self.is_running = False
         self.results_started = False
@@ -1282,7 +1350,12 @@ class StationController(QObject):
             self.fortest_service.abort_test(self.station_id)
 
         self.release_test_pressure_after_stop()
-        self.update_status("TESTI / AUTOMAATTI PYSÄYTETTY", "INFO")
+        if jig_stop_result is not None and not jig_stop_result[0]:
+            self.update_status(
+                "JIGIN PYSÄYTYS EPÄONNISTUI - TARKISTA OPTA", "ERROR"
+            )
+        else:
+            self.update_status("TESTI / AUTOMAATTI PYSÄYTETTY", "INFO")
         self.refresh_station_state()
 
     def finish_test(self, status_message=None, level="INFO"):
@@ -1392,6 +1465,10 @@ class StationController(QObject):
                 self.is_running or self._start_request_pending
                 or self._manual_jig_in_progress
                 or self.auto_part_change_in_progress
+                or (
+                    self.hardware_service is not None
+                    and self.hardware_service.is_jig_owned_by(self.station_id)
+                )
             ),
             ready=ready,
         )
