@@ -1264,8 +1264,8 @@ class StationController(QObject):
 
         record_event(
             "valve_control_error", station=station_id,
-            program=self.program_number,
-            phase=self.auto_cycle_phase,
+            program=getattr(self, "program_number", None),
+            phase=getattr(self, "auto_cycle_phase", None),
             pending_start=self._start_request_pending,
         )
         if self._start_request_pending:
