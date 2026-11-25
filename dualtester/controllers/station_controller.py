@@ -337,7 +337,10 @@ class StationController(QObject):
             self.is_running or self._start_request_pending
             or self._manual_jig_in_progress
             or self.waiting_result_from_finished_test
-            or self.status_handler.last_status != 0
+            or (
+                not self.dev_mode_fortest
+                and self.status_handler.last_status != 0
+            )
         ):
             return False
 
@@ -1195,7 +1198,7 @@ class StationController(QObject):
             self.refresh_station_state()
             return
 
-        if self.status_handler.last_status != 0:
+        if not self.dev_mode_fortest and self.status_handler.last_status != 0:
             record_event(
                 "start_denied", station=self.station_id,
                 reason="fortest_not_ready",
