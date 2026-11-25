@@ -240,13 +240,23 @@ class ModbusManager(QObject):
             return False
 
         try:
-            return bool(QMetaObject.invokeMethod(
+            queued = QMetaObject.invokeMethod(
                 self.worker,
                 "write_register",
                 Qt.QueuedConnection,
                 Q_ARG(int, int(address)),
                 Q_ARG(int, int(value)),
-            ))
+            )
+            # PyQt5:n invokeMethod palauttaa void-slotille None, vaikka
+            # QueuedConnection olisi hyväksytty ja worker suorittaisi sen.
+            # bool(None) oli False ja aiheutti väärän venttiilivirheen
+            # molemmille asemille. Vain nimenomainen False tai poikkeus
+            # merkitsee epäonnistunutta jonotusta.
+            if queued is False:
+                print(f"Opta: Qt hylkäsi rekisterin {address} jonotuksen")
+                return False
+
+            return True
         except Exception as e:
             print(f"Opta Modbus kirjoituksen jonotusvirhe: {e}")
             return False
