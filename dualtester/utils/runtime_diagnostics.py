@@ -241,7 +241,15 @@ class RuntimeDiagnostics:
             if now - self._last_upload_attempt < 60.0:
                 continue
             self._last_upload_attempt = now
-            self.upload_once()
+            try:
+                self.upload_once()
+            except Exception as exc:
+                # Levyn, verkon tai API:n poikkeus ei saa tappaa uploaderia
+                # eikä vaikuttaa varsinaiseen painetesteriin.
+                print(
+                    "Diagnostiikan taustasiirto epäonnistui: "
+                    f"{type(exc).__name__}"
+                )
 
     def close(self):
         self._stop.set()
