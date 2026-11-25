@@ -23,6 +23,7 @@ from config.modbus_config import (
     JIG_SEQUENCE_ERROR_NONE,
 )
 
+from utils.runtime_diagnostics import record_event
 from utils.modbus_manager import ModbusManager
 from utils.gpio_handler import GPIOHandler
 from utils.gpio_input_handler import GPIOInputHandler
@@ -110,6 +111,7 @@ class HardwareService(QObject):
         self._jig_operation_pending = False
         self._jig_state_pending = False
         self._jig_stop_pending = False
+        self._jig_last_logged_state = {}
         # Aina queued: myös välittömästi valmistuvan futuren kuittaus
         # käsitellään vasta, kun pyynnön lähettäjä on asettanut oman tilansa.
         self._jigJobComplete.connect(
@@ -363,8 +365,19 @@ class HardwareService(QObject):
         """Varattu jigi estää molempien asemien uuden paineistuksen."""
         return self._jig_owner_station is not None
 
+    def is_jig_owned_by(self, station_id):
+        return self._jig_owner_station == station_id
+
     def request_jig_start(self, station_id, hardware_method_name):
-        """Jigin voi varata vain yksi asema kerrallaan."""
+        """Jigin varaus ja testitilojen tarkistus ennen worker-komentoa."""
+        def deny(reason, message):
+            record_event(
+                "jig_command_denied", station=station_id,
+                action=hardware_method_name, reason=reason,
+                owner=self._jig_owner_station,
+            )
+            return False, message
+
         stations = getattr(self.parent_window, "station_controllers", {}) or {}
         for other_id, station in stations.items():
             if (
@@ -372,31 +385,46 @@ class HardwareService(QObject):
                 or getattr(station, "_start_request_pending", False)
                 or getattr(station, "waiting_result_from_finished_test", False)
             ):
-                return False, f"JIGI ESTETTY: TESTI KÄYNNISSÄ ASEMALLA {other_id}"
+                return deny(
+                    "test_active",
+                    f"JIGI ESTETTY: TESTI KÄYNNISSÄ ASEMALLA {other_id}",
+                )
+
         if hardware_method_name not in {
             "start_jig_part_clamp_sequence",
             "start_jig_part_release_sequence",
             "start_jig_part_remove_sequence",
         }:
-            return False, "Tuntematon jig-sekvenssi"
+            return deny("invalid_command", "Tuntematon jig-sekvenssi")
 
         if (
             self._jig_owner_station is not None
             and self._jig_owner_station != station_id
         ):
-            return False, f"Jigi on käytössä asemalla {self._jig_owner_station}"
+            return deny(
+                "other_owner",
+                f"Jigi on käytössä asemalla {self._jig_owner_station}",
+            )
 
-        if self._jig_operation_pending or self._jig_stop_pending:
-            return False, "Edellinen jig-komento on vielä käsittelyssä"
+        if self._jig_operation_pending or self._jig_stop_pending or self._jig_state_pending:
+            return deny("pending_jig_operation", "Edellinen jig-komento on vielä käsittelyssä")
 
+        previous_owner = self._jig_owner_station
         self._jig_owner_station = station_id
         self._jig_operation_pending = True
 
         method = getattr(self, hardware_method_name)
         if not self._submit_jig_job("start", station_id, method):
             self._jig_operation_pending = False
-            return False, "Optan jig-komennon jonotus epäonnistui"
+            # Kun tehtävää ei lainkaan saatu jonoon, uutta varausta ei
+            # saa jättää pysyvästi päälle.
+            self._jig_owner_station = previous_owner
+            return deny("queue_rejected", "Optan jig-komennon jonotus epäonnistui")
 
+        record_event(
+            "jig_command_queued", station=station_id,
+            action=hardware_method_name, owner=self._jig_owner_station,
+        )
         return True, "JIG-KOMENTO LÄHETETTY - ODOTETAAN RUNNING-KUITTAUSTA"
 
     def request_jig_state(self, station_id):
@@ -432,17 +460,25 @@ class HardwareService(QObject):
 
     def request_jig_stop(self, station_id):
         if self._jig_owner_station not in (None, station_id):
+            record_event(
+                "jig_stop_denied", station=station_id,
+                reason="other_owner", owner=self._jig_owner_station,
+            )
             return False, "Toinen asema varaa jigin"
         if self._jig_stop_pending:
             return True, "JIG STOP JO JONOSSA"
 
+        previous_owner = self._jig_owner_station
         self._jig_stop_pending = True
         self._jig_owner_station = station_id
+        record_event("jig_stop_requested", station=station_id)
 
         if not self._submit_jig_job(
             "stop", station_id, self._stop_jig_confirmed
         ):
             self._jig_stop_pending = False
+            self._jig_owner_station = previous_owner
+            record_event("jig_stop_error", station=station_id, reason="queue_rejected")
             return False, "JIG STOP EI MENNYT JONOON"
 
         return True, "JIG STOP JONOSSA"
@@ -451,26 +487,43 @@ class HardwareService(QObject):
         if kind == "start":
             self._jig_operation_pending = False
             success, message = result
+            record_event(
+                "jig_start_ack" if success else "jig_start_error",
+                station=station_id, success=bool(success),
+                owner=self._jig_owner_station,
+            )
             self.jigStartFinished.emit(station_id, bool(success), message)
             if not success:
-                # Vikatilassa omistajuutta ei vapauteta ilman pysäytyskuittausta.
+                # Epävarmassa tilanteessa varausta ei vapauteta ennen
+                # Optan STOP-tilakuittausta.
                 print(f"Opta jig-asema {station_id}: {message}")
             return
 
         if kind == "state":
             self._jig_state_pending = False
-            self.jigStateReady.emit(station_id, result)
-            if (
-                result
-                and result.get("status") in (
-                    JIG_SEQUENCE_STATUS_DONE,
-                    JIG_SEQUENCE_STATUS_ERROR,
+            current_status = result.get("status") if result else None
+            current_error = result.get("error") if result else None
+            state_pair = (current_status, current_error)
+            if self._jig_last_logged_state.get(station_id) != state_pair:
+                self._jig_last_logged_state[station_id] = state_pair
+                record_event(
+                    "jig_state_changed" if result else "jig_state_error",
+                    station=station_id, jig_status=current_status,
+                    jig_error=current_error, owner=self._jig_owner_station,
                 )
+
+            # Vapauta varaus VALMIS-kuitatusta sekvenssistä ennen kuin
+            # aseman callback päivittää painikkeiden tilan.
+            # ERROR ei yksin takaa turvallista lopputilaa -> vaadi STOP.
+            if (
+                current_status == JIG_SEQUENCE_STATUS_DONE
                 and self._jig_owner_station == station_id
                 and not self._jig_operation_pending
                 and not self._jig_stop_pending
             ):
                 self._jig_owner_station = None
+
+            self.jigStateReady.emit(station_id, result)
             return
 
         if kind == "stop":
@@ -478,6 +531,11 @@ class HardwareService(QObject):
             success, message = result
             if success and self._jig_owner_station == station_id:
                 self._jig_owner_station = None
+            record_event(
+                "jig_stop_ack" if success else "jig_stop_error",
+                station=station_id, success=bool(success),
+                owner=self._jig_owner_station,
+            )
             self.jigStopFinished.emit(station_id, bool(success), message)
 
     # ------------------------------------------------------------
