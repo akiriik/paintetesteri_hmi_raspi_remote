@@ -180,6 +180,8 @@ class StationController(QObject):
         if (
             self.is_running or self._start_request_pending
             or self.auto_part_change_in_progress or self._manual_jig_in_progress
+            or self.waiting_result_from_finished_test
+            or (self.hardware_service and self.hardware_service.is_jig_busy())
         ):
             self.update_status("OHJELMAA EI VOI VAIHTAA TESTIN TAI JIGILIIKKEEN AIKANA", "ERROR")
             return
@@ -331,7 +333,12 @@ class StationController(QObject):
         if not self.has_selected_program():
             return False
 
-        if self.is_running or self._start_request_pending or self._manual_jig_in_progress:
+        if (
+            self.is_running or self._start_request_pending
+            or self._manual_jig_in_progress
+            or self.waiting_result_from_finished_test
+            or self.status_handler.last_status != 0
+        ):
             return False
 
         if self.auto_part_change_in_progress:
@@ -1182,6 +1189,22 @@ class StationController(QObject):
             )
             return
 
+        if self.waiting_result_from_finished_test:
+            record_event("start_denied", station=self.station_id, reason="result_pending")
+            self.update_status("ODOTA TESTITULOSTA TAI PAINA STOP", "WARNING")
+            self.refresh_station_state()
+            return
+
+        if self.status_handler.last_status != 0:
+            record_event(
+                "start_denied", station=self.station_id,
+                reason="fortest_not_ready",
+                status=self.status_handler.last_status,
+            )
+            self.update_status("FORTEST EI OLE VALMIS - PAINA TARVITTAESSA STOP", "ERROR")
+            self.refresh_station_state()
+            return
+
         if self.auto_part_change_in_progress:
             self.update_status("ODOTA: AUTOMAATTINEN JIG-SEKVENSSI KESKEN", "WARNING")
             self.refresh_station_state()
@@ -1517,6 +1540,8 @@ class StationController(QObject):
         self.station_widget.update_running_state(
             is_running=(
                 self.is_running or self._start_request_pending
+                or self.waiting_result_from_finished_test
+                or self.status_handler.last_status in (1, 2, 3)
                 or self._manual_jig_in_progress
                 or self.auto_part_change_in_progress
                 or (
