@@ -2,6 +2,7 @@
 import time
 
 from PyQt5.QtCore import QObject, QTimer
+from utils.runtime_diagnostics import record_event
 
 from controllers.station_result_handler import StationResultHandler
 from controllers.station_status_handler import StationStatusHandler
@@ -28,6 +29,7 @@ JAKOTUKKI_PROGRAM_BY_STATION = {
 FORTEST_RESULT_OK = 1
 
 AUTO_POST_TEST_PRESSURE_RELEASE_DELAY_MS = 5000
+MANUAL_JIG_MAX_WAIT_S = 22.0
 # Sulkukuit­taus voi saapua vasta 10 sekunnin purkuajan jälkeen.
 # Odota valmistumista rajatusti sen sijaan, että poistaisit automaatin heti.
 AUTO_PRESSURE_RELEASE_CONFIRM_GRACE_MS = 12000
@@ -92,6 +94,9 @@ class StationController(QObject):
         self.auto_cycle_phase = AUTO_PHASE_IDLE
         self.auto_restart_after_manual_clamp = False
         self._manual_jig_in_progress = False
+        self._manual_jig_started_at = None
+        self._manual_jig_stop_requested = False
+        self._last_manual_block_reason = None
 
         self.hardware_service.jigStartFinished.connect(
             self._handle_jig_start_finished
@@ -363,6 +368,50 @@ class StationController(QObject):
             self.station_id, hold_ms
         )
 
+    def _trace(self, event, **values):
+        record_event(
+            event, station=self.station_id, program=self.program_number,
+            phase=self.auto_cycle_phase, **values,
+        )
+
+    def _manual_jig_block_reason(self):
+        """Yksi yhteinen estologiikka käyttöliittymälle ja painalluksille."""
+        if not self.is_jakotukki_station_and_program():
+            return "wrong_program"
+        if not self.hardware_service:
+            return "opta_missing"
+        if self.is_running:
+            return "test_running"
+        if self._start_request_pending:
+            return "start_pending"
+        if self.waiting_result_from_finished_test:
+            return "result_pending"
+        if self.auto_part_change_in_progress:
+            return "auto_jig_active"
+        if self._manual_jig_in_progress:
+            return "manual_jig_active"
+        if self.test_valve_controller.pressure_release_active_by_station.get(
+            self.station_id, False
+        ):
+            return "pressure_release_active"
+        if self.status_handler.last_status != 0:
+            return "fortest_not_ready"
+        if self.hardware_service.is_jig_busy():
+            return "jig_owner_active"
+
+        for other_id, other in getattr(
+            self.main_window, "station_controllers", {}
+        ).items():
+            if other_id == self.station_id:
+                continue
+            if (
+                other.is_running
+                or other._start_request_pending
+                or other.waiting_result_from_finished_test
+            ):
+                return "other_test_active"
+        return None
+
     def update_jig_controls_visibility(self):
         visible = self.is_jakotukki_station_and_program()
 
@@ -372,8 +421,20 @@ class StationController(QObject):
         if hasattr(self.station_widget, "set_auto_part_change_visible"):
             self.station_widget.set_auto_part_change_visible(visible)
 
-        if visible and hasattr(self.station_widget, "set_jig_controls_enabled"):
-            self.station_widget.set_jig_controls_enabled(not self.auto_part_change_in_progress)
+        reason = self._manual_jig_block_reason() if visible else "wrong_program"
+        if reason != self._last_manual_block_reason:
+            self._last_manual_block_reason = reason
+            self._trace(
+                "jig_manual_ready" if reason is None else "jig_manual_blocked",
+                reason=reason,
+                jig_status=self.status_handler.last_status,
+                owner=getattr(self.hardware_service, "_jig_owner_station", None),
+                manual_busy=self._manual_jig_in_progress,
+                auto_busy=self.auto_part_change_in_progress,
+            )
+
+        if hasattr(self.station_widget, "set_jig_controls_enabled"):
+            self.station_widget.set_jig_controls_enabled(visible and reason is None)
 
         if not visible:
             self.auto_part_change_enabled = False
@@ -386,11 +447,8 @@ class StationController(QObject):
                 self.station_widget.set_auto_part_change_enabled_state(False)
 
     def _release_manual_jig_buttons(self):
-        if self.auto_part_change_in_progress:
-            return
-
-        if hasattr(self.station_widget, "set_jig_controls_enabled"):
-            self.station_widget.set_jig_controls_enabled(True)
+        # Älä ohita aktiivisen sekvenssin tai Optan varauksen lukituksia.
+        self.refresh_station_state()
 
     def _start_jig_sequence(self, hardware_method_name, sequence_name, keep_buttons_disabled=False):
         if not self.is_jakotukki_station_and_program():
@@ -413,29 +471,17 @@ class StationController(QObject):
             self.update_status("JIG-SEKVENSSIN OHJAUS PUUTTUU HARDWARE SERVICESTÄ", "ERROR")
             return False
 
-        if (
-            self.is_running
-            or self._start_request_pending
-            or self.auto_part_change_in_progress
-            or self._manual_jig_in_progress
-            or self.waiting_result_from_finished_test
-            or self.test_valve_controller.pressure_release_active_by_station.get(
-                self.station_id, False
+        block_reason = self._manual_jig_block_reason()
+        if block_reason is not None:
+            self._trace(
+                "jig_manual_denied",
+                action=hardware_method_name, reason=block_reason,
+                jig_status=self.status_handler.last_status,
             )
-            or self.status_handler.last_status != 0
-        ):
-            self.update_status("JIGIÄ EI SAA OHJATA TESTIN / PURUN AIKANA", "ERROR")
+            self.update_status(
+                f"KÄSIKÄYTTÖ ESTETTY: {block_reason}", "ERROR"
+            )
             return False
-
-        for other_id, other in self.main_window.station_controllers.items():
-            if other_id == self.station_id:
-                continue
-            if (
-                other.is_running or other._start_request_pending
-                or other.waiting_result_from_finished_test
-            ):
-                self.update_status("TOINEN TESTERI ON KÄYNNISSÄ", "ERROR")
-                return False
 
         if hasattr(self.station_widget, "set_jig_controls_enabled"):
             self.station_widget.set_jig_controls_enabled(False)
@@ -445,6 +491,13 @@ class StationController(QObject):
             self.station_id, hardware_method_name
         )
         self._manual_jig_in_progress = bool(success)
+        self._manual_jig_started_at = time.monotonic() if success else None
+        self._manual_jig_stop_requested = False
+        self._trace(
+            "jig_manual_queued" if success else "jig_manual_denied",
+            action=hardware_method_name,
+            reason=None if success else "hardware_rejected",
+        )
 
         self.update_status(message, "INFO" if success else "ERROR")
         if not success and hasattr(self.station_widget, "set_jig_controls_enabled"):
