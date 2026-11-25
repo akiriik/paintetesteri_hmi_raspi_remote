@@ -91,6 +91,10 @@ class PhysicalButtonController(QObject):
             station.is_running or getattr(station, "_start_request_pending", False)
             or getattr(station, "_manual_jig_in_progress", False)
             or getattr(station, "auto_part_change_in_progress", False)
+            or (
+                station.hardware_service is not None
+                and station.hardware_service.is_jig_owned_by(station_id)
+            )
         ):
             station.stop_test()
         else:
