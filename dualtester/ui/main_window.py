@@ -54,8 +54,14 @@ class MainWindow(QWidget):
 
         # Loki käynnistyy ENNEN laitteiden ja asemien alustusta.
         # Synkronointi tapahtuu omassa taustasäikeessään.
-        self.runtime_diagnostics = configure_runtime_diagnostics()
-        record_event("application_started")
+        try:
+            self.runtime_diagnostics = configure_runtime_diagnostics()
+            record_event("application_started")
+        except Exception as e:
+            # Täysi levy / puuttuvat oikeudet eivät saa estää
+            # painetesterin käynnistymistä.
+            self.runtime_diagnostics = None
+            print(f"Diagnostiikkaloki ei käynnistynyt: {e}")
         self.setup_window()
         self.create_managers()
         self.create_screens()
