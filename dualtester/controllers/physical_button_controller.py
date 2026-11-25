@@ -89,6 +89,11 @@ class PhysicalButtonController(QObject):
 
         if (
             station.is_running or getattr(station, "_start_request_pending", False)
+            or getattr(station, "waiting_result_from_finished_test", False)
+            or (
+                not station.dev_mode_fortest
+                and station.status_handler.last_status in (1, 2, 3)
+            )
             or getattr(station, "_manual_jig_in_progress", False)
             or getattr(station, "auto_part_change_in_progress", False)
             or (
