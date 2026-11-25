@@ -75,9 +75,10 @@ class RuntimeDiagnostics:
         self.directory.mkdir(parents=True, exist_ok=True)
         self.token_file = Path(token_file or DEFAULT_TOKEN_FILE)
         self.upload_interval = upload_interval
-        self.device = re.sub(
-            r"[^a-zA-Z0-9_-]", "_", socket.gethostname()
-        )[:40] or "raspi"
+        # Julkisessa repossa ei julkaista koneen nimeä.
+        self.device = "unit-" + hashlib.sha256(
+            socket.gethostname().encode("utf-8")
+        ).hexdigest()[:12]
         self._write_lock = threading.RLock()
         self._stop = threading.Event()
         self._wake_upload = threading.Event()
