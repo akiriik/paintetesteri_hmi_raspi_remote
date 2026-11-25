@@ -10,6 +10,11 @@ from ui.components.environment_status_bar import EnvironmentStatusBar
 
 from utils.program_manager import ProgramManager
 from utils.ui_freeze_watchdog import UiFreezeWatchdog
+from utils.runtime_diagnostics import (
+    configure_runtime_diagnostics,
+    record_event,
+    close_runtime_diagnostics,
+)
 
 from services.hardware_service import HardwareService
 from services.fortest_service import ForTestService
@@ -47,6 +52,10 @@ class MainWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        # Loki käynnistyy ENNEN laitteiden ja asemien alustusta.
+        # Synkronointi tapahtuu omassa taustasäikeessään.
+        self.runtime_diagnostics = configure_runtime_diagnostics()
+        record_event("application_started")
         self.setup_window()
         self.create_managers()
         self.create_screens()
@@ -319,6 +328,7 @@ class MainWindow(QWidget):
         self.showFullScreen()
 
     def closeEvent(self, event):
+        record_event("application_closing")
         if getattr(self, "ui_freeze_watchdog", None):
             self.ui_freeze_watchdog.cleanup()
 
@@ -328,4 +338,5 @@ class MainWindow(QWidget):
         if hasattr(self, "application_cleanup_controller") and self.application_cleanup_controller:
             self.application_cleanup_controller.cleanup()
 
+        close_runtime_diagnostics()
         super().closeEvent(event)
