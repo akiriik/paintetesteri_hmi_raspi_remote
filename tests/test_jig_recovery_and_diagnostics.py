@@ -155,7 +155,7 @@ class JigRecoveryTests(unittest.TestCase):
         self.assertTrue(widget.jig_enabled)
         self.assertIsNone(station._manual_jig_block_reason())
 
-    def test_other_jig_owner_does_not_block_hp_coo_start_or_program_change(self):
+    def test_other_jig_owner_does_not_block_hp_coo_ready_state(self):
         station, widget, hardware = make_station()
         # Tester 1 käyttää HP-COO:ta, Tester 2 varaa yhteisen jigin.
         station.station_id = 1
@@ -172,6 +172,52 @@ class JigRecoveryTests(unittest.TestCase):
         # Oman aseman jigi on edelleen START-este.
         hardware.is_jig_owned_by = lambda sid: sid == 1
         self.assertFalse(StationController.check_ready_to_start(station))
+
+    def test_hp_coo_start_is_actually_queued_while_other_jig_is_busy(self):
+        station, widget, hardware = make_station()
+        station.station_id = 1
+        station.program_number = 1
+        station.dev_mode_fortest = True
+        station.auto_part_change_enabled = False
+        station._start_generation = 0
+        station.has_selected_program = lambda: True
+        hardware.is_jig_busy = lambda: True
+        hardware.is_jig_owned_by = lambda sid: sid == 2
+        hardware.is_modbus_connected = lambda: True
+
+        scheduled = []
+        station.test_valve_controller = SimpleNamespace(
+            reset_release_for_new_test=lambda sid: None,
+            is_closed_confirmed=lambda sid: True,
+        )
+        station.close_test_valve = lambda: True
+        station.register_test_activity = lambda: None
+        station._schedule_start_after_valve = lambda gen: scheduled.append(gen)
+        station._start_valve_ack_timeout = lambda gen: None
+        StationController.start_test(station)
+
+        self.assertTrue(station._start_request_pending)
+        self.assertEqual(scheduled, [1])
+
+    def test_program_change_is_allowed_with_other_station_jig_active(self):
+        station, widget, hardware = make_station()
+        station.station_id = 1
+        station.program_number = 1
+        station.dev_mode_fortest = True
+        station._pending_program_number = None
+        hardware.is_jig_busy = lambda: True
+        hardware.is_jig_owned_by = lambda sid: sid == 2
+        station.disable_auto_part_change = lambda *a, **kw: None
+        station._configure_automatic_purge_hold = lambda: None
+        station.update_jig_controls_visibility = lambda: None
+        station.refresh_station_state = lambda: None
+        widget.update_program_info = lambda **kw: None
+
+        StationController.set_program(station, {
+            "id": 2, "name": "OTHER_HP_COO",
+        })
+        self.assertEqual(station.program_number, 2)
+        self.assertTrue(station.program_written_to_fortest)
 
     def test_manual_buttons_work_in_fail_wait_state_if_safe(self):
         station, widget, _ = make_station("WAIT_FAIL_REMOVE")
