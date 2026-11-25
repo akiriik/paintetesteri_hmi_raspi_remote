@@ -172,6 +172,11 @@ class StationController(QObject):
         if not program_data:
             return
 
+        record_event(
+            "program_select_requested", station=self.station_id,
+            program=program_data.get("id") if isinstance(program_data, dict) else None,
+        )
+
         if (
             self.is_running or self._start_request_pending
             or self.auto_part_change_in_progress or self._manual_jig_in_progress
@@ -286,6 +291,10 @@ class StationController(QObject):
                 "ERROR",
             )
 
+        record_event(
+            "program_select_ack" if success else "program_select_error",
+            station=self.station_id, program=pending, success=bool(success),
+        )
         self._configure_automatic_purge_hold()
         self.refresh_station_state()
 
@@ -295,6 +304,11 @@ class StationController(QObject):
             return
 
         self._start_request_pending = False
+        record_event(
+            "fortest_start_ack" if success else "fortest_start_error",
+            station=self.station_id, program=self.program_number,
+            success=bool(success),
+        )
 
         if success:
             self.is_running = True
@@ -1151,7 +1165,21 @@ class StationController(QObject):
         return success
 
     def start_test(self):
+        record_event(
+            "start_requested",
+            station=self.station_id,
+            program=self.program_number,
+            phase=self.auto_cycle_phase,
+            running=self.is_running,
+            pending_start=self._start_request_pending,
+            manual_busy=self._manual_jig_in_progress,
+            auto_busy=self.auto_part_change_in_progress,
+        )
         if self.is_running or self._start_request_pending or self._manual_jig_in_progress:
+            record_event(
+                "start_denied", station=self.station_id,
+                reason="already_busy",
+            )
             return
 
         if self.auto_part_change_in_progress:
@@ -1234,6 +1262,12 @@ class StationController(QObject):
         if station_id != self.station_id:
             return
 
+        record_event(
+            "valve_control_error", station=station_id,
+            program=self.program_number,
+            phase=self.auto_cycle_phase,
+            pending_start=self._start_request_pending,
+        )
         if self._start_request_pending:
             # START on estettävä aina, jos sulku ei saanut kuittausta.
             self.handle_start_ack(False, error_msg)
@@ -1314,6 +1348,15 @@ class StationController(QObject):
             self.fortest_service.abort_test(self.station_id)
 
     def stop_test(self):
+        record_event(
+            "stop_requested",
+            station=getattr(self, "station_id", None),
+            program=getattr(self, "program_number", None),
+            phase=getattr(self, "auto_cycle_phase", None),
+            running=self.is_running,
+            manual_busy=getattr(self, "_manual_jig_in_progress", False),
+            owner=getattr(self.hardware_service, "_jig_owner_station", None),
+        )
         # Invalidoi myös jo ajastettu 200 ms START.
         was_starting = self._start_request_pending
         was_running = self.is_running
@@ -1411,6 +1454,11 @@ class StationController(QObject):
         if not self.test_has_reached_active_status:
             return
 
+        record_event(
+            "fortest_test_finished",
+            station=self.station_id, program=self.program_number,
+        )
+
         self.is_running = False
         self.results_started = True
         self.waiting_result_from_finished_test = True
@@ -1423,6 +1471,12 @@ class StationController(QObject):
         test_result = self.result_handler.update_test_results(result)
 
         if test_result is not None:
+            record_event(
+                "test_result_accepted",
+                station=self.station_id,
+                program=self.program_number,
+                phase=self.auto_cycle_phase,
+            )
             self.register_test_activity()
             self.waiting_result_from_finished_test = False
             self.results_started = False
